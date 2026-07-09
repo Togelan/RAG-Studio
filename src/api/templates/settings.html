@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}RAG Studio — Settings{% endblock %}
+{% block content %}
+<div class="tab-content active" id="tab-settings">
+  <div class="container fade-in">
+
+    <!-- Two-Column Settings Layout -->
+    <div class="settings-layout" data-testid="settings-layout" id="settings-layout" style="visibility:hidden;">
+      <!-- LEFT COLUMN (40%) -->
+      <div class="settings-left" data-testid="settings-left">
+        <!-- Provider Dropdown -->
+        <div class="settings-card card settings-card-equal-height">
+          <label for="settings-provider" data-i18n="settings_provider_label">Provider</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <select id="settings-provider" class="input-field" data-testid="provider-select" style="flex:1;">
+              <option value="openai" disabled>OpenAI (coming soon)</option>
+              <option value="deepseek" selected>DeepSeek</option>
+              <option value="anthropic" disabled>Anthropic (coming soon)</option>
+              <option value="ollama" disabled data-i18n="settings_provider_local">Local / Ollama (coming soon)</option>
+            </select>
+            <button type="button" class="btn-icon btn-refresh-models" id="btn-refresh-models" data-testid="refresh-models-btn" data-i18n-title="settings_refresh_models" title="Refresh models" aria-label="Refresh model list">🔄</button>
+          </div>
+        </div>
+
+        <!-- API Key Input -->
+        <div class="settings-card card settings-card-equal-height">
+          <label for="settings-api-key" data-i18n="settings_api_key_label">API Key</label>
+          <input type="password" id="settings-api-key" class="input-field" data-testid="api-key-input" placeholder="sk-..." data-i18n-placeholder="settings_api_key_placeholder" autocomplete="off">
+        </div>
+
+        <!-- Max Tokens Dropdown -->
+        <div class="settings-card card settings-card-equal-height">
+          <label for="settings-max-tokens" data-i18n="settings_max_tokens_label">Max Tokens</label>
+          <select id="settings-max-tokens" class="input-field" data-testid="max-tokens-select">
+            <option value="512">512</option>
+            <option value="1024">1024</option>
+            <option value="2048" selected>2048</option>
+            <option value="4096">4096</option>
+            <option value="8192">8192</option>
+            <option value="16384">16384</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN (60%) -->
+      <div class="settings-right" data-testid="settings-right">
+        <!-- Model Selector -->
+        <div class="settings-card card settings-card-equal-height">
+          <label for="settings-model" data-i18n="settings_model_label">Model</label>
+          <select id="settings-model" class="input-field" data-testid="model-select">
+            <option value="" disabled selected data-i18n="settings_loading_models">Loading models...</option>
+          </select>
+        </div>
+
+        <!-- Temperature Slider -->
+        <div class="settings-card card settings-card-equal-height">
+          <label for="settings-temperature" data-i18n="settings_temperature_label">Temperature: <span id="temp-value">1.0</span></label>
+          <input type="range" id="settings-temperature" class="input-field" data-testid="temperature-slider" min="0.0" max="2.0" step="0.01" value="1.0">
+        </div>
+
+        <!-- Retrieval Settings Row (Top-K, Chunk Size, Chunk Overlap) -->
+        <div class="settings-card card retrieval-settings-row settings-card-equal-height" data-testid="retrieval-settings-row">
+          <div class="retrieval-setting-item">
+            <label for="settings-top-k" data-i18n="settings_top_k_label">Top-K</label>
+            <select id="settings-top-k" class="input-field" data-testid="top-k-select">
+              <option value="3">3</option>
+              <option value="5" selected>5</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+            </select>
+          </div>
+          <div class="retrieval-setting-item">
+            <label for="settings-chunk-size" data-i18n="settings_chunk_size_label">Chunk Size</label>
+            <select id="settings-chunk-size" class="input-field" data-testid="chunk-size-select">
+              <option value="256">256</option>
+              <option value="512" selected>512</option>
+              <option value="1024">1024</option>
+            </select>
+          </div>
+          <div class="retrieval-setting-item">
+            <label for="settings-chunk-overlap" data-i18n="settings_chunk_overlap_label">Chunk Overlap</label>
+            <select id="settings-chunk-overlap" class="input-field" data-testid="chunk-overlap-select">
+              <option value="32">32</option>
+              <option value="64" selected>64</option>
+              <option value="128">128</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- System Prompt (full grid width) -->
+      <div class="settings-card card system-prompt-card" data-testid="system-prompt-card" style="grid-column: 1 / -1;">
+        <label for="settings-system-prompt" data-i18n="settings_system_prompt_label">System Prompt</label>
+        <textarea id="settings-system-prompt" class="input-field" data-testid="system-prompt-textarea" rows="4">You are RAG-Studio AI assistant. Answer strictly based on the provided context. If you don't know, say so.</textarea>
+        <button type="button" class="btn-link" id="btn-reset-prompt" data-testid="reset-prompt-btn" data-i18n="settings_reset_prompt">Reset to default</button>
+        <span class="reset-prompt-status" id="reset-prompt-status" data-testid="reset-prompt-status"></span>
+
+        <!-- Re-Ingestion Modal — centered above System Prompt board -->
+        <div class="modal-overlay" id="reingestModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="reingest-modal-title">
+          <div class="modal-card reingest-modal-card" data-testid="reingest-modal">
+            <h3 id="reingest-modal-title" data-i18n="reingest_modal_title">Settings Changed</h3>
+            <p id="reingest-modal-message" data-i18n="reingest_modal_message">Chunk settings have been updated. To apply the new settings, all uploaded documents must be re-ingested. This may take a few moments.</p>
+            <div class="reingest-progress" id="reingest-progress-container" style="display:none;">
+              <div class="progress-bar">
+                <div class="progress-bar-fill" id="reingest-progress-bar" style="width: 0%;"></div>
+              </div>
+              <p class="progress-text" id="reingest-progress-text" data-i18n="reingest_progress">Re-ingesting documents...</p>
+            </div>
+            <div class="modal-actions">
+              <button class="btn-secondary" id="reingest-modal-skip" data-i18n="reingest_skip">Skip</button>
+              <button class="btn-danger" id="reingest-modal-confirm" data-i18n="reingest_confirm">Re-ingest All</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save Settings Button — inside layout, hidden until settings load -->
+      <div class="save-settings-wrapper">
+        <button type="button" class="btn-primary" id="btn-save-settings" data-testid="save-settings-btn" data-i18n="settings_save">Save Settings</button>
+        <span class="settings-save-status" id="settings-save-status" data-testid="save-status"></span>
+      </div>
+    </div>
+
+    <!-- FULL WIDTH: Document Upload Zone -->
+    <div class="settings-card card settings-docs" data-testid="doc-upload-zone">
+      <h3 data-i18n="settings_documents_title">Documents</h3>
+      <div class="upload-dropzone" id="upload-dropzone" data-testid="upload-dropzone">
+        <p data-i18n="settings_drag_drop">Drag & drop files here</p>
+        <span data-i18n="settings_or">or</span>
+        <button type="button" class="btn-primary" id="btn-browse-files" data-testid="browse-files-btn" data-i18n="settings_browse_files">Browse files</button>
+        <input type="file" id="file-input" multiple hidden accept=".txt,.md,.pdf,.docx,.csv">
+      </div>
+      <!-- Upload Progress Container -->
+      <div class="upload-progress" id="upload-progress" style="display:none;"></div>
+      <!-- Document List Table -->
+      <table class="doc-table" id="doc-table" data-testid="doc-table">
+        <thead>
+          <tr>
+            <th data-i18n="settings_doc_col_filename">Filename</th>
+            <th data-i18n="settings_doc_col_type">Type</th>
+            <th data-i18n="settings_doc_col_chunks">Chunks</th>
+            <th data-i18n="settings_doc_col_chunk_settings">Chunk Settings</th>
+            <th data-i18n="settings_doc_col_date">Date</th>
+            <th data-i18n="settings_doc_col_actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="doc-table-body">
+          <!-- Rows rendered by JS -->
+          <tr class="doc-table-empty">
+            <td colspan="6" data-i18n="settings_no_documents">No documents uploaded yet.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Confirmation Modal — centered within Documents board -->
+      <div class="modal-overlay" id="confirmModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+        <div class="modal-card confirm-modal-card" data-testid="confirm-modal">
+          <h3 id="confirm-modal-title" data-i18n="settings_delete_confirm">Delete this document?</h3>
+          <p id="confirm-modal-message"></p>
+          <div class="modal-actions">
+            <button class="btn-secondary" id="confirm-modal-cancel" data-i18n="settings_cancel">Cancel</button>
+            <button class="btn-danger" id="confirm-modal-ok" data-i18n="settings_delete">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Duplicate File Modal (AC-001.8–001.10) — centered within Documents board -->
+      <div class="modal-overlay" id="duplicateModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="duplicate-modal-title" data-testid="duplicate-modal">
+        <div class="modal-card duplicate-modal-card">
+          <h3 id="duplicate-modal-title" data-i18n="duplicate_modal_title">Duplicate File Detected</h3>
+          <p class="duplicate-filename-title"><strong id="duplicate-filename"></strong></p>
+          <div class="duplicate-comparison">
+            <div class="duplicate-col duplicate-col-existing">
+              <h4 data-i18n="duplicate_existing_label">Existing File</h4>
+              <div class="duplicate-stat"><span data-i18n="duplicate_modal_size">Size:</span> <span id="duplicate-existing-size">—</span></div>
+              <div class="duplicate-stat"><span data-i18n="duplicate_modal_chunks">Chunks:</span> <span id="duplicate-existing-chunks">—</span></div>
+              <div class="duplicate-stat"><span data-i18n="duplicate_chunk_settings">Chunk Settings:</span> <span id="duplicate-existing-settings">—</span></div>
+            </div>
+            <div class="duplicate-col duplicate-col-new">
+              <h4 data-i18n="duplicate_new_label">New Upload</h4>
+              <div class="duplicate-stat"><span data-i18n="duplicate_modal_size">Size:</span> <span id="duplicate-new-size">—</span></div>
+              <div class="duplicate-stat"><span data-i18n="duplicate_estimated_chunks">Est. Chunks:</span> <span id="duplicate-estimated-chunks">—</span></div>
+              <div class="duplicate-stat"><span data-i18n="duplicate_chunk_settings">Chunk Settings:</span> <span id="duplicate-new-settings">512 token, 64 overlap</span></div>
+            </div>
+          </div>
+          <div id="duplicate-settings-warning" class="duplicate-warning" style="display:none;">
+            <span data-i18n="duplicate_modal_warning">⚠️ Your chunking settings have changed since this file was last ingested. Replacing will use the new settings.</span>
+          </div>
+          <div class="modal-actions duplicate-actions">
+            <button class="btn-sm btn-link-style" id="duplicate-modal-cancel" data-i18n="duplicate_cancel">Cancel Upload</button>
+            <button class="btn-sm btn-secondary" id="duplicate-modal-rename" data-i18n="duplicate_rename">Upload as new</button>
+            <button class="btn-sm btn-danger" id="duplicate-modal-replace" data-i18n="duplicate_replace">Replace</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FULL WIDTH: LangSmith Card -->
+    <div class="settings-card card settings-langsmith" data-testid="langsmith-card">
+      <h3 data-i18n="settings_langsmith_title">LangSmith Integration</h3>
+      <p data-i18n="settings_langsmith_desc">Connect LangSmith for observability and RAGAS evaluations.</p>
+      <button type="button" class="btn-secondary" id="btn-connect-langsmith" data-testid="connect-langsmith-btn" data-i18n="settings_connect_langsmith">Connect LangSmith</button>
+    </div>
+
+    <!-- LangSmith Integration Modal -->
+    <div class="modal-overlay" id="langsmithModal" style="display:none;" data-testid="langsmith-modal">
+      <div class="modal-card" role="dialog" aria-modal="true">
+        <h3 data-i18n="settings_langsmith_title">LangSmith Integration</h3>
+        <label for="langsmith-api-key" data-i18n="settings_langsmith_api_key">LangSmith API Key</label>
+        <input type="password" id="langsmith-api-key" class="input-field" placeholder="ls__..." data-i18n-placeholder="settings_langsmith_api_key_placeholder">
+        <label for="langsmith-project" data-i18n="settings_langsmith_project">Project Name</label>
+        <input type="text" id="langsmith-project" class="input-field" value="rag-studio">
+        <label for="langsmith-endpoint" data-i18n="settings_langsmith_endpoint">Endpoint URL</label>
+        <input type="text" id="langsmith-endpoint" class="input-field" value="https://api.smith.langchain.com">
+        <div class="modal-actions">
+          <button class="btn-secondary" id="langsmith-cancel" data-i18n="settings_cancel">Cancel</button>
+          <button class="btn-primary" id="langsmith-connect" data-i18n="settings_connect_langsmith">Connect</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

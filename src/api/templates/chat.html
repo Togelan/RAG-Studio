@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}RAG Studio — Chat{% endblock %}
+{% block content %}
+<div class="tab-content active" id="tab-chat">
+  <div class="chat-full-width">
+    <div class="chat-layout">
+    <!-- Session Sidebar -->
+    <aside class="chat-sidebar" id="chatSidebar" aria-label="Chat sessions" data-i18n-aria="aria_chat_sessions">
+      <div class="sidebar-header">
+        <button class="btn-primary btn-new-chat" id="btnNewChat" data-i18n="chat_new_chat">+ New Chat</button>
+      </div>
+      <div class="session-list" id="sessionList" role="listbox" aria-label="Session list" data-i18n-aria="aria_session_list">
+      </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <section class="chat-main">
+      <div class="chat-header">
+        <button class="btn-icon sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" data-i18n-aria="aria_toggle_sidebar">☰</button>
+        <h2 class="chat-session-title" id="sessionTitle" data-i18n="chat_new_session">New Session</h2>
+        <div class="chat-controls">
+          <button class="btn-icon" id="btnClearChat" title="Clear chat" data-i18n-title="chat_clear_title" aria-label="Clear chat" data-i18n-aria="aria_clear_chat">🗑️</button>
+          <button class="btn-icon" id="btnRegenerate" title="Regenerate" data-i18n-title="chat_regenerate_title" aria-label="Regenerate last response" data-i18n-aria="aria_regenerate">🔄</button>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chatMessages" role="log" aria-label="Chat messages" data-i18n-aria="aria_chat_messages" aria-live="polite">
+        <div class="chat-empty-state" id="chatEmptyState">
+          <div class="chat-empty-icon">💬</div>
+          <h3 data-i18n="chat_empty_title">Start a conversation</h3>
+          <p data-i18n="chat_empty_subtitle">Upload documents in Settings, then ask questions here.</p>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <form class="chat-input-form" id="chatForm" autocomplete="off">
+          <label for="chatInput" class="sr-only" data-i18n="chat_message_input_label">Message input</label>
+          <textarea class="chat-input" id="chatInput" name="message" placeholder="Ask about your documents..." data-i18n-placeholder="chat_input_placeholder" rows="1" autofocus></textarea>
+          <button type="submit" class="btn-primary btn-send" id="btnSend" aria-label="Send message" data-i18n-aria="aria_send_message">
+            <span class="send-icon">➤</span>
+          </button>
+        </form>
+      </div>
+    </section>
+    </div>
+  </div>
+
+  <!-- Sidebar Backdrop -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+
+  <!-- Context Menu -->
+  <div class="context-menu" id="contextMenu" role="menu" style="display: none;">
+    <button class="context-menu-item" data-action="rename" role="menuitem" data-i18n="chat_context_menu_rename">Rename</button>
+    <button class="context-menu-item" data-action="delete" role="menuitem" data-i18n="chat_context_menu_delete">Delete</button>
+  </div>
+
+  <!-- Confirmation Dialog -->
+  <div class="modal-overlay" id="confirmDialog" style="display: none;">
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <p class="modal-message" id="confirmMessage"></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="confirmCancel" data-i18n="confirm_cancel">Cancel</button>
+        <button class="btn-destructive" id="confirmOk" data-i18n="confirm_ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Dialog -->
+  <div class="modal-overlay" id="renameDialog" style="display: none;">
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <p class="modal-message" data-i18n="chat_rename_prompt">New session name:</p>
+      <input type="text" class="input-field" id="renameInput" maxlength="200" aria-label="Session name">
+      <div class="modal-actions">
+        <button class="btn-secondary" id="renameCancel" data-i18n="confirm_cancel">Cancel</button>
+        <button class="btn-primary" id="renameOk" data-i18n="confirm_ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback Reason Dialog -->
+  <div class="modal-overlay" id="feedbackReasonDialog" style="display: none;">
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <p class="modal-message" data-i18n="chat_feedback_reason">What was wrong? (optional)</p>
+      <textarea class="input-field feedback-reason-input" id="feedbackReasonInput" rows="2" placeholder="Enter reason..." data-i18n-placeholder="feedback_reason_placeholder"></textarea>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="feedbackReasonCancel" data-i18n="feedback_skip">Skip</button>
+        <button class="btn-primary" id="feedbackReasonSubmit" data-i18n="feedback_submit">Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/chat.js"></script>
+{% endblock %}

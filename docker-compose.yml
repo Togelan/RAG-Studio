@@ -1,0 +1,58 @@
+# RAG-Studio — Docker Compose Configuration
+# Minimum RAM: 4 GB | Recommended RAM: 8 GB | CPU: 2 cores minimum
+#
+# Usage:
+#   docker compose up -d
+#   docker compose down
+#   docker compose logs -f
+
+version: "3.9"
+
+services:
+  rag-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rag-studio:latest
+    container_name: rag-studio
+
+    # Port mapping: host:container
+    ports:
+      - "8000:8000"
+
+    # Volume mounts for data persistence (AC-008.1, AC-008.2)
+    volumes:
+      # Unified app data volume (Qdrant, models, logs, secrets)
+      - ./rag-data:/app/data
+      # Legacy mounts (backward compatibility)
+      - ./rag-data/qdrant:/data/qdrant
+      - ./rag-data/secrets:/root/.rag-studio/secrets
+      - ./rag-data/logs:/root/.rag-studio/logs
+
+    # Environment variables
+    env_file:
+      - .env
+
+    environment:
+      - QDRANT_PATH=/data/qdrant
+      - RAG_STUDIO_SECRETS_PATH=/root/.rag-studio/secrets/secrets.enc
+      - RAG_STUDIO_LOGS_PATH=/root/.rag-studio/logs
+
+    # Resource constraints (AC-008.7)
+    # Minimum: 4 GB RAM, 2 CPUs
+    mem_limit: 4g
+    cpus: "2"
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Stop grace period for graceful shutdown (AC-008.9)
+    stop_grace_period: 15s
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

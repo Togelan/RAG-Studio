@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" data-locale="{{ lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}RAG Studio{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css?v=4">
+  <!-- Inter + JetBrains Mono from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Global Header -->
+  <header class="global-header">
+    <div class="container header-inner">
+      <a href="/" class="header-logo">RAG Studio</a>
+
+      <!-- Desktop Navigation Tabs -->
+      <nav class="nav-tabs" id="navTabs" aria-label="Main navigation" data-i18n-aria="aria_main_nav">
+        <button class="nav-tab {% if active_tab == 'welcome' %}active{% endif %}" data-tab="welcome" data-i18n="nav_welcome">Home</button>
+        <button class="nav-tab {% if active_tab == 'settings' %}active{% endif %}" data-tab="settings" data-i18n="nav_settings">Settings</button>
+        <button class="nav-tab {% if active_tab == 'chat' %}active{% endif %}" data-tab="chat" data-i18n="nav_chat">Chat</button>
+      </nav>
+
+      <!-- Hamburger for tablet -->
+      <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" data-i18n-aria="aria_toggle_menu" onclick="RAGStudio.toggleMobileMenu()">
+        <span></span><span></span><span></span>
+      </button>
+
+      <!-- Language Switcher -->
+      <div class="lang-switcher" aria-label="Language selector" data-i18n-aria="aria_lang_selector">
+        <button class="lang-btn {% if lang == 'en' %}active{% endif %}" data-lang="en" aria-label="English" data-i18n-aria="aria_english">EN</button>
+        <button class="lang-btn {% if lang == 'ru' %}active{% endif %}" data-lang="ru" aria-label="Russian" data-i18n-aria="aria_russian">RU</button>
+      </div>
+
+      <!-- Status Indicator -->
+      <div class="status-indicator" id="statusIndicator" aria-label="System status" data-i18n-aria="aria_system_status">
+        <span class="status-dot status-yellow"></span>
+        <span class="status-text" data-i18n="status_checking">Checking...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Mobile Bottom Tab Bar (visible <768px) -->
+  <nav class="mobile-tab-bar" id="mobileTabBar" aria-label="Mobile navigation" data-i18n-aria="aria_mobile_nav">
+    <button class="mobile-tab {% if active_tab == 'welcome' %}active{% endif %}" data-tab="welcome" aria-label="Home" data-i18n-aria="nav_welcome">
+      <span class="mobile-tab-icon">🏠</span>
+      <span class="mobile-tab-label" data-i18n="nav_welcome">Home</span>
+    </button>
+    <button class="mobile-tab {% if active_tab == 'settings' %}active{% endif %}" data-tab="settings" aria-label="Settings" data-i18n-aria="nav_settings">
+      <span class="mobile-tab-icon">⚙️</span>
+      <span class="mobile-tab-label" data-i18n="nav_settings">Settings</span>
+    </button>
+    <button class="mobile-tab {% if active_tab == 'chat' %}active{% endif %}" data-tab="chat" aria-label="Chat" data-i18n-aria="nav_chat">
+      <span class="mobile-tab-icon">💬</span>
+      <span class="mobile-tab-label" data-i18n="nav_chat">Chat</span>
+    </button>
+  </nav>
+
+  <!-- Mobile Nav Overlay (tablet hamburger menu) -->
+  <div class="mobile-nav-overlay" id="mobileNavOverlay">
+    <div class="mobile-nav-menu" role="menu">
+      <button class="mobile-nav-close" aria-label="Close menu" data-i18n-aria="aria_close_menu" onclick="RAGStudio.toggleMobileMenu()">✕</button>
+      <button class="mobile-nav-item {% if active_tab == 'welcome' %}active{% endif %}" data-tab="welcome" role="menuitem" data-i18n="nav_welcome">Home</button>
+      <button class="mobile-nav-item {% if active_tab == 'settings' %}active{% endif %}" data-tab="settings" role="menuitem" data-i18n="nav_settings">Settings</button>
+      <button class="mobile-nav-item {% if active_tab == 'chat' %}active{% endif %}" data-tab="chat" role="menuitem" data-i18n="nav_chat">Chat</button>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js?v=4"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

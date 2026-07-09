@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}RAG Studio — Welcome{% endblock %}
+{% block content %}
+<div class="tab-content active" id="tab-welcome">
+  <div class="container">
+    <div class="welcome-hero">
+      <h1 data-i18n="welcome_title">Welcome to RAG Studio</h1>
+      <p data-i18n="welcome_subtitle">Your private, local document chat assistant.</p>
+    </div>
+
+    <!-- Animated Value Propositions -->
+    <div class="counters-row">
+      <div class="counter-card" data-counter="10">
+        <div class="counter-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M13 2L3 14h5l-1 8 10-12h-5l1-8z" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="counter-number">0</div>
+        <div class="counter-suffix">×</div>
+        <div class="counter-label" data-i18n="welcome.counter_speed">Up to 10× faster document analysis</div>
+      </div>
+      <div class="counter-card" data-counter="100">
+        <div class="counter-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="var(--color-accent)" stroke-width="2" fill="none"/>
+            <path d="M12 6v6l4 2" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="counter-number">0</div>
+        <div class="counter-suffix">+</div>
+        <div class="counter-label" data-i18n="welcome.counter_hours">Save 100+ hours/month on manual search</div>
+      </div>
+      <div class="counter-card" data-counter="100">
+        <div class="counter-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 2l1.5 4.5L18 8l-3 2.5.5 5L12 13l-3.5 2.5L9 10.5 6 8l4.5-1.5L12 2z" stroke="var(--color-accent)" stroke-width="2" stroke-linejoin="round" fill="none"/>
+            <path d="M12 22V18" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <path d="M8 20h8" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="counter-number">0</div>
+        <div class="counter-suffix">%</div>
+        <div class="counter-label" data-i18n="welcome.counter_privacy">100% private — your data stays on your machine</div>
+      </div>
+    </div>
+
+    <!-- Get Started CTA -->
+    <div class="btn-get-started-wrapper">
+      <button class="btn-get-started" id="btn-get-started" data-i18n="welcome.get_started"><span class="btn-get-started-text">Get Started</span><span class="btn-get-started-arrow">→</span></button>
+    </div>
+
+    <!-- Video Placeholder -->
+    <div class="welcome-video-placeholder" data-testid="video-placeholder">
+      <div class="video-placeholder-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <path d="M9 5v18l15-9z" fill="white"/>
+        </svg>
+      </div>
+      <p class="video-placeholder-text" data-i18n="welcome.video_placeholder">Video tutorial coming soon</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

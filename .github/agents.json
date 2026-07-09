@@ -1,0 +1,37 @@
+{
+  "description": "RAG-Studio custom agent registry. VS Code discovers .md files in .github/agents/ automatically. This file serves as documentation and model assignment reference.",
+  "agents": [
+    {
+      "name": "ba",
+      "displayName": "Business Analyst",
+      "instructionsFile": ".github/agents/ba.md",
+      "model": "deepseek-v4-pro",
+      "isSubagent": false,
+      "description": "Owns system_spec.md. Elicits requirements, writes FRs with Gherkin ACs. Does NOT write code."
+    },
+    {
+      "name": "architect",
+      "displayName": "Architect & PM",
+      "instructionsFile": ".github/agents/architect.md",
+      "model": "deepseek-v4-pro",
+      "isSubagent": false,
+      "description": "Orchestrator. Gates DoR, decomposes FRs into tasks, spawns @dev and @qa subagents. Does NOT write code."
+    },
+    {
+      "name": "dev",
+      "displayName": "Developer",
+      "instructionsFile": ".github/agents/developer.md",
+      "model": "deepseek-v4-pro",
+      "isSubagent": true,
+      "description": "Implements one FR at a time. Writes Python/FastAPI/LangGraph code in src/. Returns structured DEV_RESULT JSON."
+    },
+    {
+      "name": "qa",
+      "displayName": "QA Engineer",
+      "instructionsFile": ".github/agents/qa.md",
+      "model": "deepseek-v4-flash",
+      "isSubagent": true,
+      "description": "Runs pytest, invokes langsmith-eval skill, runs RAGAS metrics. Returns structured QA_VERDICT JSON."
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+[project]
+name = "rag-studio"
+version = "0.1.0"
+description = "Local-first RAG tool — upload docs, chat with them via your own LLM API key"
+requires-python = ">=3.14"
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# Pytest configuration for RAG-Studio
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "unit: marks tests as unit tests",
+    "e2e: marks end-to-end tests that use real Qdrant, embeddings, and graph execution",
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.14"
+
+[[tool.mypy.overrides]]
+module = "flashrank.*"
+ignore_missing_imports = true
+
+[tool.pyright]
+reportMissingTypeStubs = false

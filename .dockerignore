@@ -1,0 +1,53 @@
+# RAG-Studio — .dockerignore
+# Exclude files and directories from Docker build context
+
+# Version control
+.git/
+.gitignore
+
+# Environment & secrets
+.env
+*.local
+!.env.example
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+*.egg
+dist/
+build/
+
+# Tests & quality reports
+tests/
+bandit_report.json
+coverage.xml
+htmlcov/
+
+# Logs & temp files
+*.log
+*.err
+*.bat
+*.tmp
+server.err
+run_tests.bat
+
+# Data directories (mounted at runtime as volumes)
+data/raw_data/
+data/checkpoints/
+data/qdrant_storage/
+data/models/
+
+# IDE & editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
