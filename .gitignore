@@ -29,6 +29,7 @@ data/
 !data/**/.gitkeep
 rag-data/
 models/
+graph-structure.md
 
 # ============================================================
 # Logs & Temporary Files
