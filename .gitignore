@@ -30,6 +30,7 @@ data/
 rag-data/
 models/
 graph-structure.md
+graphify-out/
 
 # ============================================================
 # Logs & Temporary Files
@@ -38,6 +39,7 @@ graph-structure.md
 *.err
 *.tmp
 *.temp
+sandbox/
 
 # ============================================================
 # IDE & OS
