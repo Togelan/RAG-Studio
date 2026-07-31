@@ -71,6 +71,29 @@ docker run -d \
 
 You can also set the key from the **Settings** page in the UI (`/settings`) — it will be validated, encrypted, and persisted.
 
+### Cross-Origin Requests (CORS)
+
+The bundled UI is served by RAG-Studio itself and does not need CORS. By
+default, cross-origin browser requests are limited to the local application
+origins `http://localhost:8000`, `http://127.0.0.1:8000`, and
+`http://[::1]:8000`. Only `GET`, `POST`, `PATCH`, and `DELETE` requests are
+allowed, and the only non-simple request headers accepted are `Content-Type`
+and `X-API-Key`. Credentialed CORS requests are disabled.
+
+For a separately hosted development UI or a deployed frontend, set
+`RAG_STUDIO_CORS_ORIGINS` to a comma-separated allowlist of exact origins:
+
+```bash
+# .env or deployment environment
+RAG_STUDIO_CORS_ORIGINS=http://localhost:5173,https://rag.example.com
+```
+
+Each entry must be a full `http://` or `https://` origin with no path, query,
+or fragment. Wildcards are rejected at startup. To explicitly disable all
+cross-origin browser access, set `RAG_STUDIO_CORS_ORIGINS` to an empty value.
+When deploying behind a reverse proxy, list the public browser origin (for
+example, `https://rag.example.com`), not the container's internal URL.
+
 ### Volumes
 
 All persistent data lives in `./rag-data/` on your host:

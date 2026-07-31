@@ -14,6 +14,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator, cast
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,8 +35,75 @@ logger = logging.getLogger(__name__)
 # Shutdown timeout (AC-008.9)
 _SHUTDOWN_TIMEOUT = 10  # seconds
 
+# The bundled UI is same-origin. Keep default cross-origin access local-only;
+# deployments that have a separate frontend must explicitly configure it.
+_DEFAULT_CORS_ORIGINS = (
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://[::1]:8000",
+)
+_CORS_METHODS = ("GET", "POST", "PATCH", "DELETE")
+_CORS_HEADERS = ("Content-Type", "X-API-Key")
+
 # Track in-progress tasks for graceful shutdown
 _pending_tasks: set[asyncio.Task[Any]] = set()
+
+
+def _cors_origins_from_environment() -> tuple[str, ...]:
+    """Return a validated, explicit CORS origin allowlist.
+
+    ``RAG_STUDIO_CORS_ORIGINS`` is a comma-separated list of complete HTTP(S)
+    origins. An unset value uses local-only defaults; an explicitly empty value
+    disables cross-origin access. Invalid configuration fails application
+    creation instead of silently using a broader policy.
+    """
+    configured_origins = os.getenv("RAG_STUDIO_CORS_ORIGINS")
+    if configured_origins is None:
+        return _DEFAULT_CORS_ORIGINS
+    if not configured_origins.strip():
+        return ()
+
+    origins: list[str] = []
+    for origin in configured_origins.split(","):
+        origin = origin.strip()
+        if not origin:
+            raise ValueError(
+                "RAG_STUDIO_CORS_ORIGINS must not contain empty origin entries."
+            )
+        if origin == "*":
+            raise ValueError(
+                "RAG_STUDIO_CORS_ORIGINS must list explicit origins; "
+                "'*' is not allowed."
+            )
+
+        try:
+            parsed = urlsplit(origin)
+        except ValueError as exc:
+            raise ValueError(f"Invalid CORS origin {origin!r}.") from exc
+        try:
+            parsed.port  # Validates malformed port values.
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid CORS origin {origin!r}: port must be a valid number."
+            ) from exc
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.hostname is None
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(
+                f"Invalid CORS origin {origin!r}: use a complete HTTP(S) origin "
+                "without a path."
+            )
+        if origin not in origins:
+            origins.append(origin)
+
+    return tuple(origins)
 
 
 def _create_task(coro: Any) -> asyncio.Task[Any]:
@@ -144,10 +212,10 @@ def create_app() -> FastAPI:
     # CORS middleware — allow local development
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=_cors_origins_from_environment(),
+        allow_credentials=False,
+        allow_methods=_CORS_METHODS,
+        allow_headers=_CORS_HEADERS,
     )
 
     # Mount route modules
