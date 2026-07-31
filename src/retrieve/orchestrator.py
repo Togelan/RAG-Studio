@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+from threading import Lock
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ _FINAL_TOP_K = 5
 _reranker: Any = None
 _reranker_available: bool | None = None  # None = not yet attempted
 _reranker_load_error: str | None = None
+_reranker_lock = Lock()
 
 
 def _get_reranker() -> Any | None:
@@ -47,37 +49,40 @@ def _get_reranker() -> Any | None:
     """
     global _reranker, _reranker_available, _reranker_load_error
 
-    if _reranker_available is not None:
-        return _reranker if _reranker_available else None
+    with _reranker_lock:
+        if _reranker_available is not None:
+            return _reranker if _reranker_available else None
 
-    logger.info("Attempting to load FlashRank reranker (%s)...", _FLASHRANK_MODEL_NAME)
-    try:
-        from flashrank import Ranker
+        logger.info(
+            "Attempting to load FlashRank reranker (%s)...", _FLASHRANK_MODEL_NAME
+        )
+        try:
+            from flashrank import Ranker
 
-        _reranker = Ranker(
-            model_name=_FLASHRANK_MODEL_NAME,
-            cache_dir=_FLASHRANK_CACHE_DIR,
-            max_length=512,
-        )
-        _reranker_available = True
-        logger.info("FlashRank reranker loaded successfully.")
-    except MemoryError as e:
-        _reranker_available = False
-        _reranker_load_error = str(e)
-        logger.warning(
-            "Cannot load reranker due to insufficient memory. "
-            "Falling back to RRF-only retrieval (no reranking). "
-            "Error: %s",
-            e,
-        )
-    except Exception as e:
-        _reranker_available = False
-        _reranker_load_error = str(e)
-        logger.warning(
-            "Cannot load reranker: %s. "
-            "Falling back to RRF-only retrieval (no reranking).",
-            e,
-        )
+            _reranker = Ranker(
+                model_name=_FLASHRANK_MODEL_NAME,
+                cache_dir=_FLASHRANK_CACHE_DIR,
+                max_length=512,
+            )
+            _reranker_available = True
+            logger.info("FlashRank reranker loaded successfully.")
+        except MemoryError as e:
+            _reranker_available = False
+            _reranker_load_error = str(e)
+            logger.warning(
+                "Cannot load reranker due to insufficient memory. "
+                "Falling back to RRF-only retrieval (no reranking). "
+                "Error: %s",
+                e,
+            )
+        except Exception as e:
+            _reranker_available = False
+            _reranker_load_error = str(e)
+            logger.warning(
+                "Cannot load reranker: %s. "
+                "Falling back to RRF-only retrieval (no reranking).",
+                e,
+            )
 
     return _reranker if _reranker_available else None
 
@@ -273,6 +278,7 @@ async def hybrid_search(
 def reset_reranker() -> None:
     """Reset the reranker state (useful for testing)."""
     global _reranker, _reranker_available, _reranker_load_error
-    _reranker = None
-    _reranker_available = None
-    _reranker_load_error = None
+    with _reranker_lock:
+        _reranker = None
+        _reranker_available = None
+        _reranker_load_error = None

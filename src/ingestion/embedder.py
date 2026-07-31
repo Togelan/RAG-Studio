@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from threading import Lock
 from typing import Any, cast
 
 from qdrant_client import AsyncQdrantClient
@@ -42,6 +43,11 @@ _FASTEMBED_CACHE_DIR = os.getenv(
 # Module-level lazy-loaded embedding models
 _dense_model: Any = None
 _sparse_model: Any = None
+# Model construction downloads/loads sizable ONNX assets.  Keep separate locks so
+# that a first dense and first sparse request may initialize independently, while
+# concurrent requests for the same model always share one instance.
+_dense_model_lock = Lock()
+_sparse_model_lock = Lock()
 
 
 def _get_cache_dir() -> str:
@@ -60,20 +66,21 @@ def _get_dense_model() -> Any:
         TextEmbedding instance for paraphrase-multilingual-MiniLM-L12-v2.
     """
     global _dense_model
-    if _dense_model is None:
-        from fastembed import TextEmbedding
+    with _dense_model_lock:
+        if _dense_model is None:
+            from fastembed import TextEmbedding
 
-        cache_dir = _get_cache_dir()
-        logger.info(
-            "Loading dense embedding model: paraphrase-multilingual-MiniLM-L12-v2 "
-            "(cache: %s)",
-            cache_dir,
-        )
-        _dense_model = TextEmbedding(
-            model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-            cache_dir=cache_dir,
-        )
-        logger.info("Dense embedding model loaded.")
+            cache_dir = _get_cache_dir()
+            logger.info(
+                "Loading dense embedding model: paraphrase-multilingual-MiniLM-L12-v2 "
+                "(cache: %s)",
+                cache_dir,
+            )
+            _dense_model = TextEmbedding(
+                model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                cache_dir=cache_dir,
+            )
+            logger.info("Dense embedding model loaded.")
     return _dense_model
 
 
@@ -84,19 +91,20 @@ def _get_sparse_model() -> Any:
         SparseTextEmbedding instance for Qdrant/bm25.
     """
     global _sparse_model
-    if _sparse_model is None:
-        from fastembed import SparseTextEmbedding
+    with _sparse_model_lock:
+        if _sparse_model is None:
+            from fastembed import SparseTextEmbedding
 
-        cache_dir = _get_cache_dir()
-        logger.info(
-            "Loading sparse embedding model: Qdrant/bm25 (cache: %s)",
-            cache_dir,
-        )
-        _sparse_model = SparseTextEmbedding(
-            model_name="Qdrant/bm25",
-            cache_dir=cache_dir,
-        )
-        logger.info("Sparse embedding model loaded.")
+            cache_dir = _get_cache_dir()
+            logger.info(
+                "Loading sparse embedding model: Qdrant/bm25 (cache: %s)",
+                cache_dir,
+            )
+            _sparse_model = SparseTextEmbedding(
+                model_name="Qdrant/bm25",
+                cache_dir=cache_dir,
+            )
+            logger.info("Sparse embedding model loaded.")
     return _sparse_model
 
 
