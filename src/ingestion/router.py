@@ -179,18 +179,6 @@ class ReingestResponse(BaseModel):
 # ============================================================
 
 
-def compute_sha256(content: bytes) -> str:
-    """Compute the SHA-256 hex digest of file content.
-
-    Args:
-        content: Raw file bytes.
-
-    Returns:
-        Lowercase hex-encoded SHA-256 hash string.
-    """
-    return hashlib.sha256(content).hexdigest()
-
-
 def generate_unique_filename(original_filename: str) -> str:
     """Generate a unique filename for 'Upload as new' action (AC-001.8).
 
@@ -251,7 +239,7 @@ def _safe_int(value: object) -> int | None:
     try:
         v = int(str(value))
         return v if v > 0 else None
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return None
 
 
@@ -606,15 +594,27 @@ async def upload_document(
 
     original_filename = file.filename
 
-    # Read file content
-    content = await file.read()
+    # Stream file to temp location in 64KB chunks (avoid loading entirely in RAM)
+    file_id = str(uuid.uuid4())
+    suffix = Path(original_filename).suffix
+    tmp_path = Path(tempfile.gettempdir()) / f"rag-studio-{file_id}{suffix}"
+    file_size = 0
+    sha256_hash = hashlib.sha256()
+    with open(tmp_path, "wb") as f:
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            f.write(chunk)
+            sha256_hash.update(chunk)
+            file_size += len(chunk)
+    new_hash = sha256_hash.hexdigest()
 
     # Validate file (AC-001.7)
     try:
         validate_file(
             filename=original_filename,
-            file_size=len(content),
-            content=content,
+            file_size=file_size,
         )
     except ValueError as e:
         log_audit(
@@ -637,7 +637,6 @@ async def upload_document(
         )
         raise HTTPException(status_code=400, detail=str(e))
 
-    new_hash = compute_sha256(content)
     stored = await get_stored_file(original_filename)
     logger.info(
         "Duplicate check: get_stored_file('%s') → %s",
@@ -774,23 +773,14 @@ async def upload_document(
         # by running the chunker without storing results (AC-001.9)
         estimated_chunks = 0
         try:
-            estimate_id = str(uuid.uuid4())
-            est_suffix = Path(original_filename).suffix
-            estimate_path = (
-                Path(tempfile.gettempdir()) / f"rag-est-{estimate_id}{est_suffix}"
+            text, _ = detect_and_parse(
+                str(tmp_path), original_filename, file.content_type
             )
-            estimate_path.write_bytes(content)
-            try:
-                text, _ = detect_and_parse(
-                    str(estimate_path), original_filename, file.content_type
+            if text.strip():
+                temp_chunks = chunk_text(
+                    text, chunk_size=current_cs, chunk_overlap=current_co
                 )
-                if text.strip():
-                    temp_chunks = chunk_text(
-                        text, chunk_size=current_cs, chunk_overlap=current_co
-                    )
-                    estimated_chunks = len(temp_chunks)
-            finally:
-                estimate_path.unlink(missing_ok=True)
+                estimated_chunks = len(temp_chunks)
         except Exception:
             estimated_chunks = 0
 
@@ -814,7 +804,7 @@ async def upload_document(
                 existing_size=existing_size,
                 stored_chunk_size=stored_chunk_size,
                 stored_chunk_overlap=stored_chunk_overlap,
-                new_file_size=len(content),
+                new_file_size=file_size,
                 estimated_chunks=estimated_chunks,
                 chunks_settings_changed=settings_changed,
                 current_chunk_size=current_cs,
@@ -832,9 +822,6 @@ async def upload_document(
         new_hash[:12],
     )
 
-    # Generate a unique file_id for this ingestion job
-    file_id = str(uuid.uuid4())
-
     # Store file metadata NOW (synchronously) so duplicate detection works
     # on subsequent uploads (AC-001.8–001.10). The chunk_count is updated
     # in _ingest_file after background processing completes.
@@ -848,16 +835,11 @@ async def upload_document(
         chunk_overlap=_co,
     )
 
-    # Write file to temp location
-    suffix = Path(original_filename).suffix
-    tmp_path = Path(tempfile.gettempdir()) / f"rag-studio-{file_id}{suffix}"
-    tmp_path.write_bytes(content)
-
     # Also store a persistent copy in data/raw_uploads/ for re-ingestion (AC-010.4).
     doc_id = make_document_doc_id(original_filename)
     _RAW_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     raw_path = _RAW_UPLOADS_DIR / f"{doc_id}{suffix}"
-    raw_path.write_bytes(content)
+    shutil.copy2(tmp_path, raw_path)
     logger.debug("Raw upload saved for re-ingestion: %s (doc_id=%s)", raw_path, doc_id)
 
     # Initialize progress
@@ -880,7 +862,7 @@ async def upload_document(
         "File '%s' accepted for ingestion: file_id=%s, size=%d bytes, action=%s",
         original_filename,
         file_id,
-        len(content),
+        file_size,
         action,
     )
 
@@ -1202,7 +1184,7 @@ async def reingest_document(
                 saved: dict[str, object] = json.load(f)
             _cur_chunk_size = int(str(saved.get("chunk_size", 512)))
             _cur_chunk_overlap = int(str(saved.get("chunk_overlap", 64)))
-        except json.JSONDecodeError, OSError, ValueError:
+        except (json.JSONDecodeError, OSError, ValueError):
             pass
 
     # Find the stored file in data/raw_uploads/ by doc_id.

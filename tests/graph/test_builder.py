@@ -55,7 +55,6 @@ def _make_state(**overrides: object) -> RAGState:
         "faithfulness_score": 0.0,
         "validation_passed": False,
         "session_id": "test-session-001",
-        "user_api_key": None,
         "provider": "openai",
         "model_name": "gpt-4o-mini",
         "temperature": 1.0,
@@ -80,9 +79,9 @@ class TestRoutingFunctions:
         assert route_after_analyzer(state) == "cache_check"
 
     def test_route_after_analyzer_standalone(self) -> None:
-        """Standalone intent → 'retrieve'."""
+        """ALL intents → 'cache_check' (standalone queries also hit cache)."""
         state = _make_state(intent="standalone_question")
-        assert route_after_analyzer(state) == "retrieve"
+        assert route_after_analyzer(state) == "cache_check"
 
     def test_route_after_cache_check_hit(self) -> None:
         """Cache hit → 'generate_from_cache'."""
@@ -733,4 +732,35 @@ class TestPersistenceAcrossRestarts:
             ai_content = getattr(ai_msgs[0], "content", "")
             assert ai_content == "Test answer from retrieval.", (
                 f"AIMessage content mismatch: {ai_content}"
+            )
+
+
+# ============================================================
+# RACE-H01: WAL mode test
+# ============================================================
+
+
+class TestWALMode:
+    """Verify that SQLite WAL mode is enabled for concurrent access."""
+
+    @pytest.mark.asyncio
+    async def test_wal_mode_enabled(self, tmp_path: Any) -> None:
+        """create_graph() should set PRAGMA journal_mode=WAL."""
+        import aiosqlite
+
+        from src.graph import create_graph
+
+        db_path = str(tmp_path / "test_wal.db")
+
+        async with create_graph(db_path=db_path) as graph:
+            assert graph is not None
+
+        # After graph creation, verify WAL mode directly
+        async with aiosqlite.connect(db_path) as conn:
+            cursor = await conn.execute("PRAGMA journal_mode;")
+            row = await cursor.fetchone()
+            assert row is not None
+            journal_mode: str = row[0]
+            assert journal_mode.lower() == "wal", (
+                f"Expected journal_mode=wal, got {journal_mode}"
             )

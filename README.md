@@ -7,8 +7,7 @@
 ## Features
 
 - 🔒 **100% Local & Private** — All embeddings, vector search, and reranking run on your machine. Only the LLM call goes to the provider API (using your key).
-- 📄 **Rich Document Support** — Upload `.txt`, `.md` files. Chunked, embedded, and indexed automatically.   
-_(Support for PDF, DOCX, and CSV is planned for future releases.)_
+- 📄 **Document Support** — Upload `.txt`, `.md`, `.pdf`, `.docx`, and `.csv` files. Text is chunked, embedded, and indexed automatically. PDF support is text-extraction only; image-only scans require OCR outside the app.
 - 🔍 **Hybrid Search** — Combines dense (semantic) and sparse (BM25 keyword) search with Reciprocal Rank Fusion (RRF) and cross-encoder reranking for best-in-class retrieval quality.
 - 💬 **Conversational RAG Chat** — Multi-session chat with streaming responses, source citations (`[N]` badges with hover tooltips and expandable cards), and semantic answer caching for instant follow-up responses.
 - 🌐 **Bilingual UI** — English and Russian, switchable on the fly with no page reload.
@@ -127,6 +126,42 @@ python scripts/download_models.py
 This downloads the same models to `data/models/fastembed_cache/` and `data/models/flashrank/`.
 
 ---
+
+## Automatic graph updates
+
+Run the watcher in a separate terminal during development:
+
+```powershell
+.\scripts\watch_graph.ps1
+```
+
+After tests pass and before staging or committing, run the final update:
+
+```powershell
+.\scripts\update_graph.ps1
+```
+
+The watcher rebuilds code-graph changes while it runs. The final update also
+catches documentation and skill changes. It requires a working Python
+environment with graphify installed.
+
+### LazyCodex + project skills
+
+LazyCodex is optional orchestration for Codex; durable project knowledge stays
+in `AGENTS.md` and `.agents/skills/`. For substantial work use:
+
+`understand (ba/architect) → plan → implement (dev) → test (qa) → review → update graph → commit`
+
+Require a goal, constraints, acceptance criteria, affected files, and
+verification commands before implementation. After tests and review pass, run
+`.\scripts\update_graph.ps1` and commit `graphify-out/` with the code. For a
+small obvious fix, normal Codex plus a focused skill is enough.
+
+Use **`create task <name>`** as shorthand for creating a `codex/<task-name>`
+branch from `develop`, running `architect`, implementing with `dev` when ready,
+verifying with `qa`, updating Graphity, and reporting the diff and evidence.
+Codex waits for explicit approval before staging, committing, pushing, or
+merging.
 
 ## Container Lifecycle
 

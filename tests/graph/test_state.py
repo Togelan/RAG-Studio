@@ -14,7 +14,7 @@ class TestRAGStateSchema:
     """Tests for the RAGState TypedDict schema definition."""
 
     def test_all_required_fields_present(self) -> None:
-        """Verify all 19 required fields are defined in RAGState."""
+        """Verify all 18 required fields are defined in RAGState (user_api_key removed per SEC-C01)."""
         hints = get_type_hints(RAGState)
         required_fields = {
             "messages",
@@ -29,7 +29,6 @@ class TestRAGStateSchema:
             "faithfulness_score",
             "validation_passed",
             "session_id",
-            "user_api_key",
             "provider",
             "model_name",
             "temperature",
@@ -62,7 +61,6 @@ class TestRAGStateSchema:
             "faithfulness_score": 0.0,
             "validation_passed": False,
             "session_id": "test-session",
-            "user_api_key": None,
             "provider": "openai",
             "model_name": "gpt-4o-mini",
             "temperature": 1.0,
@@ -93,7 +91,7 @@ class TestRAGStateSchema:
         )
 
     def test_optional_fields_accept_none(self) -> None:
-        """Verify optional fields (cached_answer, final_answer, user_api_key) accept None."""
+        """Verify optional fields (cached_answer, final_answer) accept None."""
         from langchain_core.messages import HumanMessage
 
         state: RAGState = {
@@ -109,7 +107,6 @@ class TestRAGStateSchema:
             "faithfulness_score": 0.0,
             "validation_passed": False,
             "session_id": "test-session",
-            "user_api_key": None,
             "provider": "openai",
             "model_name": "gpt-4o-mini",
             "temperature": 1.0,
@@ -118,4 +115,3 @@ class TestRAGStateSchema:
         }
         assert state["cached_answer"] is None
         assert state["final_answer"] is None
-        assert state["user_api_key"] is None

@@ -41,6 +41,7 @@ data/raw_data/
 data/checkpoints/
 data/qdrant_storage/
 data/models/
+rag-data/
 
 # IDE & editor
 .idea/

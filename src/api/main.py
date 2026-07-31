@@ -19,10 +19,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from src.api.auth import AuthMiddleware
+from src.api.body_limit import BodySizeLimitMiddleware
 from src.api.dependencies import log_audit
-from src.api.routes.chat import router as chat_router
-from src.api.routes.chat import set_graph
+from src.api.rate_limiter import RateLimitMiddleware
+from src.api.routes.chat_state import set_graph
+from src.api.routes.chat_stream import router as chat_stream_router
+from src.api.routes.feedback_routes import router as feedback_router
 from src.api.routes.health import router as health_router
+from src.api.routes.session_routes import router as session_router
 from src.api.routes.settings import router as settings_router
 from src.api.routes.ui import router as ui_router
 from src.graph import create_graph
@@ -141,19 +146,43 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware — allow local development
+    # CORS middleware — restrict to localhost origins only
+    # Using explicit origins (not "*") per security best practices.
+    # "*" with allow_credentials=True is invalid per the CORS spec.
+    # Body size limit — reject oversized requests before reading body (EDGE-H01)
+    app.add_middleware(BodySizeLimitMiddleware)
+
+    # Rate limiting — sliding-window per IP (SEC-H04)
+    app.add_middleware(RateLimitMiddleware)
+
+    # Auth middleware — Bearer token check on /api/* endpoints (SEC-C03)
+    app.add_middleware(AuthMiddleware)
+
+    # CORS must be outermost so it can respond to browser preflight requests
+    # before the authentication middleware attempts to validate a token.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "Accept",
+            "Origin",
+            "X-API-Key",
+        ],
     )
 
     # Mount route modules
     app.include_router(health_router)
     app.include_router(ingestion_router)
-    app.include_router(chat_router)
+    app.include_router(chat_stream_router)
+    app.include_router(session_router)
+    app.include_router(feedback_router)
     app.include_router(settings_router)
     app.include_router(ui_router)
 

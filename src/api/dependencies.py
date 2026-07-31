@@ -13,14 +13,12 @@ import hashlib
 import json
 import logging
 import os
-import platform
-import uuid
 from datetime import datetime, timezone
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import Any
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from qdrant_client import AsyncQdrantClient
 
 from src.vector_store.client import get_qdrant_client as _get_qdrant_client
@@ -44,72 +42,104 @@ _SENSITIVE_KEYS = frozenset(
     }
 )
 
-# Machine-specific identifier for key derivation
-_MACHINE_ID = str(uuid.getnode())  # MAC-based machine identifier
+_PBKDF2_ITERATIONS = 600_000
+_PBKDF2_DKLEN = 32
+_SALT_SEPARATOR = ":"
 
 
-def _get_machine_id() -> str:
-    """Return a machine-specific identifier for Fernet key derivation.
-
-    Uses a combination of:
-    - Platform node (MAC address hash)
-    - Machine hostname
+def _get_passphrase() -> str:
+    """Get the encryption passphrase from environment.
 
     Returns:
-        A stable string unique to this machine.
+        The passphrase string.
+
+    Raises:
+        RuntimeError: If RAG_STUDIO_PASSPHRASE is not set.
     """
-    return f"{_MACHINE_ID}:{platform.node()}"
+    passphrase = os.getenv("RAG_STUDIO_PASSPHRASE")
+    if not passphrase:
+        raise RuntimeError(
+            "RAG_STUDIO_PASSPHRASE environment variable is not set. "
+            "Please set a strong passphrase to encrypt your API keys "
+            "(e.g., `export RAG_STUDIO_PASSPHRASE='your-strong-passphrase'`)."
+        )
+    return passphrase
 
 
-def _derive_fernet_key(passphrase: str | None = None) -> bytes:
-    """Derive a Fernet-compatible 32-byte key from machine_id + optional passphrase.
+def _derive_key(salt: bytes, passphrase: str) -> bytes:
+    """Derive a Fernet-compatible 32-byte key via PBKDF2-HMAC-SHA256.
 
     Args:
-        passphrase: Optional user-provided passphrase for extra security.
+        salt: Random 16-byte salt.
+        passphrase: The user-provided passphrase.
 
     Returns:
-        32-byte base64-encoded Fernet key.
+        32-byte base64-urlsafe-encoded Fernet key.
     """
-    machine_id = _get_machine_id()
-    seed = machine_id
-    if passphrase:
-        seed = f"{machine_id}:{passphrase}"
-    digest = hashlib.sha256(seed.encode("utf-8")).digest()
-    return base64.urlsafe_b64encode(digest)
-
-
-def _get_fernet() -> Fernet:
-    """Return a Fernet instance using the derived key."""
-    passphrase = os.getenv("RAG_STUDIO_PASSPHRASE")
-    key = _derive_fernet_key(passphrase if passphrase else None)
-    return Fernet(key)
+    raw = hashlib.pbkdf2_hmac(
+        "sha256",
+        passphrase.encode("utf-8"),
+        salt,
+        _PBKDF2_ITERATIONS,
+        dklen=_PBKDF2_DKLEN,
+    )
+    return base64.urlsafe_b64encode(raw)
 
 
 def encrypt_api_key(plaintext: str) -> str:
-    """Encrypt an API key using AES-256 (Fernet).
+    """Encrypt a plaintext value using Fernet with PBKDF2 key derivation.
+
+    Generates a random 16-byte salt, derives the encryption key via
+    PBKDF2-HMAC-SHA256 (600k iterations), and encrypts with Fernet.
+    The salt is prepended to the ciphertext: ``<salt_b64>:<token>``.
 
     Args:
-        plaintext: The API key to encrypt.
+        plaintext: The value to encrypt.
 
     Returns:
-        Base64-encoded encrypted key string.
+        Encrypted string in ``salt:token`` format.
+
+    Raises:
+        RuntimeError: If RAG_STUDIO_PASSPHRASE is not set.
     """
-    f = _get_fernet()
+    salt = os.urandom(16)
+    passphrase = _get_passphrase()
+    key = _derive_key(salt, passphrase)
+    f = Fernet(key)
     encrypted = f.encrypt(plaintext.encode("utf-8"))
-    return encrypted.decode("utf-8")
+    salt_b64 = base64.b64encode(salt).decode("ascii")
+    return f"{salt_b64}{_SALT_SEPARATOR}{encrypted.decode('ascii')}"
 
 
 def decrypt_api_key(ciphertext: str) -> str:
-    """Decrypt an API key previously encrypted with Fernet.
+    """Decrypt a value previously encrypted with encrypt_api_key.
+
+    Parses the ``salt:token`` format, re-derives the key via
+    PBKDF2, and decrypts with Fernet.
 
     Args:
-        ciphertext: The encrypted API key string.
+        ciphertext: The encrypted string in ``salt:token`` format.
 
     Returns:
-        The original plaintext API key.
+        The decrypted plaintext string.
+
+    Raises:
+        ValueError: If the ciphertext uses the old (pre-PBKDF2) format.
+        RuntimeError: If RAG_STUDIO_PASSPHRASE is not set.
+        InvalidToken: If the token cannot be decrypted (wrong passphrase).
     """
-    f = _get_fernet()
-    decrypted = f.decrypt(ciphertext.encode("utf-8"))
+    if _SALT_SEPARATOR not in ciphertext:
+        raise ValueError(
+            "Old-format encrypted secret detected (no salt prefix). "
+            "Please re-save your secrets with the new passphrase-based encryption. "
+            "Set RAG_STUDIO_PASSPHRASE and re-enter your API keys in Settings."
+        )
+    salt_b64, token = ciphertext.split(_SALT_SEPARATOR, 1)
+    salt = base64.b64decode(salt_b64)
+    passphrase = _get_passphrase()
+    key = _derive_key(salt, passphrase)
+    f = Fernet(key)
+    decrypted = f.decrypt(token.encode("ascii"))
     return decrypted.decode("utf-8")
 
 
@@ -128,7 +158,12 @@ def load_secrets() -> dict[str, str]:
     """Load and decrypt stored secrets from disk.
 
     Returns:
-        Dictionary of decrypted key-value pairs, or empty dict if no secrets exist.
+        Dictionary of decrypted key-value pairs, or empty dict if no
+        secrets file exists or if the file is corrupted/unreadable.
+
+    Raises:
+        RuntimeError: If RAG_STUDIO_PASSPHRASE is not set.
+        OSError: On unexpected filesystem errors (not FileNotFoundError).
     """
     path = get_secrets_path()
     if not path.exists():
@@ -138,7 +173,21 @@ def load_secrets() -> dict[str, str]:
         plaintext = decrypt_api_key(ciphertext)
         secrets: dict[str, str] = json.loads(plaintext)
         return secrets
-    except Exception:
+    except FileNotFoundError:
+        return {}
+    except (InvalidToken, json.JSONDecodeError) as e:
+        logging.getLogger(__name__).warning(
+            "Failed to decrypt secrets file %s: %s. Starting with empty secrets.",
+            path,
+            e,
+        )
+        return {}
+    except ValueError as e:
+        logging.getLogger(__name__).warning(
+            "Failed to decrypt secrets file %s: %s. Starting with empty secrets.",
+            path,
+            e,
+        )
         return {}
 
 

@@ -6,6 +6,7 @@ Uses Annotated reducers for accumulating state (messages via add_messages).
 
 from __future__ import annotations
 
+import contextvars
 from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import BaseMessage
@@ -45,7 +46,6 @@ class RAGState(TypedDict):
 
     # Metadata
     session_id: str
-    user_api_key: str | None
 
     # LLM Configuration (from user settings)
     provider: str  # "openai" | "deepseek" | "anthropic" | "ollama"
@@ -53,3 +53,42 @@ class RAGState(TypedDict):
     temperature: float  # 0.0–2.0
     max_tokens: int  # max tokens for generation
     system_prompt: str  # custom system prompt from settings
+
+
+# ============================================================
+# Context Variable: User API Key (SEC-H02)
+# ============================================================
+# Stored in a context variable rather than in RunnableConfig or
+# RAGState so that LangSmith NEVER traces it and the checkpointer
+# NEVER persists it.
+
+_user_api_key_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "_rag_user_api_key", default=None
+)
+
+
+def get_user_api_key() -> str | None:
+    """Get the user API key from the current async context.
+
+    Context vars are NOT traced by LangSmith and NOT persisted by
+    the checkpointer (SEC-H02).
+
+    Returns:
+        The user's API key, or None if not set.
+    """
+    return _user_api_key_ctx.get()
+
+
+def set_user_api_key(key: str | None) -> contextvars.Token[str | None]:
+    """Set the user API key in the current async context.
+
+    Returns a Token that should be passed to ``_user_api_key_ctx.reset()``
+    to restore the previous value when the graph invocation completes.
+
+    Args:
+        key: The user's API key, or None.
+
+    Returns:
+        A contextvars Token for restoring the previous value.
+    """
+    return _user_api_key_ctx.set(key)

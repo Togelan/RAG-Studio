@@ -58,7 +58,6 @@ def _make_state(**overrides: object) -> RAGState:
         "faithfulness_score": 0.0,
         "validation_passed": False,
         "session_id": "test-session-001",
-        "user_api_key": None,
         "provider": "openai",
         "model_name": "gpt-4o-mini",
         "temperature": 1.0,
