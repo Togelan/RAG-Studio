@@ -15,6 +15,9 @@ services:
       dockerfile: Dockerfile
     image: rag-studio:latest
     container_name: rag-studio
+    # Start as root only long enough for the entrypoint to chown host bind
+    # mounts, then it re-execs the application as ragstudio.
+    user: "0:0"
 
     # Port mapping: host:container
     ports:
@@ -26,8 +29,8 @@ services:
       - ./rag-data:/app/data
       # Legacy mounts (backward compatibility)
       - ./rag-data/qdrant:/data/qdrant
-      - ./rag-data/secrets:/root/.rag-studio/secrets
-      - ./rag-data/logs:/root/.rag-studio/logs
+      - ./rag-data/secrets:/home/ragstudio/.rag-studio/secrets
+      - ./rag-data/logs:/home/ragstudio/.rag-studio/logs
 
     # Environment variables
     env_file:
@@ -36,8 +39,8 @@ services:
     environment:
       - RAG_STUDIO_DATA_ROOT=/app/data
       - QDRANT_PATH=/data/qdrant
-      - RAG_STUDIO_SECRETS_PATH=/root/.rag-studio/secrets/secrets.enc
-      - RAG_STUDIO_LOGS_PATH=/root/.rag-studio/logs
+      - RAG_STUDIO_SECRETS_PATH=/home/ragstudio/.rag-studio/secrets/secrets.enc
+      - RAG_STUDIO_LOGS_PATH=/home/ragstudio/.rag-studio/logs
 
     # Resource constraints (AC-008.7)
     # Minimum: 4 GB RAM, 2 CPUs

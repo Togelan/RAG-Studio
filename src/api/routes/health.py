@@ -54,7 +54,7 @@ async def health_check(
         # without adding safety — the AttributeError fallback below
         # handles the case where the method is genuinely absent.
         qdrant_ok = await client.health_check()  # type: ignore[attr-defined]
-    except AttributeError, Exception:
+    except (AttributeError, Exception):
         qdrant_ok = False
 
     qdrant_status = "ok" if qdrant_ok else "unavailable"

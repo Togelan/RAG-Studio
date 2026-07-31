@@ -64,6 +64,11 @@ def _settings_path() -> Path:
     """Return the same settings location used by the settings API."""
     return configured_path("RAG_STUDIO_SETTINGS_PATH", "settings.enc.json")
 
+# A single document can otherwise fan out into an unbounded embedding batch.
+# This limit applies to both uploads and re-ingestion before any embeddings or
+# Qdrant writes are attempted.
+MAX_CHUNKS_PER_DOCUMENT = 10_000
+
 # In-memory store of ingested file metadata for duplicate detection (AC-001.8–001.10)
 # Key: normalized filename (lowercase), Value: dict with hash, chunk_settings, chunk_count
 stored_files: dict[str, dict[str, object]] = {}
@@ -227,6 +232,17 @@ class ReingestResponse(BaseModel):
     file_id: str
     message: str = ""
     detail: str | None = None
+
+
+class ChunkLimitExceededError(ValueError):
+    """Raised when a document would exceed the ingestion chunk safety limit."""
+
+    def __init__(self, chunk_count: int) -> None:
+        super().__init__(
+            f"Document produces {chunk_count} chunks, exceeding the maximum of "
+            f"{MAX_CHUNKS_PER_DOCUMENT:,}. Reduce the document size or increase "
+            "the chunk size and try again."
+        )
 
 
 # ============================================================
@@ -562,6 +578,9 @@ async def _ingest_file_locked(
                 extra={"error": "no_chunks"},
             )
             return
+
+        if len(chunks) > MAX_CHUNKS_PER_DOCUMENT:
+            raise ChunkLimitExceededError(len(chunks))
 
         await _set_progress(
             file_id, "processing", f"Generating embeddings for {len(chunks)} chunks..."

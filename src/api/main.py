@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.api.dependencies import log_audit
+from src.api.rate_limiter import RateLimitMiddleware
 from src.api.routes.chat import router as chat_router
 from src.api.routes.chat import set_graph
 from src.api.routes.health import router as health_router
@@ -207,6 +208,8 @@ def create_app() -> FastAPI:
     )
 
     # CORS middleware — allow local development
+    # Apply per-IP sliding-window limits to API requests.
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins_from_environment(),

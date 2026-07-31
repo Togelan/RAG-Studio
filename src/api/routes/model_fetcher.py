@@ -104,7 +104,7 @@ def load_models_cache() -> dict[str, Any]:
     try:
         with open(cache_path, encoding="utf-8") as f:
             return cast("dict[str, Any]", json.load(f))
-    except json.JSONDecodeError, OSError:
+    except (json.JSONDecodeError, OSError):
         return {}
 
 
@@ -254,7 +254,7 @@ async def check_anthropic_auth(api_key: str) -> bool:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(url, headers=headers, json=payload)
             return resp.status_code in (200, 429)  # 429 = rate-limited but auth valid
-    except httpx.TimeoutException, httpx.RequestError, OSError:
+    except (httpx.TimeoutException, httpx.RequestError, OSError):
         return False
 
 

@@ -524,7 +524,7 @@ CONTEXT:
     try:
         score = float(str(response.content).strip() if response.content else "0.5")
         score = max(0.0, min(1.0, score))  # clamp to [0, 1]
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         score = 0.5  # default on parse failure
 
     validation_passed = score > FAITHFULNESS_THRESHOLD
