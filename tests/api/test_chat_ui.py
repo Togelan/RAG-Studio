@@ -39,7 +39,7 @@ def fixture_client() -> Generator[TestClient, Any, None]:
             return_value=None,
         ),
         patch(
-            "src.api.routes.chat.run_rag_graph",
+            "src.api.routes.chat_stream.run_rag_graph",
             new_callable=AsyncMock,
             return_value={
                 "final_answer": (
@@ -98,10 +98,13 @@ def fixture_client() -> Generator[TestClient, Any, None]:
 @pytest.fixture(autouse=True)
 def _reset_chat_state() -> Generator[None, Any, None]:  # pyright: ignore[reportUnusedFunction]
     """Reset in-memory chat session state before each test."""
-    import src.api.routes.chat as chat_module
+    import src.api.routes.chat_state as chat_state
+    from src.api.routes.session_store import BoundedSessionStore
 
-    chat_module._session_meta.clear()  # pyright: ignore[reportPrivateUsage]
-    chat_module._session_messages.clear()  # pyright: ignore[reportPrivateUsage]
+    chat_state._session_meta.clear()  # pyright: ignore[reportPrivateUsage]
+    chat_state._session_messages = BoundedSessionStore(  # pyright: ignore[reportPrivateUsage]
+        max_sessions=50, max_messages_per_session=100
+    )
     yield
 
 
@@ -492,7 +495,7 @@ class TestAdversarialPromptRobustness:
 
         AC-006.7: Grounding instruction is FIRST SystemMessage.
         """
-        from src.api.routes.chat import GROUNDING_INSTRUCTION
+        from src.api.routes.chat_state import GROUNDING_INSTRUCTION
 
         assert "RAG-Studio" in GROUNDING_INSTRUCTION
         assert "Answer strictly based on the provided context" in GROUNDING_INSTRUCTION
@@ -518,7 +521,7 @@ class TestAdversarialPromptRobustness:
 
         AC-006.7: Grounding instruction cannot be overridden by user input.
         """
-        from src.api.routes.chat import GROUNDING_INSTRUCTION
+        from src.api.routes.chat_state import GROUNDING_INSTRUCTION
 
         # The constant is immutable in the module
         expected = (

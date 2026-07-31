@@ -106,7 +106,7 @@
     showLoadingIndicator();
 
     try {
-      var resp = await fetch('/api/chat/send', {
+      var resp = await ragFetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: text, session_id: activeSessionId || 'default' })
@@ -180,16 +180,24 @@
   }
 
   function updateStreamingMessage(content, msgId) {
-    // Remove any previous streaming placeholder
-    messages = messages.filter(function (m) { return m.id !== '_streaming'; });
-    messages.push({
-      id: '_streaming',
-      role: 'assistant',
-      content: content,
-      created_at: new Date().toISOString(),
-      citations: null
-    });
-    renderMessages();
+    // Update or create the streaming bubble directly — no full re-render.
+    // This prevents flicker when cache responses arrive near-instantly.
+    var msgsContainer = el('chatMessages');
+    if (!msgsContainer) return;
+
+    var streamEl = msgsContainer.querySelector('.message.streaming');
+    if (!streamEl) {
+      streamEl = document.createElement('div');
+      streamEl.className = 'message assistant streaming';
+      var bubble = document.createElement('div');
+      bubble.className = 'message-bubble';
+      streamEl.appendChild(bubble);
+      msgsContainer.appendChild(streamEl);
+    }
+    var bubbleEl = streamEl.querySelector('.message-bubble');
+    if (bubbleEl) {
+      bubbleEl.innerHTML = escapeHtml(content);
+    }
     scrollToBottom();
   }
 
@@ -448,7 +456,7 @@
 
   async function doSubmitFeedback(messageId, feedback, reason) {
     try {
-      var resp = await fetch('/api/chat/feedback', {
+      var resp = await ragFetch('/api/chat/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -514,7 +522,7 @@
       async function () {
         if (activeSessionId) {
           try {
-            await fetch('/api/chat/sessions/' + encodeURIComponent(activeSessionId) + '/messages', {
+            await ragFetch('/api/chat/sessions/' + encodeURIComponent(activeSessionId) + '/messages', {
               method: 'DELETE'
             });
           } catch (e) {
@@ -740,7 +748,7 @@
 
   async function loadSessions() {
     try {
-      var resp = await fetch('/api/chat/sessions');
+      var resp = await ragFetch('/api/chat/sessions');
       if (!resp.ok) return;
       sessions = await resp.json();
       renderSessionList();
@@ -751,7 +759,7 @@
 
   async function createSession() {
     try {
-      var resp = await fetch('/api/chat/sessions', {
+      var resp = await ragFetch('/api/chat/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'New Session' })
@@ -768,7 +776,7 @@
 
   async function deleteSession(id) {
     try {
-      var resp = await fetch('/api/chat/sessions/' + encodeURIComponent(id), {
+      var resp = await ragFetch('/api/chat/sessions/' + encodeURIComponent(id), {
         method: 'DELETE'
       });
       if (!resp.ok) return;
@@ -796,7 +804,7 @@
     showRenameModal(currentTitle, async function (newTitle) {
       if (!newTitle || !newTitle.trim()) return;
       try {
-        var resp = await fetch('/api/chat/sessions/' + encodeURIComponent(id), {
+        var resp = await ragFetch('/api/chat/sessions/' + encodeURIComponent(id), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: newTitle.trim() })
@@ -879,7 +887,7 @@
 
     // Load messages for this session
     try {
-      var resp = await fetch('/api/chat/sessions/' + encodeURIComponent(id) + '/messages');
+      var resp = await ragFetch('/api/chat/sessions/' + encodeURIComponent(id) + '/messages');
       if (resp.ok) {
         var msgs = await resp.json();
         messages = msgs;

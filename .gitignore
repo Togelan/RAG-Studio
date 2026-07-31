@@ -64,7 +64,11 @@ htmlcov/
 docker-compose.override.yml
 
 # ============================================================
+# Graphity generated AST/semantic cache (rebuildable; keep graph artifacts)
+# ============================================================
+graphify-out/cache/
+
 # Documentation (local-use only)
 # ============================================================
-short instruction of use.md
+sandbox/
 blog-post-ru.md

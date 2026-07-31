@@ -1,9 +1,10 @@
 """LangGraph StateGraph builder and runner for the RAG-Studio chat graph (FR-003).
 
-Assembles all 7 nodes with conditional edges and a patched AsyncSqliteSaver
-checkpointer that uses JsonPlusSerializer for both checkpoint data AND metadata,
-fixing the langgraph 0.4.x bug where json.dumps() on metadata fails on
-HumanMessage objects in writes.__start__.messages.
+Assembles all 7 nodes with conditional edges and AsyncSqliteSaver checkpointer.
+Uses the official LangGraph async pattern:
+    async with AsyncSqliteSaver.from_conn_string(...) as saver:
+        await saver.setup()
+        graph = builder.compile(checkpointer=saver)
 """
 
 from __future__ import annotations
@@ -11,8 +12,10 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, cast
+from pathlib import Path
+from typing import Any, cast
 
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import END, StateGraph
 
 from src.graph.nodes import (
@@ -24,65 +27,9 @@ from src.graph.nodes import (
     save_to_cache_node,
     validate_node,
 )
-from src.graph.state import RAGState
-
-if TYPE_CHECKING:
-    from langchain_core.runnables import RunnableConfig
-    from langgraph.checkpoint.base import (
-        ChannelVersions,
-        Checkpoint,
-        CheckpointMetadata,
-    )
+from src.graph.state import RAGState, _user_api_key_ctx, set_user_api_key
 
 logger = logging.getLogger(__name__)
-
-
-# ============================================================
-# JSON Sanitizer — prevents UnicodeDecodeError in checkpointer
-# ============================================================
-
-
-def _sanitize_for_json(obj: Any) -> Any:
-    """Recursively sanitize values for JSON serialization.
-
-    Converts non-JSON-serializable types:
-    - bytes → str via repr() (produces b'...' strings)
-    - dict keys/values → recursive sanitize
-    - list/tuple/set items → recursive sanitize
-    - Any other non-serializable type → str() fallback
-
-    Args:
-        obj: The value to sanitize.
-
-    Returns:
-        A JSON-serializable version of the input.
-    """
-    if isinstance(obj, bytes):
-        logger.warning(
-            "Sanitized non-serializable value: type=%s, repr=%.200s",
-            type(obj).__name__,
-            repr(obj)[:200],
-        )
-        return repr(obj)  # b'...' — valid JSON string
-    if isinstance(obj, dict):
-        return {
-            _sanitize_for_json(k): _sanitize_for_json(v)
-            for k, v in obj.items()  # pyright: ignore[reportUnknownVariableType]
-        }
-    if isinstance(obj, (list, tuple, set)):
-        return [
-            _sanitize_for_json(item)  # pyright: ignore[reportUnknownVariableType]
-            for item in obj  # pyright: ignore[reportUnknownVariableType]
-        ]
-    if isinstance(obj, (str, int, float, bool)) or obj is None:
-        return obj
-    # Fallback: convert to string
-    logger.warning(
-        "Sanitized non-serializable value: type=%s, repr=%.200s",
-        type(obj).__name__,
-        repr(obj)[:200],
-    )
-    return str(obj)
 
 
 # ============================================================
@@ -91,17 +38,19 @@ def _sanitize_for_json(obj: Any) -> Any:
 
 
 def route_after_analyzer(state: RAGState) -> str:
-    """Route based on intent: follow-up → cache_check, standalone → retrieve.
+    """Route ALL queries through cache_check first for maximum cache hit rate.
+
+    Previously only follow-up questions were routed to cache_check.
+    Now standalone questions also hit the cache, avoiding redundant
+    retrieval + LLM generation for semantically similar queries.
 
     Args:
         state: Current RAGState after analyzer_node.
 
     Returns:
-        Next node name: "cache_check" or "retrieve".
+        Next node name: "cache_check" always.
     """
-    if state["intent"] == "follow_up_question":
-        return "cache_check"
-    return "retrieve"
+    return "cache_check"
 
 
 def route_after_cache_check(state: RAGState) -> str:
@@ -178,11 +127,11 @@ def build_rag_graph() -> StateGraph:
     # Set entry point
     builder.set_entry_point("analyzer")
 
-    # Conditional edges from analyzer
+    # All queries route through cache_check first
     builder.add_conditional_edges(
         "analyzer",
         route_after_analyzer,
-        {"cache_check": "cache_check", "retrieve": "retrieve"},
+        {"cache_check": "cache_check"},
     )
 
     # Conditional edges from cache_check
@@ -212,8 +161,106 @@ def build_rag_graph() -> StateGraph:
 
 
 # ============================================================
-# Graph Lifecycle — AsyncSqliteSaver (persistent checkpointer)
+# Custom Serializer — handles LangChain message objects in checkpoints
 # ============================================================
+
+# Known LangChain message class names and their short type codes.
+# Must match what convert_to_messages expects ('human', 'ai', etc.).
+_LC_MESSAGE_TYPE_MAP: dict[str, str] = {
+    "HumanMessage": "human",
+    "AIMessage": "ai",
+    "SystemMessage": "system",
+    "ToolMessage": "tool",
+    "FunctionMessage": "function",
+    "ChatMessage": "chat",
+}
+
+_LC_MESSAGE_TYPES: frozenset[str] = frozenset(_LC_MESSAGE_TYPE_MAP.keys())
+
+
+def _convert_lc_messages(obj: object) -> object:
+    """Recursively convert LangChain message objects to plain dicts.
+
+    The default JsonPlusSerializer uses ormsgpack which cannot encode
+    LangChain message objects when nested inside checkpoint metadata
+    (e.g. the 'writes' field). This function walks the entire object
+    graph and converts any LangChain message to a JSON-safe dict.
+    """
+    if obj is None or isinstance(obj, (str, int, float, bool, bytes, bytearray)):
+        return obj
+    type_name = type(obj).__name__
+    if type_name in _LC_MESSAGE_TYPES and hasattr(obj, "content"):
+        msg: dict[str, object] = {
+            "type": _LC_MESSAGE_TYPE_MAP.get(type_name, type_name.lower()),
+            "content": getattr(obj, "content", ""),
+        }
+        for attr in ("additional_kwargs", "response_metadata", "id", "name"):
+            if hasattr(obj, attr):
+                val = getattr(obj, attr)
+                if val is not None:
+                    msg[attr] = val
+        return msg
+    if isinstance(obj, dict):
+        return {str(k): _convert_lc_messages(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_convert_lc_messages(item) for item in obj]
+    return obj
+
+
+class _RAGStudioSerializer(JsonPlusSerializer):
+    """Custom serde that converts LangChain messages before msgpack encoding.
+
+    Overrides dumps_typed (the method actually called by LangGraph's
+    AsyncSqliteSaver) to pre-process objects and replace any LangChain
+    message with its dict representation before ormsgpack encoding.
+    """
+
+    def dumps_typed(self, obj: object) -> tuple[str, bytes]:
+        converted = _convert_lc_messages(obj)
+        return super().dumps_typed(converted)
+
+    def loads_typed(self, data: tuple[str, bytes]) -> object:
+        """Restore serialized LangChain message dictionaries after loading."""
+        from langchain_core.messages.utils import convert_to_messages
+
+        def restore(value: object) -> object:
+            if isinstance(value, dict):
+                message_type = value.get("type")
+                if isinstance(message_type, str) and message_type in {
+                    "human",
+                    "ai",
+                    "system",
+                    "tool",
+                    "function",
+                }:
+                    return convert_to_messages([value])[0]
+                return {str(key): restore(item) for key, item in value.items()}
+            if isinstance(value, list):
+                return [restore(item) for item in value]
+            return value
+
+        return restore(super().loads_typed(data))
+
+
+# ============================================================
+# Graph Lifecycle — AsyncSqliteSaver (Official LangGraph Pattern)
+# ============================================================
+
+
+def _default_checkpoints_path() -> str:
+    """Return the absolute path to the checkpoints database.
+
+    Resolves to ``<project_root>/data/checkpoints/checkpoints.db``.
+
+    Returns:
+        Absolute path string to the SQLite checkpoints database.
+    """
+    # __file__ → src/graph/builder.py
+    # .parent → src/graph/
+    # .parent.parent → src/
+    # .parent.parent.parent → project root (RAG-Studio/)
+    project_root = Path(__file__).resolve().parent.parent.parent
+    return str(project_root / "data" / "checkpoints" / "checkpoints.db")
 
 
 @asynccontextmanager
@@ -222,369 +269,70 @@ async def create_graph(
 ) -> AsyncIterator[Any]:
     """Create a compiled graph with AsyncSqliteSaver checkpointer.
 
-    Uses a patched AsyncSqliteSaver with persistent SQLite storage and
-    JsonPlusSerializer for LangChain message serialization in WRITES,
-    so chat sessions survive server restarts. Falls back to
-    MemorySaver if db_path is not provided.
-
-    The patched subclass overrides aput_writes() to use serde for the
-    VALUE column (BLOB) which may contain HumanMessage/AIMessage objects.
-    The aput() method uses json.dumps() for metadata (TEXT column —
-    aget_tuple reads it via json.loads()) and serde only for checkpoints.
-    This fixes the langgraph 0.4.x bug where json.dumps() on writes
-    crashes on HumanMessage objects.
+    Uses the official LangGraph async pattern:
+    1. Resolve the absolute db_path (defaults to
+       ``<project_root>/data/checkpoints/checkpoints.db``).
+    2. Ensure the parent directory exists.
+    3. Open AsyncSqliteSaver connection via async context manager.
+    4. Call setup() to create tables on first run.
+    5. Compile the graph with the checkpointer.
+    6. Yield the compiled graph for use.
+    7. Close the connection on context exit.
 
     Args:
-        db_path: Path to SQLite database for checkpoint persistence.
+        db_path: Absolute or relative path to the SQLite database file.
+            If None, uses ``<project_root>/data/checkpoints/checkpoints.db``.
 
     Yields:
         Compiled StateGraph ready for ainvoke/astream calls.
-    """
-    from pathlib import Path
 
-    from langgraph.checkpoint.memory import MemorySaver
-    from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+    Example:
+        async with create_graph() as graph:
+            result = await run_rag_graph(
+                query="What is ML?",
+                session_id="session-1",
+                compiled_graph=graph,
+            )
+    """
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-    if db_path:
-        db_path_resolved = str(Path(db_path).resolve())
-        Path(db_path_resolved).parent.mkdir(parents=True, exist_ok=True)
+    resolved_path: str = db_path if db_path is not None else _default_checkpoints_path()
 
-        from collections.abc import Sequence
+    # Ensure the parent directory exists so SQLite can create the file.
+    Path(resolved_path).parent.mkdir(parents=True, exist_ok=True)
 
-        import aiosqlite
+    import aiosqlite
 
-        async with aiosqlite.connect(db_path_resolved) as conn:
-            serde = JsonPlusSerializer()
+    async with aiosqlite.connect(resolved_path) as conn:
+        await conn.execute("PRAGMA journal_mode=WAL;")
+        saver = AsyncSqliteSaver(conn, serde=_RAGStudioSerializer())
 
-            # Patched subclass: overrides aput() and aput_writes() to fix
-            # LangGraph 0.4.x serialization bugs:
-            # - aput:     checkpoint uses serde (BLOB), metadata uses json.dumps()
-            #             (TEXT — aget_tuple reads via json.loads())
-            # - aput_writes: channel uses json.dumps() (TEXT), value uses serde
-            #             (BLOB — may contain HumanMessage/AIMessage objects)
-            class _PatchedSaver(AsyncSqliteSaver):
-                async def aput(
-                    self,
-                    config: RunnableConfig,
-                    checkpoint: Checkpoint,
-                    metadata: CheckpointMetadata,
-                    new_versions: ChannelVersions,
-                ) -> RunnableConfig:
-                    # Serialize checkpoint with serde (JsonPlusSerializer)
-                    type_, serialized_checkpoint = self.serde.dumps_typed(checkpoint)
+        # Wrap aput to convert LangChain messages in metadata before
+        # the hard-coded json.dumps() call in AsyncSqliteSaver.aput.
+        _orig_aput = saver.aput
 
-                    # Serialize metadata with serde (NOT json.dumps()).
-                    # BUGFIX: Previously json.dumps() was used here, but
-                    # aget_tuple() reads metadata via serde.loads_typed().
-                    # The mismatch caused UnicodeDecodeError ("Input must be
-                    # bytes, bytearray, memoryview") on every checkpoint read,
-                    # making sessions disappear after server restart.
-                    _, serialized_metadata = self.serde.dumps_typed(metadata)
-                    await self.setup()
-                    configurable: dict[str, Any] = config.get("configurable", {})
-                    thread_id = configurable["thread_id"]
-                    checkpoint_ns = configurable["checkpoint_ns"]
+        async def _wrapped_aput(
+            config: dict[str, object],
+            checkpoint: object,
+            metadata: dict[str, object],
+            new_versions: dict[str, object],
+        ) -> None:
+            safe_metadata = _convert_lc_messages(metadata)
+            await _orig_aput(config, checkpoint, safe_metadata, new_versions)  # type: ignore[arg-type]
 
-                    # Diagnostic log: what is being saved to the checkpointer
-                    import json as _json
+        saver.aput = _wrapped_aput  # type: ignore[assignment]
 
-                    channel_values: object = checkpoint.get("channel_values", {})
-                    raw_msgs: object = (
-                        channel_values.get("messages", [])  # type: ignore[union-attr]
-                    )
-                    msg_count = (
-                        len(cast("list[object]", raw_msgs))
-                        if isinstance(raw_msgs, (list, tuple))
-                        else 0
-                    )
-                    meta_keys: object = list(metadata.keys())
-                    logger.info(
-                        "aput: thread_id=%s, checkpoint_id=%.8s, "
-                        "messages_in_state=%d, metadata_keys=%s",
-                        thread_id,
-                        str(checkpoint.get("id", ""))[:8],
-                        msg_count,
-                        _json.dumps(meta_keys, default=str)[:200],
-                    )
-
-                    async with (
-                        self.lock,
-                        self.conn.execute(
-                            "INSERT OR REPLACE INTO checkpoints "
-                            "(thread_id, checkpoint_ns, checkpoint_id, "
-                            "parent_checkpoint_id, type, checkpoint, metadata) "
-                            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                            (
-                                str(thread_id),
-                                checkpoint_ns,
-                                checkpoint["id"],
-                                configurable.get("checkpoint_id"),
-                                type_,
-                                serialized_checkpoint,
-                                serialized_metadata,
-                            ),
-                        ),
-                    ):
-                        await self.conn.commit()
-                    return {
-                        "configurable": {
-                            "thread_id": thread_id,
-                            "checkpoint_ns": checkpoint_ns,
-                            "checkpoint_id": checkpoint["id"],
-                        }
-                    }
-
-                async def aput_writes(
-                    self,
-                    config: RunnableConfig,
-                    writes: Sequence[tuple[str, Any]],
-                    task_id: str,
-                    task_path: str = "",
-                ) -> None:
-                    """Override aput_writes to use serde for VALUE serialization.
-
-                    langgraph 0.4.x AsyncSqliteSaver.aput_writes() calls
-                    json.dumps() on write VALUES which crashes when writes
-                    contain LangChain message objects (e.g., messages channel
-                    with HumanMessage/AIMessage in writes).
-
-                    Only the VALUE column uses serde (BLOB). The CHANNEL column
-                    (TEXT) uses json.dumps() as expected by the table schema.
-                    """
-                    import json as _json
-
-                    await self.setup()
-                    configurable: dict[str, Any] = config.get("configurable", {})
-                    thread_id = configurable["thread_id"]
-                    checkpoint_ns = configurable["checkpoint_ns"]
-                    checkpoint_id = configurable["checkpoint_id"]
-
-                    # Diagnostic: log what writes are being saved
-                    write_channels = [ch for ch, _ in writes]
-                    logger.info(
-                        "aput_writes: thread_id=%s, checkpt=%.8s, "
-                        "task_id=%.8s, channels=%s, count=%d",
-                        thread_id,
-                        str(checkpoint_id)[:8],
-                        str(task_id)[:8],
-                        write_channels,
-                        len(writes),
-                    )
-
-                    async with self.lock:
-                        for idx, (channel, value) in enumerate(writes):
-                            # Channel is TEXT — use json.dumps() (original behavior)
-                            channel_str = (
-                                _json.dumps(channel)
-                                if not isinstance(channel, str)  # pyright: ignore[reportUnnecessaryIsInstance]
-                                else channel
-                            )
-                            # Value may contain LangChain messages — use serde
-                            # Wrap in try/except with sanitize fallback for bytes
-                            try:
-                                type_, serialized_value = self.serde.dumps_typed(value)
-                            except Exception as exc:
-                                logger.warning(
-                                    "aput_writes: value serialization failed "
-                                    "(%s: %s), attempting sanitize fallback.",
-                                    type(exc).__name__,
-                                    exc,
-                                )
-                                sanitized_value = _sanitize_for_json(value)
-                                type_, serialized_value = self.serde.dumps_typed(
-                                    sanitized_value
-                                )
-                            await self.conn.execute(
-                                "INSERT OR REPLACE INTO writes "
-                                "(thread_id, checkpoint_ns, checkpoint_id, "
-                                "task_id, idx, channel, type, value) "
-                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                (
-                                    str(thread_id),
-                                    checkpoint_ns,
-                                    checkpoint_id,
-                                    task_id,
-                                    idx,
-                                    channel_str,
-                                    type_,
-                                    serialized_value,
-                                ),
-                            )
-                        await self.conn.commit()
-
-                async def aget_tuple(
-                    self, config: RunnableConfig
-                ) -> Any:  # CheckpointTuple | None
-                    """Override aget_tuple to use serde.loads_typed() for checkpoint and metadata.
-
-                    Since aput() and aput_writes() now serialize checkpoints and
-                    metadata using serde.dumps_typed() (not json.dumps()), the
-                    read path must also use serde.loads_typed().
-
-                    Backward compatibility: old checkpoints may have metadata
-                    stored as plain JSON text (bug from v0.1). If
-                    serde.loads_typed() fails on metadata, fall back to
-                    json.loads().
-                    """
-                    await self.setup()
-                    _configurable: dict[str, Any] = config.get("configurable", {})
-                    checkpoint_ns = _configurable.get("checkpoint_ns", "")
-                    async with self.lock, self.conn.cursor() as cur:
-                        from langgraph.checkpoint.base import (
-                            get_checkpoint_id,
-                        )
-
-                        if checkpoint_id := get_checkpoint_id(config):
-                            await cur.execute(
-                                "SELECT thread_id, checkpoint_id, "
-                                "parent_checkpoint_id, type, checkpoint, metadata "
-                                "FROM checkpoints WHERE thread_id = ? "
-                                "AND checkpoint_ns = ? AND checkpoint_id = ?",
-                                (
-                                    str(_configurable["thread_id"]),
-                                    checkpoint_ns,
-                                    checkpoint_id,
-                                ),
-                            )
-                        else:
-                            await cur.execute(
-                                "SELECT thread_id, checkpoint_id, "
-                                "parent_checkpoint_id, type, checkpoint, metadata "
-                                "FROM checkpoints WHERE thread_id = ? "
-                                "AND checkpoint_ns = ? "
-                                "ORDER BY checkpoint_id DESC LIMIT 1",
-                                (
-                                    str(_configurable["thread_id"]),
-                                    checkpoint_ns,
-                                ),
-                            )
-                        if value := await cur.fetchone():
-                            (
-                                thread_id,
-                                cp_id,
-                                parent_checkpoint_id,
-                                type_,
-                                checkpoint_blob,
-                                metadata_blob,
-                            ) = value
-                            if not get_checkpoint_id(config):
-                                config = {
-                                    "configurable": {
-                                        "thread_id": thread_id,
-                                        "checkpoint_ns": checkpoint_ns,
-                                        "checkpoint_id": cp_id,
-                                    }
-                                }
-                            # Use serde.loads_typed() for checkpoint
-                            checkpoint = self.serde.loads_typed(
-                                (type_, checkpoint_blob)
-                            )
-                            # Deserialize metadata.
-                            # Try serde.loads_typed() first (new format).
-                            # Fall back to json.loads() for old-format metadata
-                            # that was stored as plain JSON text (BUGFIX v0.1).
-                            metadata: Any = {}
-                            if metadata_blob is not None:
-                                try:
-                                    metadata = self.serde.loads_typed(
-                                        (type_, metadata_blob)
-                                    )
-                                except Exception as meta_err:
-                                    import json as _json
-
-                                    logger.warning(
-                                        "aget_tuple: metadata serde.loads_typed "
-                                        "failed (%s: %s), trying json.loads() "
-                                        "for backward compat.",
-                                        type(meta_err).__name__,
-                                        meta_err,
-                                    )
-                                    try:
-                                        # Handle both str and bytes
-                                        meta_str = (
-                                            metadata_blob.decode("utf-8")
-                                            if isinstance(metadata_blob, bytes)
-                                            else str(metadata_blob)
-                                        )
-                                        metadata = _json.loads(meta_str)
-                                    except Exception as json_err:
-                                        logger.error(
-                                            "aget_tuple: json.loads fallback "
-                                            "also failed: %s",
-                                            json_err,
-                                        )
-                                        metadata = {}
-                            # Read pending writes
-                            await cur.execute(
-                                "SELECT task_id, channel, type, value "
-                                "FROM writes WHERE thread_id = ? "
-                                "AND checkpoint_ns = ? AND checkpoint_id = ? "
-                                "ORDER BY task_id, idx",
-                                (
-                                    str(thread_id),
-                                    checkpoint_ns,
-                                    str(cp_id),
-                                ),
-                            )
-                            writes_list = [
-                                (
-                                    task_id,
-                                    channel,
-                                    self.serde.loads_typed((w_type, w_value)),
-                                )
-                                for task_id, channel, w_type, w_value in await cur.fetchall()
-                            ]
-                            from langgraph.checkpoint.base import (
-                                CheckpointTuple,
-                            )
-
-                            return CheckpointTuple(
-                                config=config,
-                                checkpoint=checkpoint,
-                                metadata=metadata,
-                                parent_config=(
-                                    {
-                                        "configurable": {
-                                            "thread_id": thread_id,
-                                            "checkpoint_ns": checkpoint_ns,
-                                            "checkpoint_id": parent_checkpoint_id,
-                                        }
-                                    }
-                                    if parent_checkpoint_id
-                                    else None
-                                ),
-                                pending_writes=writes_list if writes_list else None,
-                            )
-                        return None
-
-            saver = _PatchedSaver(conn, serde=serde)
-            await saver.setup()
-            logger.info(
-                "AsyncSqliteSaver initialized: path=%s, serde=JsonPlusSerializer (patched aput + aput_writes)",
-                db_path_resolved,
-            )
-
-            compiled_graph = build_rag_graph().compile(  # pyright: ignore[reportUnknownMemberType]
-                checkpointer=saver,
-            )
-            logger.info("Graph compiled with AsyncSqliteSaver checkpointer")
-
-            yield compiled_graph
-    else:
-        memory_saver = MemorySaver()
-        logger.info(
-            "MemorySaver initialized (in-memory, no persistence across restarts)",
-        )
+        await saver.setup()
+        logger.info("AsyncSqliteSaver initialized (db=%s)", resolved_path)
 
         compiled_graph = build_rag_graph().compile(  # pyright: ignore[reportUnknownMemberType]
-            checkpointer=memory_saver,
+            checkpointer=saver,
         )
-        logger.info("Graph compiled with MemorySaver checkpointer")
+        logger.info("Graph compiled with AsyncSqliteSaver + _RAGStudioSerializer")
 
         yield compiled_graph
 
-    logger.info("Graph context closed")
+    logger.info("AsyncSqliteSaver connection closed (db=%s)", resolved_path)
 
 
 # ============================================================
@@ -629,7 +377,7 @@ async def run_rag_graph(
     config: dict[str, Any] = {
         "configurable": {
             "thread_id": session_id,  # isolates state per session (AC-003.4)
-        }
+        },
     }
 
     initial_state: dict[str, Any] = {
@@ -645,7 +393,6 @@ async def run_rag_graph(
         "faithfulness_score": 0.0,
         "validation_passed": False,
         "session_id": session_id,
-        "user_api_key": user_api_key,
         "provider": provider,
         "model_name": model,
         "temperature": temperature,
@@ -653,7 +400,14 @@ async def run_rag_graph(
         "system_prompt": system_prompt,
     }
 
-    result = await compiled_graph.ainvoke(initial_state, config)
+    # SEC-H02: Store API key in a context variable, not in config.
+    # Context vars are NOT traced by LangSmith and NOT persisted by the
+    # checkpointer, so the API key never appears in traces or local storage.
+    token = set_user_api_key(user_api_key)
+    try:
+        result = await compiled_graph.ainvoke(initial_state, config)
+    finally:
+        _user_api_key_ctx.reset(token)
 
     # Build citations from retrieved docs
     citations: list[dict[str, object]] = []

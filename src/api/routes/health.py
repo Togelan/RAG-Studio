@@ -54,7 +54,7 @@ async def health_check(
         # without adding safety — the AttributeError fallback below
         # handles the case where the method is genuinely absent.
         qdrant_ok = await client.health_check()  # type: ignore[attr-defined]
-    except AttributeError, Exception:
+    except Exception:
         qdrant_ok = False
 
     qdrant_status = "ok" if qdrant_ok else "unavailable"
@@ -73,6 +73,38 @@ class StatusResponse(BaseModel):
     )
 
 
+def _is_placeholder_key(value: str | None) -> bool:
+    """Check if an API key value looks like a placeholder, not a real key.
+
+    Detects common placeholder patterns like 'sk-your-key-here',
+    'your-', 'change-me', 'xxx', empty strings, etc.
+
+    Args:
+        value: The API key string to check, or None.
+
+    Returns:
+        True if the value appears to be a placeholder.
+    """
+    if not value or not value.strip():
+        return True
+    v = value.strip().lower()
+    placeholder_markers = (
+        "your-key",
+        "your_api_key",
+        "change-me",
+        "changeme",
+        "replace-me",
+        "placeholder",
+        "xxx",
+        "test_key",
+        "sk-xxx",
+        "sk-your",
+        "sk-ant-your",
+        "ls__your",
+    )
+    return any(marker in v for marker in placeholder_markers)
+
+
 @router.get("/api/health/status", response_model=StatusResponse)
 async def health_status() -> StatusResponse:
     """Return lightweight status for UI status indicator polling.
@@ -80,6 +112,7 @@ async def health_status() -> StatusResponse:
     Used by the frontend status indicator (every 30s).
     Checks the secrets store for API keys (not just env vars)
     and uses the in-process Qdrant client for connectivity.
+    Filters out placeholder values like 'sk-your-key-here'.
 
     Returns:
         StatusResponse with overall status and API key configuration.
@@ -90,12 +123,16 @@ async def health_status() -> StatusResponse:
 
     # Check env vars AND secrets store for any configured API key.
     # The secrets store holds keys saved via the Settings UI (encrypted).
+    # Ignore placeholder values like 'sk-your-key-here'.
     secrets = load_secrets()
-    api_key_set = bool(
-        os.getenv("OPENAI_API_KEY")
-        or os.getenv("DEEPSEEK_API_KEY")
-        or os.getenv("ANTHROPIC_API_KEY")
-        or any(k.endswith("_api_key") for k in secrets)
+    env_keys: list[str | None] = [
+        os.getenv("OPENAI_API_KEY"),
+        os.getenv("DEEPSEEK_API_KEY"),
+        os.getenv("ANTHROPIC_API_KEY"),
+    ]
+    api_key_set = any(v and not _is_placeholder_key(v) for v in env_keys) or any(
+        k.endswith("_api_key") and not _is_placeholder_key(secrets.get(k))
+        for k in secrets
     )
 
     # Use the in-process Qdrant client (same as the rest of the app).

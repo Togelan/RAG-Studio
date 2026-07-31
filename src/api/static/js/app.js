@@ -25,6 +25,155 @@
   let statusPollInterval = null;
 
   // ============================================================
+  // Authentication (SEC-C03)
+  // ============================================================
+
+  /**
+   * Get the stored auth token from sessionStorage.
+   * @returns {string|null}
+   */
+  function getAuthToken() {
+    try {
+      return sessionStorage.getItem('rag-studio-auth-token');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Store the auth token in sessionStorage.
+   * @param {string} token
+   */
+  function setAuthToken(token) {
+    try {
+      sessionStorage.setItem('rag-studio-auth-token', token);
+    } catch (e) {
+      // sessionStorage may be unavailable
+    }
+  }
+
+  /**
+   * Clear the stored auth token.
+   */
+  function clearAuthToken() {
+    try {
+      sessionStorage.removeItem('rag-studio-auth-token');
+    } catch (e) {
+      // sessionStorage may be unavailable
+    }
+  }
+
+  /**
+   * Wrapper around fetch() that automatically attaches the
+   * Authorization: Bearer <token> header from sessionStorage.
+   * If a 401 is returned and no valid token is stored, shows a
+   * login prompt so the user can enter their token.
+   *
+   * @param {string} url - The URL to fetch
+   * @param {Object} [options] - Fetch options (method, headers, body, etc.)
+   * @returns {Promise<Response>}
+   */
+  function ragFetch(url, options) {
+    options = options || {};
+    options.headers = options.headers || {};
+
+    var token = getAuthToken();
+    if (token) {
+      options.headers['Authorization'] = 'Bearer ' + token;
+    }
+
+    return fetch(url, options).then(function (resp) {
+      // If 401 and we have a token, the token may be invalid
+      if (resp.status === 401) {
+        if (token) {
+          // Token was rejected — clear it and show login
+          clearAuthToken();
+          showAuthPrompt(function () {
+            // Retry after user enters new token
+            // Don't auto-retry to avoid loops; user will reload or retry manually
+          });
+        } else {
+          // No token set — show login prompt
+          showAuthPrompt(function () {
+            // User entered token; they should retry their action
+          });
+        }
+      }
+      return resp;
+    });
+  }
+
+  /**
+   * Show the authentication prompt dialog.
+   * @param {Function} onDone - Called after user submits or cancels
+   */
+  function showAuthPrompt(onDone) {
+    // Remove existing prompt if any
+    var existing = document.getElementById('authPromptOverlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'authPromptOverlay';
+    overlay.style.cssText =
+      'position:fixed;top:0;left:0;width:100%;height:100%;' +
+      'background:rgba(0,0,0,0.5);display:flex;align-items:center;' +
+      'justify-content:center;z-index:10000;';
+
+    var dialog = document.createElement('div');
+    dialog.style.cssText =
+      'background:var(--color-bg-primary,#EFEEE9);border-radius:12px;' +
+      'padding:32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
+
+    dialog.innerHTML =
+      '<h3 style="margin:0 0 8px;font-size:18px;font-weight:600;">' +
+      (translations['auth_title'] || 'Authentication Required') +
+      '</h3>' +
+      '<p style="margin:0 0 16px;color:var(--color-text-secondary,#666);font-size:14px;">' +
+      (translations['auth_description'] || 'Enter the access token to use RAG-Studio.') +
+      '</p>' +
+      '<input type="password" id="authTokenInput" ' +
+      'placeholder="' + (translations['auth_placeholder'] || 'Enter token...') + '" ' +
+      'style="width:100%;padding:10px 12px;border:1px solid var(--color-border,#ddd);' +
+      'border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:16px;">' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+      '<button id="authPromptCancel" style="padding:8px 16px;border:1px solid var(--color-border,#ddd);' +
+      'border-radius:8px;background:transparent;cursor:pointer;font-size:14px;">' +
+      (translations['cancel'] || 'Cancel') +
+      '</button>' +
+      '<button id="authPromptSubmit" style="padding:8px 20px;border:none;border-radius:8px;' +
+      'background:var(--color-accent,#E85D26);color:#fff;cursor:pointer;font-size:14px;font-weight:500;">' +
+      (translations['auth_submit'] || 'Submit') +
+      '</button>' +
+      '</div>';
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    var input = dialog.querySelector('#authTokenInput');
+    input.focus();
+
+    dialog.querySelector('#authPromptSubmit').addEventListener('click', function () {
+      var tokenVal = input.value.trim();
+      if (tokenVal) {
+        setAuthToken(tokenVal);
+        document.body.removeChild(overlay);
+        if (onDone) onDone(tokenVal);
+      }
+    });
+
+    dialog.querySelector('#authPromptCancel').addEventListener('click', function () {
+      document.body.removeChild(overlay);
+      if (onDone) onDone(null);
+    });
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        dialog.querySelector('#authPromptSubmit').click();
+      }
+    });
+  }
+
+  // ============================================================
   // DOM References
   // ============================================================
 
@@ -164,7 +313,7 @@
   function switchLanguage(locale) {
     if (locale === currentLocale) return;
 
-    fetch('/api/ui/locale', {
+    ragFetch('/api/ui/locale', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ locale: locale })
@@ -267,7 +416,7 @@
    * Poll the health status endpoint and update the status indicator.
    */
   function updateStatusIndicator() {
-    fetch('/api/health/status')
+    ragFetch('/api/health/status')
       .then(function (resp) {
         if (!resp.ok) {
           throw new Error('Status check failed');
@@ -770,7 +919,7 @@
       // Still fetch models in background (for potential local model list),
       // but the UI is already updated
       var requestId = ++_modelFetchCounter;
-      fetch('/api/settings/models/ollama')
+      ragFetch('/api/settings/models/ollama')
         .then(function (resp) { return resp.ok ? resp.json() : Promise.reject(); })
         .then(function () { /* models fetched — no UI update needed for Ollama */ })
         .catch(function () { /* fallback not needed — UI already correct */ });
@@ -785,7 +934,7 @@
     var requestId = ++_modelFetchCounter;
 
     // Fetch models from backend
-    fetch('/api/settings/models/' + encodeURIComponent(selectedProvider))
+    ragFetch('/api/settings/models/' + encodeURIComponent(selectedProvider))
       .then(function (resp) {
         if (!resp.ok) throw new Error('Failed to fetch models');
         return resp.json();
@@ -848,7 +997,7 @@
   function loadSettings() {
     var loadedProvider = null;
 
-    fetch('/api/settings')
+    ragFetch('/api/settings')
       .then(function (resp) {
         if (!resp.ok) throw new Error('Failed to load settings');
         return resp.json();
@@ -1035,7 +1184,7 @@
       }
 
       // Step 1: Save settings
-      fetch('/api/settings', {
+      ragFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
@@ -1051,7 +1200,7 @@
         .then(function () {
           // Step 2: Validate API key if provided
           if (apiKeyInput && apiKeyInput.value.trim()) {
-            return fetch('/api/settings/validate-key', {
+            return ragFetch('/api/settings/validate-key', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1127,7 +1276,7 @@
 
     // Check if documents exist (AC-010.1: no docs → silent save)
     try {
-      var resp = await fetch('/api/ingest/documents');
+      var resp = await ragFetch('/api/ingest/documents');
       var data = await resp.json();
       if (!data.documents || data.documents.length === 0) {
         return true; // No documents, save silently (AC-010.1)
@@ -1178,7 +1327,7 @@
 
         try {
           // Get document list before clearing
-          var docsResp = await fetch('/api/ingest/documents');
+          var docsResp = await ragFetch('/api/ingest/documents');
           var docsData = await docsResp.json();
           var documents = docsData.documents || [];
 
@@ -1189,7 +1338,7 @@
           }
 
           // Clear all documents
-          await fetch('/api/ingest/clear', { method: 'DELETE' });
+          await ragFetch('/api/ingest/clear', { method: 'DELETE' });
 
           // Re-ingest each document
           var completed = 0;
@@ -1203,7 +1352,7 @@
             progressBar.style.width = Math.round((completed / total) * 100) + '%';
 
             try {
-              var reingestResp = await fetch('/api/ingest/reingest', {
+              var reingestResp = await ragFetch('/api/ingest/reingest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ doc_id: doc.doc_id, filename: doc.filename }),
@@ -1284,7 +1433,7 @@
       var polls = 0;
 
       var interval = setInterval(function () {
-        fetch('/api/ingest/progress/' + fileId)
+        ragFetch('/api/ingest/progress/' + fileId)
           .then(function (resp) {
             if (!resp.ok) throw new Error('Progress check failed');
             return resp.json();
@@ -1396,7 +1545,7 @@
       var statusEl = progressItem.querySelector('.progress-status');
       var fillEl = progressItem.querySelector('.progress-bar-fill');
 
-      fetch('/api/ingest/upload', {
+      ragFetch('/api/ingest/upload', {
         method: 'POST',
         body: formData
       })
@@ -1412,7 +1561,7 @@
                 // Re-upload with the chosen action
                 var actionFormData = new FormData();
                 actionFormData.append('file', file);
-                return fetch('/api/ingest/upload?action=' + choice.action, {
+                return ragFetch('/api/ingest/upload?action=' + choice.action, {
                   method: 'POST',
                   body: actionFormData
                 }).then(function (r) {
@@ -1523,7 +1672,7 @@
 
       function check() {
         attempts++;
-        fetch('/api/ingest/progress/' + fileId)
+        ragFetch('/api/ingest/progress/' + fileId)
           .then(function (resp) {
             if (!resp.ok) throw new Error('Progress check failed');
             return resp.json();
@@ -1585,7 +1734,7 @@
     var tbody = document.getElementById('doc-table-body');
     if (!tbody) return;
 
-    fetch('/api/ingest/documents')
+    ragFetch('/api/ingest/documents')
       .then(function (resp) {
         if (!resp.ok) throw new Error('Failed to load documents');
         return resp.json();
@@ -1845,7 +1994,7 @@
    * @param {string} docId - The document ID to delete
    */
   function deleteDocument(docId) {
-    fetch('/api/ingest/documents/' + docId, { method: 'DELETE' })
+    ragFetch('/api/ingest/documents/' + docId, { method: 'DELETE' })
       .then(function (resp) {
         if (!resp.ok) throw new Error('Delete failed');
         return resp.json();
@@ -1883,7 +2032,7 @@
     btn.textContent = '\u23F3';
     btn.title = translations['settings_loading'] || 'Loading...';
 
-    fetch('/api/ingest/documents/' + encodeURIComponent(docId) + '/chunks')
+    ragFetch('/api/ingest/documents/' + encodeURIComponent(docId) + '/chunks')
       .then(function(resp) {
         if (!resp.ok) {
           throw new Error('Failed to fetch chunks: ' + resp.status);
@@ -2124,10 +2273,15 @@
 
   // Expose public API for testing and external use
   window.RAGStudio = {
+    ragFetch: ragFetch,
+    getAuthToken: getAuthToken,
     switchTab: switchTab,
     switchLanguage: switchLanguage,
     toggleMobileMenu: toggleMobileMenu,
     getCurrentTab: function () { return currentTab; },
     getCurrentLocale: function () { return currentLocale; }
   };
+
+  // Global alias for backward compatibility with chat.js and other modules
+  window.ragFetch = ragFetch;
 })();

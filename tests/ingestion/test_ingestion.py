@@ -16,6 +16,7 @@ Covers all 10 Acceptance Criteria:
 from __future__ import annotations
 
 import csv
+import hashlib
 import tempfile
 import uuid
 from pathlib import Path
@@ -69,6 +70,18 @@ def _large_text(num_paragraphs: int = 50) -> str:
 # ============================================================
 
 
+def _reset_rate_limiter(app: FastAPI) -> None:
+    """Clear shared-app limiter state so each upload test starts independently."""
+    from src.api.rate_limiter import RateLimitMiddleware
+
+    node: object | None = app.middleware_stack
+    while node is not None:
+        if isinstance(node, RateLimitMiddleware):
+            node._window.clear()  # pyright: ignore[reportPrivateUsage]
+            return
+        node = getattr(node, "app", None)
+
+
 def _setup_mock_qdrant(app: FastAPI, collection_exists: bool = True) -> AsyncMock:
     """Override Qdrant dependency with a mock client.
 
@@ -80,6 +93,8 @@ def _setup_mock_qdrant(app: FastAPI, collection_exists: bool = True) -> AsyncMoc
         The mock Qdrant client for additional assertions.
     """
     from src.api.dependencies import get_qdrant_client
+
+    _reset_rate_limiter(app)
 
     mock_client = AsyncMock()
     mock_client.collection_exists = AsyncMock(return_value=collection_exists)
@@ -897,13 +912,13 @@ class TestAC0018DuplicateDetection:
         from unittest.mock import patch
 
         from src.api.main import app
-        from src.ingestion.router import compute_sha256, stored_files
+        from src.ingestion.router import stored_files
 
         _setup_mock_qdrant(app)
         client = TestClient(app)
 
         content = b"Identical content for hash test."
-        file_hash = compute_sha256(content)
+        file_hash = hashlib.sha256(content).hexdigest()
 
         stored_files.clear()
         stored_files["identical.txt"] = {
@@ -1121,14 +1136,6 @@ class TestAC0018DuplicateDetection:
 
         stored_files.clear()
 
-    def test_compute_sha256(self) -> None:
-        """_compute_sha256 returns correct hex digest."""
-        from src.ingestion.router import compute_sha256
-
-        h = compute_sha256(b"hello")
-        assert len(h) == 64
-        assert h == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
-
     def test_store_and_get_file_metadata(self) -> None:
         """_store_file_metadata and _get_stored_file round-trip correctly."""
         import asyncio
@@ -1287,13 +1294,13 @@ class TestAC0018DuplicateDetection:
         from unittest.mock import patch
 
         from src.api.main import app
-        from src.ingestion.router import compute_sha256, stored_files
+        from src.ingestion.router import stored_files
 
         _setup_mock_qdrant(app)
         client = TestClient(app)
 
         content = b"Re-ingest me with new chunk settings!"
-        file_hash = compute_sha256(content)
+        file_hash = hashlib.sha256(content).hexdigest()
 
         stored_files.clear()
         # File was stored with chunk_size=512, chunk_overlap=64
@@ -1334,13 +1341,13 @@ class TestAC0018DuplicateDetection:
         from unittest.mock import patch
 
         from src.api.main import app
-        from src.ingestion.router import compute_sha256, stored_files
+        from src.ingestion.router import stored_files
 
         _setup_mock_qdrant(app)
         client = TestClient(app)
 
         content = b"Nothing has changed here."
-        file_hash = compute_sha256(content)
+        file_hash = hashlib.sha256(content).hexdigest()
 
         stored_files.clear()
         # File was stored with chunk_size=512, chunk_overlap=64

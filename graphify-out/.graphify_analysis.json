@@ -1,0 +1,2858 @@
+{
+  "communities": {
+    "0": [
+      "asyncqdrantclient",
+      "backgroundtasks",
+      "src_ingestion_router",
+      "src_ingestion_router_clear_all_documents",
+      "src_ingestion_router_delete_document",
+      "src_ingestion_router_deleteresponse",
+      "src_ingestion_router_documentinfo",
+      "src_ingestion_router_documentslistresponse",
+      "src_ingestion_router_duplicateresponse",
+      "src_ingestion_router_errorresponse",
+      "src_ingestion_router_generate_unique_filename",
+      "src_ingestion_router_get_current_chunk_settings",
+      "src_ingestion_router_get_document_chunks",
+      "src_ingestion_router_get_document_info_from_qdrant",
+      "src_ingestion_router_get_ingestion_progress",
+      "src_ingestion_router_get_progress",
+      "src_ingestion_router_get_stored_file",
+      "src_ingestion_router_ingest_file",
+      "src_ingestion_router_list_documents",
+      "src_ingestion_router_progressresponse",
+      "src_ingestion_router_py_basemodel",
+      "src_ingestion_router_py_delete",
+      "src_ingestion_router_py_get",
+      "src_ingestion_router_py_post",
+      "src_ingestion_router_py_response",
+      "src_ingestion_router_rationale_1",
+      "src_ingestion_router_rationale_104",
+      "src_ingestion_router_rationale_1065",
+      "src_ingestion_router_rationale_1113",
+      "src_ingestion_router_rationale_114",
+      "src_ingestion_router_rationale_1161",
+      "src_ingestion_router_rationale_125",
+      "src_ingestion_router_rationale_132",
+      "src_ingestion_router_rationale_140",
+      "src_ingestion_router_rationale_146",
+      "src_ingestion_router_rationale_162",
+      "src_ingestion_router_rationale_169",
+      "src_ingestion_router_rationale_183",
+      "src_ingestion_router_rationale_205",
+      "src_ingestion_router_rationale_229",
+      "src_ingestion_router_rationale_247",
+      "src_ingestion_router_rationale_266",
+      "src_ingestion_router_rationale_286",
+      "src_ingestion_router_rationale_306",
+      "src_ingestion_router_rationale_405",
+      "src_ingestion_router_rationale_580",
+      "src_ingestion_router_rationale_75",
+      "src_ingestion_router_rationale_85",
+      "src_ingestion_router_rationale_882",
+      "src_ingestion_router_rationale_916",
+      "src_ingestion_router_rationale_96",
+      "src_ingestion_router_rationale_990",
+      "src_ingestion_router_reingest_document",
+      "src_ingestion_router_reingestrequest",
+      "src_ingestion_router_reingestresponse",
+      "src_ingestion_router_remove_stored_file",
+      "src_ingestion_router_safe_int",
+      "src_ingestion_router_set_progress",
+      "src_ingestion_router_store_file_metadata",
+      "src_ingestion_router_upload_document",
+      "src_ingestion_router_uploadresponse",
+      "uploadfile"
+    ],
+    "1": [
+      "src_api_body_limit",
+      "src_api_body_limit_bodysizelimitmiddleware",
+      "src_api_body_limit_bodysizelimitmiddleware_dispatch",
+      "src_api_body_limit_bodysizelimitmiddleware_get_content_length",
+      "src_api_body_limit_bodysizelimitmiddleware_get_limit",
+      "src_api_body_limit_bodysizelimitmiddleware_init",
+      "src_api_body_limit_env_bytes",
+      "src_api_body_limit_py_asgiapp",
+      "src_api_body_limit_py_basehttpmiddleware",
+      "src_api_body_limit_py_request",
+      "src_api_body_limit_py_response",
+      "src_api_body_limit_rationale_1",
+      "src_api_body_limit_rationale_104",
+      "src_api_body_limit_rationale_122",
+      "src_api_body_limit_rationale_136",
+      "src_api_body_limit_rationale_37",
+      "src_api_body_limit_rationale_57",
+      "src_api_body_limit_rationale_79",
+      "tests_api_test_body_limit",
+      "tests_api_test_body_limit_build_app",
+      "tests_api_test_body_limit_py_fastapi",
+      "tests_api_test_body_limit_rationale_1",
+      "tests_api_test_body_limit_rationale_111",
+      "tests_api_test_body_limit_rationale_114",
+      "tests_api_test_body_limit_rationale_137",
+      "tests_api_test_body_limit_rationale_15",
+      "tests_api_test_body_limit_rationale_155",
+      "tests_api_test_body_limit_rationale_169",
+      "tests_api_test_body_limit_rationale_182",
+      "tests_api_test_body_limit_rationale_197",
+      "tests_api_test_body_limit_rationale_40",
+      "tests_api_test_body_limit_rationale_75",
+      "tests_api_test_body_limit_rationale_78",
+      "tests_api_test_body_limit_rationale_90",
+      "tests_api_test_body_limit_testchatendpointrejectsoversized",
+      "tests_api_test_body_limit_testchatendpointrejectsoversized_test_chat_at_limit_passes",
+      "tests_api_test_body_limit_testchatendpointrejectsoversized_test_chat_over_limit_rejected",
+      "tests_api_test_body_limit_testchatendpointrejectsoversized_test_chat_under_limit_passes",
+      "tests_api_test_body_limit_testdefaultlimits",
+      "tests_api_test_body_limit_testdefaultlimits_test_default_chat_limit_is_100kb",
+      "tests_api_test_body_limit_testdefaultlimits_test_default_upload_limit_is_50mb",
+      "tests_api_test_body_limit_testmissingcontentlengthpasses",
+      "tests_api_test_body_limit_testmissingcontentlengthpasses_test_chat_without_content_length_passes",
+      "tests_api_test_body_limit_testmissingcontentlengthpasses_test_upload_without_content_length_passes",
+      "tests_api_test_body_limit_testnonnumericcontentlengthpasses",
+      "tests_api_test_body_limit_testnonnumericcontentlengthpasses_test_garbage_content_length_passes",
+      "tests_api_test_body_limit_testotherpathspassthrough",
+      "tests_api_test_body_limit_testotherpathspassthrough_test_other_path_no_content_length_passes",
+      "tests_api_test_body_limit_testotherpathspassthrough_test_other_path_with_large_body_passes",
+      "tests_api_test_body_limit_testresponseformat",
+      "tests_api_test_body_limit_testresponseformat_test_413_has_json_content_type",
+      "tests_api_test_body_limit_testsafemethodsbypass",
+      "tests_api_test_body_limit_testsafemethodsbypass_test_delete_chat_passes",
+      "tests_api_test_body_limit_testsafemethodsbypass_test_get_chat_passes",
+      "tests_api_test_body_limit_testsafemethodsbypass_test_get_upload_passes",
+      "tests_api_test_body_limit_testsafemethodsbypass_test_head_chat_passes",
+      "tests_api_test_body_limit_testsafemethodsbypass_test_options_chat_passes",
+      "tests_api_test_body_limit_testuploadendpointrejectsoversized",
+      "tests_api_test_body_limit_testuploadendpointrejectsoversized_test_upload_at_limit_passes",
+      "tests_api_test_body_limit_testuploadendpointrejectsoversized_test_upload_over_limit_rejected"
+    ],
+    "2": [
+      "tests_api_test_chat_e2e",
+      "tests_api_test_chat_e2e_fixture_client",
+      "tests_api_test_chat_e2e_parse_data_lines",
+      "tests_api_test_chat_e2e_py_any",
+      "tests_api_test_chat_e2e_py_fixture",
+      "tests_api_test_chat_e2e_py_path",
+      "tests_api_test_chat_e2e_py_testclient",
+      "tests_api_test_chat_e2e_rationale_1",
+      "tests_api_test_chat_e2e_rationale_101",
+      "tests_api_test_chat_e2e_rationale_118",
+      "tests_api_test_chat_e2e_rationale_129",
+      "tests_api_test_chat_e2e_rationale_143",
+      "tests_api_test_chat_e2e_rationale_146",
+      "tests_api_test_chat_e2e_rationale_156",
+      "tests_api_test_chat_e2e_rationale_176",
+      "tests_api_test_chat_e2e_rationale_205",
+      "tests_api_test_chat_e2e_rationale_208",
+      "tests_api_test_chat_e2e_rationale_226",
+      "tests_api_test_chat_e2e_rationale_252",
+      "tests_api_test_chat_e2e_rationale_255",
+      "tests_api_test_chat_e2e_rationale_270",
+      "tests_api_test_chat_e2e_rationale_288",
+      "tests_api_test_chat_e2e_rationale_320",
+      "tests_api_test_chat_e2e_rationale_323",
+      "tests_api_test_chat_e2e_rationale_331",
+      "tests_api_test_chat_e2e_rationale_346",
+      "tests_api_test_chat_e2e_rationale_370",
+      "tests_api_test_chat_e2e_rationale_373",
+      "tests_api_test_chat_e2e_rationale_399",
+      "tests_api_test_chat_e2e_rationale_438",
+      "tests_api_test_chat_e2e_rationale_457",
+      "tests_api_test_chat_e2e_rationale_74",
+      "tests_api_test_chat_e2e_reset_chat_state",
+      "tests_api_test_chat_e2e_stream_message",
+      "tests_api_test_chat_e2e_testchatcontrols",
+      "tests_api_test_chat_e2e_testchatcontrols_test_feedback_after_stream",
+      "tests_api_test_chat_e2e_testchatcontrols_test_regenerate_sends_same_query",
+      "tests_api_test_chat_e2e_testchatcontrols_test_send_message_returns_done_event",
+      "tests_api_test_chat_e2e_testchatmessagebubbles",
+      "tests_api_test_chat_e2e_testchatmessagebubbles_test_assistant_message_streams_with_tokens",
+      "tests_api_test_chat_e2e_testchatmessagebubbles_test_citations_rendered_as_badges",
+      "tests_api_test_chat_e2e_testchatmessagebubbles_test_user_message_appears",
+      "tests_api_test_chat_e2e_testcitationtooltips",
+      "tests_api_test_chat_e2e_testcitationtooltips_test_citation_data_matches_mock",
+      "tests_api_test_chat_e2e_testcitationtooltips_test_citations_in_final_event",
+      "tests_api_test_chat_e2e_testfeedbackbuttons",
+      "tests_api_test_chat_e2e_testfeedbackbuttons_test_feedback_negative_with_reason",
+      "tests_api_test_chat_e2e_testfeedbackbuttons_test_feedback_persisted_to_jsonl",
+      "tests_api_test_chat_e2e_testfeedbackbuttons_test_feedback_positive_endpoint",
+      "tests_api_test_chat_e2e_testfullchate2eflow",
+      "tests_api_test_chat_e2e_testfullchate2eflow_test_clear_session_messages",
+      "tests_api_test_chat_e2e_testfullchate2eflow_test_complete_chat_lifecycle",
+      "tests_api_test_chat_e2e_testfullchate2eflow_test_session_lifecycle",
+      "tests_api_test_chat_e2e_testfullchate2eflow_test_session_messages_persistence"
+    ],
+    "3": [
+      "tests_retrieve_test_orchestrator",
+      "tests_retrieve_test_orchestrator_make_mock_qdrant_point",
+      "tests_retrieve_test_orchestrator_make_mock_query_points",
+      "tests_retrieve_test_orchestrator_rationale_1",
+      "tests_retrieve_test_orchestrator_rationale_109",
+      "tests_retrieve_test_orchestrator_rationale_113",
+      "tests_retrieve_test_orchestrator_rationale_156",
+      "tests_retrieve_test_orchestrator_rationale_189",
+      "tests_retrieve_test_orchestrator_rationale_193",
+      "tests_retrieve_test_orchestrator_rationale_230",
+      "tests_retrieve_test_orchestrator_rationale_264",
+      "tests_retrieve_test_orchestrator_rationale_29",
+      "tests_retrieve_test_orchestrator_rationale_300",
+      "tests_retrieve_test_orchestrator_rationale_331",
+      "tests_retrieve_test_orchestrator_rationale_335",
+      "tests_retrieve_test_orchestrator_rationale_354",
+      "tests_retrieve_test_orchestrator_rationale_394",
+      "tests_retrieve_test_orchestrator_rationale_427",
+      "tests_retrieve_test_orchestrator_rationale_43",
+      "tests_retrieve_test_orchestrator_rationale_454",
+      "tests_retrieve_test_orchestrator_rationale_457",
+      "tests_retrieve_test_orchestrator_rationale_467",
+      "tests_retrieve_test_orchestrator_rationale_478",
+      "tests_retrieve_test_orchestrator_rationale_50",
+      "tests_retrieve_test_orchestrator_rationale_66",
+      "tests_retrieve_test_orchestrator_rationale_99",
+      "tests_retrieve_test_orchestrator_reset_reranker_state",
+      "tests_retrieve_test_orchestrator_setup_mock_qdrant_client",
+      "tests_retrieve_test_orchestrator_setup_mock_ranker",
+      "tests_retrieve_test_orchestrator_testac0021rrffusion",
+      "tests_retrieve_test_orchestrator_testac0021rrffusion_test_prefetch_oversamples_candidates",
+      "tests_retrieve_test_orchestrator_testac0021rrffusion_test_rrf_fusion_is_used",
+      "tests_retrieve_test_orchestrator_testac0022reranking",
+      "tests_retrieve_test_orchestrator_testac0022reranking_test_reranker_disabled_returns_rrf_only",
+      "tests_retrieve_test_orchestrator_testac0022reranking_test_reranker_produces_top_5",
+      "tests_retrieve_test_orchestrator_testac0022reranking_test_result_includes_metadata",
+      "tests_retrieve_test_orchestrator_testac0022reranking_test_results_sorted_by_rerank_score",
+      "tests_retrieve_test_orchestrator_testac0023emptyresults",
+      "tests_retrieve_test_orchestrator_testac0023emptyresults_test_mixed_scores_passes_threshold",
+      "tests_retrieve_test_orchestrator_testac0023emptyresults_test_no_points_returns_empty_list",
+      "tests_retrieve_test_orchestrator_testac0023emptyresults_test_qdrant_error_returns_empty_list",
+      "tests_retrieve_test_orchestrator_testac0023emptyresults_test_threshold_at_zero_passes_low_scores",
+      "tests_retrieve_test_orchestrator_testrerankerlifecycle",
+      "tests_retrieve_test_orchestrator_testrerankerlifecycle_test_get_reranker_status_after_load",
+      "tests_retrieve_test_orchestrator_testrerankerlifecycle_test_reranker_fallback_when_unavailable",
+      "tests_retrieve_test_orchestrator_testrerankerlifecycle_test_reset_clears_reranker_state"
+    ],
+    "4": [
+      "ragstate",
+      "runnableconfig",
+      "src_api_locales_en_json",
+      "src_api_locales_ru_json",
+      "src_api_routes_chat",
+      "src_api_routes_chat_rationale_1",
+      "src_api_static_css_style_css",
+      "src_api_static_js_app_js",
+      "src_api_static_js_chat_js",
+      "src_api_templates_settings_html",
+      "src_graph_nodes",
+      "src_graph_nodes_analyzer_node",
+      "src_graph_nodes_cache_check_node",
+      "src_graph_nodes_ensure_cache_collection_exists",
+      "src_graph_nodes_generate_from_cache_node",
+      "src_graph_nodes_generate_from_retrieval_node",
+      "src_graph_nodes_py_any",
+      "src_graph_nodes_rationale_1",
+      "src_graph_nodes_rationale_111",
+      "src_graph_nodes_rationale_201",
+      "src_graph_nodes_rationale_281",
+      "src_graph_nodes_rationale_359",
+      "src_graph_nodes_rationale_386",
+      "src_graph_nodes_rationale_481",
+      "src_graph_nodes_rationale_574",
+      "src_graph_nodes_rationale_77",
+      "src_graph_nodes_retrieve_node",
+      "src_graph_nodes_save_to_cache_node",
+      "src_graph_nodes_validate_node",
+      "src_retrieve_orchestrator",
+      "src_vector_store_client",
+      "system_spec_md_ac_016_1",
+      "system_spec_md_ac_016_2",
+      "system_spec_md_ac_016_3",
+      "system_spec_md_ac_016_4",
+      "system_spec_md_fr_011",
+      "system_spec_md_fr_012",
+      "system_spec_md_fr_014",
+      "system_spec_md_fr_015",
+      "system_spec_md_fr_016",
+      "system_spec_md_tooltip_component"
+    ],
+    "5": [
+      "asgiapp",
+      "src_api_rate_limiter",
+      "src_api_rate_limiter_env_int",
+      "src_api_rate_limiter_py_basehttpmiddleware",
+      "src_api_rate_limiter_py_request",
+      "src_api_rate_limiter_py_response",
+      "src_api_rate_limiter_ratelimitmiddleware",
+      "src_api_rate_limiter_ratelimitmiddleware_dispatch",
+      "src_api_rate_limiter_ratelimitmiddleware_get_client_id",
+      "src_api_rate_limiter_ratelimitmiddleware_get_limit",
+      "src_api_rate_limiter_ratelimitmiddleware_init",
+      "src_api_rate_limiter_ratelimitmiddleware_sweep_stale_clients",
+      "src_api_rate_limiter_rationale_1",
+      "src_api_rate_limiter_rationale_104",
+      "src_api_rate_limiter_rationale_115",
+      "src_api_rate_limiter_rationale_129",
+      "src_api_rate_limiter_rationale_152",
+      "src_api_rate_limiter_rationale_41",
+      "src_api_rate_limiter_rationale_50",
+      "src_api_rate_limiter_rationale_71",
+      "tests_api_test_rate_limiter",
+      "tests_api_test_rate_limiter_build_app",
+      "tests_api_test_rate_limiter_find_rate_limiter",
+      "tests_api_test_rate_limiter_py_fastapi",
+      "tests_api_test_rate_limiter_rationale_1",
+      "tests_api_test_rate_limiter_rationale_13",
+      "tests_api_test_rate_limiter_rationale_25",
+      "tests_api_test_rate_limiter_rationale_41",
+      "tests_api_test_rate_limiter_rationale_55",
+      "tests_api_test_rate_limiter_testactivelimiting",
+      "tests_api_test_rate_limiter_testactivelimiting_test_limit_enforced",
+      "tests_api_test_rate_limiter_teststaleclienteviction",
+      "tests_api_test_rate_limiter_teststaleclienteviction_test_rejected_request_does_not_leave_empty_list",
+      "tests_api_test_rate_limiter_teststaleclienteviction_test_stale_entry_removed_on_sweep"
+    ],
+    "6": [
+      "tests_api_test_ui_content_py_testclient",
+      "tests_api_test_ui_content_rationale_220",
+      "tests_api_test_ui_content_rationale_223",
+      "tests_api_test_ui_content_rationale_229",
+      "tests_api_test_ui_content_rationale_237",
+      "tests_api_test_ui_content_rationale_243",
+      "tests_api_test_ui_content_rationale_249",
+      "tests_api_test_ui_content_rationale_255",
+      "tests_api_test_ui_content_rationale_261",
+      "tests_api_test_ui_content_rationale_267",
+      "tests_api_test_ui_content_rationale_285",
+      "tests_api_test_ui_content_rationale_297",
+      "tests_api_test_ui_content_rationale_337",
+      "tests_api_test_ui_content_rationale_344",
+      "tests_api_test_ui_content_rationale_351",
+      "tests_api_test_ui_content_rationale_357",
+      "tests_api_test_ui_content_rationale_369",
+      "tests_api_test_ui_content_testsettingscontent",
+      "tests_api_test_ui_content_testsettingscontent_test_all_settings_controls_have_testids",
+      "tests_api_test_ui_content_testsettingscontent_test_api_key_input_present",
+      "tests_api_test_ui_content_testsettingscontent_test_browse_files_button_present",
+      "tests_api_test_ui_content_testsettingscontent_test_chunk_size_dropdown_present",
+      "tests_api_test_ui_content_testsettingscontent_test_connect_langsmith_button_present",
+      "tests_api_test_ui_content_testsettingscontent_test_document_upload_zone_present",
+      "tests_api_test_ui_content_testsettingscontent_test_langsmith_modal_present",
+      "tests_api_test_ui_content_testsettingscontent_test_max_tokens_dropdown_present",
+      "tests_api_test_ui_content_testsettingscontent_test_model_selector_present",
+      "tests_api_test_ui_content_testsettingscontent_test_provider_dropdown_present",
+      "tests_api_test_ui_content_testsettingscontent_test_reset_prompt_button_present",
+      "tests_api_test_ui_content_testsettingscontent_test_retrieval_settings_row_present",
+      "tests_api_test_ui_content_testsettingscontent_test_system_prompt_textarea_present",
+      "tests_api_test_ui_content_testsettingscontent_test_temperature_slider_present",
+      "tests_api_test_ui_content_testsettingscontent_test_top_k_dropdown_present",
+      "tests_api_test_ui_content_testsettingscontent_test_two_column_layout_present"
+    ],
+    "7": [
+      "tests_e2e_test_rag_pipeline_get_all_text",
+      "tests_e2e_test_rag_pipeline_make_state",
+      "tests_e2e_test_rag_pipeline_py_any",
+      "tests_e2e_test_rag_pipeline_rationale_275",
+      "tests_e2e_test_rag_pipeline_rationale_298",
+      "tests_e2e_test_rag_pipeline_rationale_320",
+      "tests_e2e_test_rag_pipeline_rationale_340",
+      "tests_e2e_test_rag_pipeline_rationale_362",
+      "tests_e2e_test_rag_pipeline_rationale_384",
+      "tests_e2e_test_rag_pipeline_rationale_428",
+      "tests_e2e_test_rag_pipeline_rationale_448",
+      "tests_e2e_test_rag_pipeline_rationale_470",
+      "tests_e2e_test_rag_pipeline_rationale_492",
+      "tests_e2e_test_rag_pipeline_rationale_52",
+      "tests_e2e_test_rag_pipeline_rationale_77",
+      "tests_e2e_test_rag_pipeline_rationale_84",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_10_bench_meetings",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_1_who_is_masha",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_2_who_is_mark",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_3_how_old_is_masha",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_4_marks_walking_speed",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_5_kto_takaya_masha",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_6_skolko_let_mashe",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_7_skorost_khodby_marka",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_8_distance_window_to_gate",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_query_9_first_verbal_interaction",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_test_session_persistence_after_refresh"
+    ],
+    "8": [
+      "src_api_dependencies",
+      "tests_api_test_settings_api",
+      "tests_api_test_settings_api_fixture_client",
+      "tests_api_test_settings_api_py_any",
+      "tests_api_test_settings_api_py_testclient",
+      "tests_api_test_settings_api_rationale_1",
+      "tests_api_test_settings_api_rationale_119",
+      "tests_api_test_settings_api_rationale_131",
+      "tests_api_test_settings_api_rationale_140",
+      "tests_api_test_settings_api_rationale_157",
+      "tests_api_test_settings_api_rationale_182",
+      "tests_api_test_settings_api_rationale_197",
+      "tests_api_test_settings_api_rationale_246",
+      "tests_api_test_settings_api_rationale_27",
+      "tests_api_test_settings_api_rationale_69",
+      "tests_api_test_settings_api_rationale_72",
+      "tests_api_test_settings_api_rationale_97",
+      "tests_api_test_settings_api_testsettingsapi",
+      "tests_api_test_settings_api_testsettingsapi_test_get_document_chunks_not_found",
+      "tests_api_test_settings_api_testsettingsapi_test_get_document_chunks_success",
+      "tests_api_test_settings_api_testsettingsapi_test_get_settings",
+      "tests_api_test_settings_api_testsettingsapi_test_save_settings",
+      "tests_api_test_settings_api_testsettingsapi_test_save_settings_validation",
+      "tests_api_test_settings_api_testsettingsapi_test_validate_key_invalid",
+      "tests_api_test_settings_api_testsettingsapi_test_validate_key_ollama_skips",
+      "tests_api_test_settings_api_testsettingsapi_test_validate_key_unsupported_provider",
+      "tests_api_test_settings_api_testsettingsapi_test_validate_key_valid"
+    ],
+    "9": [
+      "tests_api_test_chat_ui_py_testclient",
+      "tests_api_test_chat_ui_rationale_117",
+      "tests_api_test_chat_ui_rationale_120",
+      "tests_api_test_chat_ui_rationale_132",
+      "tests_api_test_chat_ui_rationale_147",
+      "tests_api_test_chat_ui_rationale_157",
+      "tests_api_test_chat_ui_rationale_170",
+      "tests_api_test_chat_ui_rationale_189",
+      "tests_api_test_chat_ui_rationale_207",
+      "tests_api_test_chat_ui_rationale_223",
+      "tests_api_test_chat_ui_rationale_231",
+      "tests_api_test_chat_ui_rationale_246",
+      "tests_api_test_chat_ui_rationale_254",
+      "tests_api_test_chat_ui_rationale_645",
+      "tests_api_test_chat_ui_testcontenttypes_test_chat_page_returns_html",
+      "tests_api_test_chat_ui_testsessionmanagement",
+      "tests_api_test_chat_ui_testsessionmanagement_test_chat_page_has_sidebar_in_html",
+      "tests_api_test_chat_ui_testsessionmanagement_test_clear_session_messages",
+      "tests_api_test_chat_ui_testsessionmanagement_test_create_session",
+      "tests_api_test_chat_ui_testsessionmanagement_test_create_session_default_title",
+      "tests_api_test_chat_ui_testsessionmanagement_test_delete_nonexistent_session_returns_404",
+      "tests_api_test_chat_ui_testsessionmanagement_test_delete_session",
+      "tests_api_test_chat_ui_testsessionmanagement_test_get_session_messages",
+      "tests_api_test_chat_ui_testsessionmanagement_test_list_sessions_after_create",
+      "tests_api_test_chat_ui_testsessionmanagement_test_list_sessions_empty",
+      "tests_api_test_chat_ui_testsessionmanagement_test_messages_endpoint_exists",
+      "tests_api_test_chat_ui_testsessionmanagement_test_rename_session"
+    ],
+    "10": [
+      "tests_api_test_settings_reingest",
+      "tests_api_test_settings_reingest_fixture_client",
+      "tests_api_test_settings_reingest_py_any",
+      "tests_api_test_settings_reingest_py_testclient",
+      "tests_api_test_settings_reingest_rationale_1",
+      "tests_api_test_settings_reingest_rationale_103",
+      "tests_api_test_settings_reingest_rationale_155",
+      "tests_api_test_settings_reingest_rationale_183",
+      "tests_api_test_settings_reingest_rationale_228",
+      "tests_api_test_settings_reingest_rationale_266",
+      "tests_api_test_settings_reingest_rationale_298",
+      "tests_api_test_settings_reingest_rationale_30",
+      "tests_api_test_settings_reingest_rationale_332",
+      "tests_api_test_settings_reingest_rationale_72",
+      "tests_api_test_settings_reingest_rationale_79",
+      "tests_api_test_settings_reingest_testsettingsreingest",
+      "tests_api_test_settings_reingest_testsettingsreingest_test_chunks_changed_no_documents_no_effect",
+      "tests_api_test_settings_reingest_testsettingsreingest_test_clear_endpoint_exists",
+      "tests_api_test_settings_reingest_testsettingsreingest_test_reingest_endpoint_accepts_request",
+      "tests_api_test_settings_reingest_testsettingsreingest_test_reingest_endpoint_no_stored_file",
+      "tests_api_test_settings_reingest_testsettingsreingest_test_reingest_progress_endpoint_exists",
+      "tests_api_test_settings_reingest_testsettingsreingest_test_save_settings_chunks_changed_chunk_overlap",
+      "tests_api_test_settings_reingest_testsettingsreingest_test_save_settings_chunks_changed_chunk_size",
+      "tests_api_test_settings_reingest_testsettingsreingest_test_save_settings_no_chunk_change",
+      "tests_api_test_settings_reingest_testsettingsreingest_test_save_settings_no_chunk_change_other_fields"
+    ],
+    "11": [
+      "tests_test_security_rationale_111",
+      "tests_test_security_rationale_122",
+      "tests_test_security_rationale_132",
+      "tests_test_security_rationale_147",
+      "tests_test_security_rationale_174",
+      "tests_test_security_rationale_185",
+      "tests_test_security_rationale_41",
+      "tests_test_security_rationale_44",
+      "tests_test_security_rationale_57",
+      "tests_test_security_rationale_73",
+      "tests_test_security_rationale_84",
+      "tests_test_security_rationale_97",
+      "tests_test_security_testac0083apikeyencryption",
+      "tests_test_security_testac0083apikeyencryption_test_different_encryptions_produce_different_ciphertext",
+      "tests_test_security_testac0083apikeyencryption_test_encrypt_decrypt_roundtrip",
+      "tests_test_security_testac0083apikeyencryption_test_encrypted_data_is_not_plaintext_json",
+      "tests_test_security_testac0083apikeyencryption_test_load_secrets_empty_when_no_file",
+      "tests_test_security_testac0083apikeyencryption_test_load_secrets_handles_corrupted_file",
+      "tests_test_security_testac0083apikeyencryption_test_missing_passphrase_raises_runtime_error",
+      "tests_test_security_testac0083apikeyencryption_test_old_format_ciphertext_raises_value_error",
+      "tests_test_security_testac0083apikeyencryption_test_pbkdf2_key_derivation_uses_salt",
+      "tests_test_security_testac0083apikeyencryption_test_pbkdf2_same_salt_same_passphrase_same_key",
+      "tests_test_security_testac0083apikeyencryption_test_secrets_save_and_load_roundtrip",
+      "tests_test_security_testac0083apikeyencryption_test_wrong_passphrase_raises_invalid_token"
+    ],
+    "12": [
+      "src_api_auth",
+      "src_api_auth_authmiddleware_dispatch",
+      "src_api_auth_extract_bearer_token",
+      "src_api_auth_get_auth_token",
+      "src_api_auth_get_configured_token",
+      "src_api_auth_is_api_path",
+      "src_api_auth_is_auth_enabled",
+      "src_api_auth_is_public_path",
+      "src_api_auth_py_request",
+      "src_api_auth_py_response",
+      "src_api_auth_rationale_1",
+      "src_api_auth_rationale_112",
+      "src_api_auth_rationale_124",
+      "src_api_auth_rationale_181",
+      "src_api_auth_rationale_46",
+      "src_api_auth_rationale_58",
+      "src_api_auth_rationale_67",
+      "src_api_auth_rationale_76",
+      "src_api_auth_rationale_94",
+      "src_api_auth_require_auth",
+      "src_api_auth_verify_token",
+      "tests_test_security",
+      "tests_test_security_rationale_1"
+    ],
+    "13": [
+      "src_api_routes_model_fetcher",
+      "src_api_routes_model_fetcher_check_anthropic_auth",
+      "src_api_routes_model_fetcher_fetch_deepseek_models",
+      "src_api_routes_model_fetcher_fetch_ollama_models",
+      "src_api_routes_model_fetcher_fetch_openai_models",
+      "src_api_routes_model_fetcher_get_fallback_models",
+      "src_api_routes_model_fetcher_get_models_for_provider",
+      "src_api_routes_model_fetcher_get_supported_providers",
+      "src_api_routes_model_fetcher_is_cache_valid",
+      "src_api_routes_model_fetcher_load_models_cache",
+      "src_api_routes_model_fetcher_py_any",
+      "src_api_routes_model_fetcher_rationale_1",
+      "src_api_routes_model_fetcher_rationale_106",
+      "src_api_routes_model_fetcher_rationale_117",
+      "src_api_routes_model_fetcher_rationale_137",
+      "src_api_routes_model_fetcher_rationale_161",
+      "src_api_routes_model_fetcher_rationale_193",
+      "src_api_routes_model_fetcher_rationale_227",
+      "src_api_routes_model_fetcher_rationale_263",
+      "src_api_routes_model_fetcher_rationale_69",
+      "src_api_routes_model_fetcher_rationale_81",
+      "src_api_routes_model_fetcher_rationale_91",
+      "src_api_routes_model_fetcher_save_models_cache"
+    ],
+    "14": [
+      "src_ingestion_chunker",
+      "src_ingestion_embedder_generate_dense_embeddings",
+      "src_ingestion_embedder_generate_sparse_embeddings",
+      "src_ingestion_embedder_rationale_174",
+      "src_ingestion_embedder_rationale_190",
+      "tests_e2e_test_rag_pipeline",
+      "tests_e2e_test_rag_pipeline_py_monkeypatch",
+      "tests_e2e_test_rag_pipeline_rationale_1",
+      "tests_e2e_test_rag_pipeline_rationale_88",
+      "tests_e2e_test_rag_pipeline_testragpipelinee2e_setup_teardown",
+      "tests_ingestion_test_ingestion_rationale_292",
+      "tests_ingestion_test_ingestion_rationale_295",
+      "tests_ingestion_test_ingestion_rationale_309",
+      "tests_ingestion_test_ingestion_rationale_327",
+      "tests_ingestion_test_ingestion_rationale_345",
+      "tests_ingestion_test_ingestion_rationale_355",
+      "tests_ingestion_test_ingestion_testac0013vectorization",
+      "tests_ingestion_test_ingestion_testac0013vectorization_test_dense_embedding_dimensions",
+      "tests_ingestion_test_ingestion_testac0013vectorization_test_dense_embeddings_are_floats",
+      "tests_ingestion_test_ingestion_testac0013vectorization_test_different_chunks_different_embeddings",
+      "tests_ingestion_test_ingestion_testac0013vectorization_test_embedding_count_matches_input",
+      "tests_ingestion_test_ingestion_testac0013vectorization_test_sparse_embedding_non_empty"
+    ],
+    "15": [
+      "tests_ingestion_test_ingestion_create_temp_txt",
+      "tests_ingestion_test_ingestion_rationale_38",
+      "tests_ingestion_test_ingestion_rationale_435",
+      "tests_ingestion_test_ingestion_rationale_438",
+      "tests_ingestion_test_ingestion_rationale_445",
+      "tests_ingestion_test_ingestion_rationale_451",
+      "tests_ingestion_test_ingestion_rationale_457",
+      "tests_ingestion_test_ingestion_rationale_463",
+      "tests_ingestion_test_ingestion_rationale_469",
+      "tests_ingestion_test_ingestion_rationale_476",
+      "tests_ingestion_test_ingestion_rationale_510",
+      "tests_ingestion_test_ingestion_rationale_525",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_detect_by_content_type_fallback",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_detect_csv_by_extension",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_detect_docx_by_extension",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_detect_md_by_extension",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_detect_pdf_by_extension",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_detect_txt_by_extension",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_md_parser_reads_content",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_txt_parser_reads_content",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_unsupported_extension_raises_error"
+    ],
+    "16": [
+      "tests_test_security_rationale_206",
+      "tests_test_security_rationale_209",
+      "tests_test_security_rationale_218",
+      "tests_test_security_rationale_226",
+      "tests_test_security_rationale_234",
+      "tests_test_security_rationale_242",
+      "tests_test_security_rationale_256",
+      "tests_test_security_rationale_264",
+      "tests_test_security_rationale_272",
+      "tests_test_security_rationale_287",
+      "tests_test_security_rationale_302",
+      "tests_test_security_testsanitization",
+      "tests_test_security_testsanitization_test_env_example_has_no_real_keys",
+      "tests_test_security_testsanitization_test_sanitize_anthropic_key",
+      "tests_test_security_testsanitization_test_sanitize_api_key",
+      "tests_test_security_testsanitization_test_sanitize_deepseek_key",
+      "tests_test_security_testsanitization_test_sanitize_generic_api_key_field",
+      "tests_test_security_testsanitization_test_sanitize_langchain_key",
+      "tests_test_security_testsanitization_test_sanitize_lists_of_dicts",
+      "tests_test_security_testsanitization_test_sanitize_nested_api_keys",
+      "tests_test_security_testsanitization_test_sanitize_password_field",
+      "tests_test_security_testsanitization_test_sanitize_token_field"
+    ],
+    "17": [
+      "src_ingestion_init",
+      "src_ingestion_init_rationale_1",
+      "src_ingestion_parser",
+      "src_ingestion_parser_detect_and_parse",
+      "src_ingestion_parser_detect_file_type",
+      "src_ingestion_parser_parse_csv",
+      "src_ingestion_parser_parse_csv_as_rows",
+      "src_ingestion_parser_parse_docx",
+      "src_ingestion_parser_parse_md",
+      "src_ingestion_parser_parse_pdf",
+      "src_ingestion_parser_parse_txt",
+      "src_ingestion_parser_py_path",
+      "src_ingestion_parser_rationale_1",
+      "src_ingestion_parser_rationale_123",
+      "src_ingestion_parser_rationale_146",
+      "src_ingestion_parser_rationale_180",
+      "src_ingestion_parser_rationale_220",
+      "src_ingestion_parser_rationale_35",
+      "src_ingestion_parser_rationale_65",
+      "src_ingestion_parser_rationale_78",
+      "src_ingestion_parser_rationale_90"
+    ],
+    "18": [
+      "system_spec_md_ac_018_3",
+      "system_spec_md_analyzer_node",
+      "system_spec_md_asyncsqlitesaver",
+      "system_spec_md_cache_check_node",
+      "system_spec_md_checkpointer",
+      "system_spec_md_fr_003",
+      "system_spec_md_generate_from_cache_node",
+      "system_spec_md_generate_from_retrieval_node",
+      "system_spec_md_generator_node",
+      "system_spec_md_greeter_node",
+      "system_spec_md_junk_filter_node",
+      "system_spec_md_llm_as_judge",
+      "system_spec_md_memory_saver",
+      "system_spec_md_rag_state",
+      "system_spec_md_rag_studio_cache_collection",
+      "system_spec_md_reranker_node",
+      "system_spec_md_retrieve_node",
+      "system_spec_md_retriever_node",
+      "system_spec_md_save_to_cache_node",
+      "system_spec_md_validate_node",
+      "system_spec_md_validator_node"
+    ],
+    "19": [
+      "_agents_readme_doc",
+      "_agents_skills_architect_agents_openai_yaml",
+      "_agents_skills_architect_skill_doc",
+      "_agents_skills_ba_agents_openai_yaml",
+      "_agents_skills_ba_skill_doc",
+      "_agents_skills_dev_agents_openai_yaml",
+      "_agents_skills_dev_skill_doc",
+      "_agents_skills_rag_studio_delivery_skill_doc",
+      "_agents_skills_rag_studio_review_skill_doc",
+      "agents_doc",
+      "agents_graphify",
+      "agents_graphify_out",
+      "agents_role_architect",
+      "agents_role_ba",
+      "agents_role_dev",
+      "agents_role_qa",
+      "agents_tool_bandit",
+      "agents_tool_mypy",
+      "agents_tool_pytest",
+      "agents_tool_ruff"
+    ],
+    "20": [
+      "readme_aes256",
+      "readme_deepseek",
+      "readme_dense_embeddings",
+      "readme_doc",
+      "readme_docker_container",
+      "readme_fastembed",
+      "readme_flashrank",
+      "readme_model_minilm",
+      "readme_model_multibert",
+      "readme_model_qdrant_bm25",
+      "readme_pipeline_analyzer",
+      "readme_pipeline_cache_check",
+      "readme_pipeline_generate_from_cache",
+      "readme_pipeline_generate_from_retrieval",
+      "readme_pipeline_retrieve",
+      "readme_pipeline_save_to_cache",
+      "readme_pipeline_validate",
+      "readme_rrf_fusion",
+      "readme_semantic_cache",
+      "readme_sparse_embeddings"
+    ],
+    "21": [
+      "src_api_routes_chat_state_is_placeholder_api_key",
+      "src_api_routes_chat_state_rationale_283",
+      "src_api_routes_chat_state_rationale_55",
+      "src_api_routes_chat_state_safe_json_value",
+      "src_api_routes_chat_stream",
+      "src_api_routes_chat_stream_messagesend",
+      "src_api_routes_chat_stream_py_any",
+      "src_api_routes_chat_stream_py_basemodel",
+      "src_api_routes_chat_stream_py_post",
+      "src_api_routes_chat_stream_py_request",
+      "src_api_routes_chat_stream_rationale_1",
+      "src_api_routes_chat_stream_rationale_238",
+      "src_api_routes_chat_stream_rationale_46",
+      "src_api_routes_chat_stream_rationale_67",
+      "src_api_routes_chat_stream_rationale_99",
+      "src_api_routes_chat_stream_send_message",
+      "src_api_routes_chat_stream_sse_stream",
+      "src_api_routes_chat_stream_tokenize_response",
+      "src_api_routes_settings",
+      "streamingresponse"
+    ],
+    "22": [
+      "system_spec_md_adversarial_prompt_robustness",
+      "system_spec_md_anthropic_provider",
+      "system_spec_md_chat_page",
+      "system_spec_md_citation_badge",
+      "system_spec_md_citation_tooltip",
+      "system_spec_md_deepseek_provider",
+      "system_spec_md_expandable_citation_card",
+      "system_spec_md_feedback_button",
+      "system_spec_md_fernet_encryption",
+      "system_spec_md_input_sanitization_xss_prevention",
+      "system_spec_md_langsmith_integration",
+      "system_spec_md_loading_indicator",
+      "system_spec_md_navigation_layout_responsive_design",
+      "system_spec_md_ollama_provider",
+      "system_spec_md_openai_provider",
+      "system_spec_md_settings_page",
+      "system_spec_md_sse",
+      "system_spec_md_sse_streaming",
+      "system_spec_md_user_query",
+      "system_spec_md_welcome_page"
+    ],
+    "23": [
+      "tests_api_test_ui_content_rationale_101",
+      "tests_api_test_ui_content_rationale_108",
+      "tests_api_test_ui_content_rationale_116",
+      "tests_api_test_ui_content_rationale_51",
+      "tests_api_test_ui_content_rationale_54",
+      "tests_api_test_ui_content_rationale_60",
+      "tests_api_test_ui_content_rationale_66",
+      "tests_api_test_ui_content_rationale_72",
+      "tests_api_test_ui_content_rationale_78",
+      "tests_api_test_ui_content_rationale_86",
+      "tests_api_test_ui_content_testsidebarexclusivity",
+      "tests_api_test_ui_content_testsidebarexclusivity_test_chat_page_has_sidebar",
+      "tests_api_test_ui_content_testsidebarexclusivity_test_chat_page_has_two_column_layout",
+      "tests_api_test_ui_content_testsidebarexclusivity_test_chat_page_is_full_width",
+      "tests_api_test_ui_content_testsidebarexclusivity_test_chat_page_no_page_scrollbar",
+      "tests_api_test_ui_content_testsidebarexclusivity_test_settings_page_has_container",
+      "tests_api_test_ui_content_testsidebarexclusivity_test_settings_page_no_sidebar",
+      "tests_api_test_ui_content_testsidebarexclusivity_test_sidebar_backdrop_only_on_chat",
+      "tests_api_test_ui_content_testsidebarexclusivity_test_welcome_page_has_container",
+      "tests_api_test_ui_content_testsidebarexclusivity_test_welcome_page_no_sidebar"
+    ],
+    "24": [
+      "tests_ingestion_test_ingestion_rationale_1035",
+      "tests_ingestion_test_ingestion_rationale_1100",
+      "tests_ingestion_test_ingestion_rationale_1126",
+      "tests_ingestion_test_ingestion_rationale_1157",
+      "tests_ingestion_test_ingestion_rationale_1220",
+      "tests_ingestion_test_ingestion_rationale_1322",
+      "tests_ingestion_test_ingestion_rationale_1434",
+      "tests_ingestion_test_ingestion_rationale_767",
+      "tests_ingestion_test_ingestion_rationale_770",
+      "tests_ingestion_test_ingestion_rationale_974",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_case_sensitivity_delete_document_matches_original_case",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_case_sensitivity_original_filename_preserved",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_duplicate_returns_409",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_generate_unique_filename",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_qdrant_fallback_populates_metadata",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_qdrant_fallback_zero_settings_no_warning",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_reupload_after_delete_no_duplicate",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_settings_unchanged_hash_match_returns_200",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_store_and_get_file_metadata"
+    ],
+    "25": [
+      "tests_graph_test_builder_make_state",
+      "tests_graph_test_builder_rationale_102",
+      "tests_graph_test_builder_rationale_107",
+      "tests_graph_test_builder_rationale_44",
+      "tests_graph_test_builder_rationale_74",
+      "tests_graph_test_builder_rationale_77",
+      "tests_graph_test_builder_rationale_82",
+      "tests_graph_test_builder_rationale_87",
+      "tests_graph_test_builder_rationale_92",
+      "tests_graph_test_builder_rationale_97",
+      "tests_graph_test_builder_testroutingfunctions",
+      "tests_graph_test_builder_testroutingfunctions_test_route_after_analyzer_follow_up",
+      "tests_graph_test_builder_testroutingfunctions_test_route_after_analyzer_standalone",
+      "tests_graph_test_builder_testroutingfunctions_test_route_after_cache_check_hit",
+      "tests_graph_test_builder_testroutingfunctions_test_route_after_cache_check_miss",
+      "tests_graph_test_builder_testroutingfunctions_test_route_after_validate_cache_src",
+      "tests_graph_test_builder_testroutingfunctions_test_route_after_validate_retrieval_failed",
+      "tests_graph_test_builder_testroutingfunctions_test_route_after_validate_retrieval_passed"
+    ],
+    "26": [
+      "tests_test_security_rationale_331",
+      "tests_test_security_rationale_336",
+      "tests_test_security_rationale_378",
+      "tests_test_security_rationale_389",
+      "tests_test_security_rationale_400",
+      "tests_test_security_rationale_411",
+      "tests_test_security_rationale_422",
+      "tests_test_security_rationale_431",
+      "tests_test_security_rationale_497",
+      "tests_test_security_testauthmiddleware",
+      "tests_test_security_testauthmiddleware_test_api_paths_identified_correctly",
+      "tests_test_security_testauthmiddleware_test_auth_disabled_when_token_not_set",
+      "tests_test_security_testauthmiddleware_test_auth_token_in_env_example",
+      "tests_test_security_testauthmiddleware_test_extract_bearer_token_empty_bearer",
+      "tests_test_security_testauthmiddleware_test_extract_bearer_token_empty_header",
+      "tests_test_security_testauthmiddleware_test_extract_bearer_token_from_header",
+      "tests_test_security_testauthmiddleware_test_extract_bearer_token_raw_format",
+      "tests_test_security_testauthmiddleware_test_public_paths_identified_correctly"
+    ],
+    "27": [
+      "tests_test_security_rationale_517",
+      "tests_test_security_rationale_521",
+      "tests_test_security_rationale_532",
+      "tests_test_security_rationale_538",
+      "tests_test_security_rationale_547",
+      "tests_test_security_rationale_556",
+      "tests_test_security_rationale_565",
+      "tests_test_security_rationale_583",
+      "tests_test_security_rationale_594",
+      "tests_test_security_testauthmiddlewareintegration",
+      "tests_test_security_testauthmiddlewareintegration_auth_client",
+      "tests_test_security_testauthmiddlewareintegration_test_api_health_endpoint_no_auth_required",
+      "tests_test_security_testauthmiddlewareintegration_test_protected_endpoint_accepts_raw_token",
+      "tests_test_security_testauthmiddlewareintegration_test_protected_endpoint_accepts_valid_token",
+      "tests_test_security_testauthmiddlewareintegration_test_protected_endpoint_returns_401_with_wrong_token",
+      "tests_test_security_testauthmiddlewareintegration_test_protected_endpoint_returns_401_without_token",
+      "tests_test_security_testauthmiddlewareintegration_test_public_health_endpoint_no_auth_required",
+      "tests_test_security_testauthmiddlewareintegration_test_ui_pages_no_auth_required"
+    ],
+    "28": [
+      "patch",
+      "src_api_routes_session_routes_rationale_194",
+      "src_api_routes_session_routes_rename_session",
+      "tests_api_test_chat_ui",
+      "tests_api_test_chat_ui_fixture_client",
+      "tests_api_test_chat_ui_py_any",
+      "tests_api_test_chat_ui_py_fixture",
+      "tests_api_test_chat_ui_rationale_1",
+      "tests_api_test_chat_ui_rationale_100",
+      "tests_api_test_chat_ui_rationale_29",
+      "tests_api_test_chat_ui_rationale_338",
+      "tests_api_test_chat_ui_rationale_341",
+      "tests_api_test_chat_ui_rationale_430",
+      "tests_api_test_chat_ui_reset_chat_state",
+      "tests_api_test_chat_ui_testmessagefeedback_test_feedback_writes_to_jsonl",
+      "tests_api_test_chat_ui_testsourcecitations",
+      "tests_api_test_chat_ui_testsourcecitations_test_citation_format_in_mock_response"
+    ],
+    "29": [
+      "sparsevector",
+      "src_ingestion_embedder",
+      "src_ingestion_embedder_delete_document_points",
+      "src_ingestion_embedder_ensure_collection_exists",
+      "src_ingestion_embedder_get_cache_dir",
+      "src_ingestion_embedder_get_dense_model",
+      "src_ingestion_embedder_get_sparse_model",
+      "src_ingestion_embedder_py_any",
+      "src_ingestion_embedder_py_asyncqdrantclient",
+      "src_ingestion_embedder_rationale_1",
+      "src_ingestion_embedder_rationale_104",
+      "src_ingestion_embedder_rationale_230",
+      "src_ingestion_embedder_rationale_289",
+      "src_ingestion_embedder_rationale_48",
+      "src_ingestion_embedder_rationale_57",
+      "src_ingestion_embedder_rationale_81",
+      "src_ingestion_embedder_upsert_chunks"
+    ],
+    "30": [
+      "src_ingestion_parser_rationale_268",
+      "src_ingestion_parser_validate_file",
+      "tests_ingestion_test_ingestion_rationale_625",
+      "tests_ingestion_test_ingestion_rationale_628",
+      "tests_ingestion_test_ingestion_rationale_635",
+      "tests_ingestion_test_ingestion_rationale_642",
+      "tests_ingestion_test_ingestion_rationale_656",
+      "tests_ingestion_test_ingestion_rationale_663",
+      "tests_ingestion_test_ingestion_rationale_670",
+      "tests_ingestion_test_ingestion_testac0017filevalidation",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_reject_absolute_path_unix",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_reject_absolute_path_windows_drive",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_reject_empty_file",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_reject_file_too_large",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_reject_path_traversal_backslash",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_reject_path_traversal_dot_dot",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_valid_filename_accepted"
+    ],
+    "31": [
+      "src_api_sanitizer",
+      "src_api_sanitizer_detect_prompt_injection",
+      "src_api_sanitizer_rationale_1",
+      "src_api_sanitizer_rationale_43",
+      "tests_test_security_rationale_608",
+      "tests_test_security_rationale_611",
+      "tests_test_security_rationale_637",
+      "tests_test_security_rationale_652",
+      "tests_test_security_rationale_670",
+      "tests_test_security_rationale_695",
+      "tests_test_security_testpromptinjection",
+      "tests_test_security_testpromptinjection_test_detect_prompt_injection_flags_dan_pattern",
+      "tests_test_security_testpromptinjection_test_detect_prompt_injection_strips_system_tokens",
+      "tests_test_security_testpromptinjection_test_flag_patterns_detect_variations",
+      "tests_test_security_testpromptinjection_test_normal_message_not_flagged",
+      "tests_test_security_testpromptinjection_test_user_query_delimiter_wrapping"
+    ],
+    "32": [
+      "src_api_templates_settings_html_api_key_input",
+      "src_api_templates_settings_html_confirm_modal",
+      "src_api_templates_settings_html_document_table",
+      "src_api_templates_settings_html_document_upload",
+      "src_api_templates_settings_html_duplicate_modal",
+      "src_api_templates_settings_html_langsmith_card",
+      "src_api_templates_settings_html_langsmith_modal",
+      "src_api_templates_settings_html_max_tokens_dropdown",
+      "src_api_templates_settings_html_model_selector",
+      "src_api_templates_settings_html_provider_dropdown",
+      "src_api_templates_settings_html_reingestion_modal",
+      "src_api_templates_settings_html_retrieval_settings",
+      "src_api_templates_settings_html_save_settings_button",
+      "src_api_templates_settings_html_settings_page",
+      "src_api_templates_settings_html_system_prompt",
+      "src_api_templates_settings_html_temperature_slider"
+    ],
+    "33": [
+      "src_ingestion_embedder_make_doc_id",
+      "src_ingestion_embedder_make_document_doc_id",
+      "src_ingestion_embedder_rationale_137",
+      "src_ingestion_embedder_rationale_157",
+      "tests_ingestion_test_ingestion_rationale_372",
+      "tests_ingestion_test_ingestion_rationale_375",
+      "tests_ingestion_test_ingestion_rationale_386",
+      "tests_ingestion_test_ingestion_rationale_395",
+      "tests_ingestion_test_ingestion_rationale_403",
+      "tests_ingestion_test_ingestion_rationale_413",
+      "tests_ingestion_test_ingestion_testac0014deterministicids",
+      "tests_ingestion_test_ingestion_testac0014deterministicids_test_document_doc_id_deterministic",
+      "tests_ingestion_test_ingestion_testac0014deterministicids_test_reingestion_deletes_old_points",
+      "tests_ingestion_test_ingestion_testac0014deterministicids_test_uuid5_deterministic",
+      "tests_ingestion_test_ingestion_testac0014deterministicids_test_uuid5_different_files_different_ids",
+      "tests_ingestion_test_ingestion_testac0014deterministicids_test_uuid5_is_valid_uuid"
+    ],
+    "34": [
+      "system_spec_md_ac_010_1",
+      "system_spec_md_ac_010_2",
+      "system_spec_md_ac_010_3",
+      "system_spec_md_ac_010_4",
+      "system_spec_md_ac_010_5",
+      "system_spec_md_ac_010_6",
+      "system_spec_md_confirm_modal",
+      "system_spec_md_data_raw_uploads",
+      "system_spec_md_delete_api_ingest_clear",
+      "system_spec_md_get_api_ingest_documents",
+      "system_spec_md_get_api_ingest_progress_file_id",
+      "system_spec_md_get_api_settings",
+      "system_spec_md_langsmith_modal",
+      "system_spec_md_post_api_ingest_upload",
+      "system_spec_md_post_api_settings",
+      "system_spec_md_reingestion_modal"
+    ],
+    "35": [
+      "tests_api_test_ui_navigation_rationale_163",
+      "tests_api_test_ui_navigation_rationale_166",
+      "tests_api_test_ui_navigation_rationale_179",
+      "tests_api_test_ui_navigation_rationale_191",
+      "tests_api_test_ui_navigation_rationale_200",
+      "tests_api_test_ui_navigation_rationale_210",
+      "tests_api_test_ui_navigation_rationale_216",
+      "tests_api_test_ui_navigation_rationale_224",
+      "tests_api_test_ui_navigation_testresponsivedesign",
+      "tests_api_test_ui_navigation_testresponsivedesign_test_container_class_present",
+      "tests_api_test_ui_navigation_testresponsivedesign_test_hamburger_and_overlay_render",
+      "tests_api_test_ui_navigation_testresponsivedesign_test_mobile_tab_bar_renders",
+      "tests_api_test_ui_navigation_testresponsivedesign_test_responsive_meta_viewport",
+      "tests_api_test_ui_navigation_testresponsivedesign_test_settings_stacks_on_mobile",
+      "tests_api_test_ui_navigation_testresponsivedesign_test_static_assets_served",
+      "tests_api_test_ui_navigation_testresponsivedesign_test_welcome_video_placeholder_responsive"
+    ],
+    "36": [
+      "tests_ingestion_test_ingestion_large_text",
+      "tests_ingestion_test_ingestion_rationale_205",
+      "tests_ingestion_test_ingestion_rationale_208",
+      "tests_ingestion_test_ingestion_rationale_219",
+      "tests_ingestion_test_ingestion_rationale_235",
+      "tests_ingestion_test_ingestion_rationale_252",
+      "tests_ingestion_test_ingestion_rationale_261",
+      "tests_ingestion_test_ingestion_rationale_275",
+      "tests_ingestion_test_ingestion_rationale_58",
+      "tests_ingestion_test_ingestion_testac0012chunking",
+      "tests_ingestion_test_ingestion_testac0012chunking_test_chunk_size_approximately_512",
+      "tests_ingestion_test_ingestion_testac0012chunking_test_chunks_not_empty",
+      "tests_ingestion_test_ingestion_testac0012chunking_test_csv_chunking_row_by_row",
+      "tests_ingestion_test_ingestion_testac0012chunking_test_minimum_chunk_length_filtered",
+      "tests_ingestion_test_ingestion_testac0012chunking_test_overlap_between_chunks",
+      "tests_ingestion_test_ingestion_testac0012chunking_test_preserves_paragraph_boundaries"
+    ],
+    "37": [
+      "tests_test_security_rationale_722",
+      "tests_test_security_rationale_730",
+      "tests_test_security_rationale_744",
+      "tests_test_security_rationale_763",
+      "tests_test_security_rationale_775",
+      "tests_test_security_rationale_792",
+      "tests_test_security_rationale_811",
+      "tests_test_security_rationale_832",
+      "tests_test_security_testapikeyshiddenfromtraces",
+      "tests_test_security_testapikeyshiddenfromtraces_test_config_does_not_contain_api_key",
+      "tests_test_security_testapikeyshiddenfromtraces_test_context_var_isolated_from_state",
+      "tests_test_security_testapikeyshiddenfromtraces_test_context_var_set_and_get",
+      "tests_test_security_testapikeyshiddenfromtraces_test_context_var_set_none",
+      "tests_test_security_testapikeyshiddenfromtraces_test_nodes_read_api_key_from_context_var",
+      "tests_test_security_testapikeyshiddenfromtraces_test_run_rag_graph_uses_context_var",
+      "tests_test_security_testapikeyshiddenfromtraces_test_user_api_key_accessible_in_context"
+    ],
+    "38": [
+      "system_spec_md_chat_tab",
+      "system_spec_md_cryptography_fernet",
+      "system_spec_md_docker_container",
+      "system_spec_md_empty_state",
+      "system_spec_md_encrypted_local_storage",
+      "system_spec_md_i18n",
+      "system_spec_md_jinja2",
+      "system_spec_md_langgraph",
+      "system_spec_md_langsmith",
+      "system_spec_md_pydantic",
+      "system_spec_md_rag_studio",
+      "system_spec_md_sidebar",
+      "system_spec_md_ui_analytics_tab",
+      "system_spec_md_ui_education_tab",
+      "system_spec_md_ui_graph_builder_tab"
+    ],
+    "39": [
+      "tests_graph_test_builder_make_sparse_vector",
+      "tests_graph_test_builder_py_simplenamespace",
+      "tests_graph_test_builder_rationale_147",
+      "tests_graph_test_builder_rationale_151",
+      "tests_graph_test_builder_rationale_225",
+      "tests_graph_test_builder_rationale_273",
+      "tests_graph_test_builder_rationale_285",
+      "tests_graph_test_builder_rationale_343",
+      "tests_graph_test_builder_rationale_39",
+      "tests_graph_test_builder_testfullgraphflow",
+      "tests_graph_test_builder_testfullgraphflow_test_citations_included_in_result",
+      "tests_graph_test_builder_testfullgraphflow_test_empty_retrieval_results_in_no_info_response",
+      "tests_graph_test_builder_testfullgraphflow_test_follow_up_with_cache_hit_bypasses_retrieval",
+      "tests_graph_test_builder_testfullgraphflow_test_session_isolation_two_thread_ids",
+      "tests_graph_test_builder_testfullgraphflow_test_standalone_question_flows_through_all_nodes"
+    ],
+    "40": [
+      "tests_ingestion_test_ingestion_py_fastapi",
+      "tests_ingestion_test_ingestion_rationale_582",
+      "tests_ingestion_test_ingestion_rationale_680",
+      "tests_ingestion_test_ingestion_rationale_695",
+      "tests_ingestion_test_ingestion_rationale_710",
+      "tests_ingestion_test_ingestion_rationale_74",
+      "tests_ingestion_test_ingestion_rationale_838",
+      "tests_ingestion_test_ingestion_rationale_897",
+      "tests_ingestion_test_ingestion_setup_mock_qdrant",
+      "tests_ingestion_test_ingestion_testac0016scannedpdf_test_scanned_pdf_error_in_background",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_upload_empty_file_returns_400",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_upload_invalid_filename_returns_400",
+      "tests_ingestion_test_ingestion_testac0017filevalidation_test_upload_unsupported_type_returns_400",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_duplicate_rename_action",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_identical_hash_returns_unchanged"
+    ],
+    "41": [
+      "tests_test_security_py_monkeypatch",
+      "tests_test_security_rationale_31",
+      "tests_test_security_rationale_346",
+      "tests_test_security_rationale_357",
+      "tests_test_security_rationale_370",
+      "tests_test_security_rationale_448",
+      "tests_test_security_rationale_463",
+      "tests_test_security_rationale_483",
+      "tests_test_security_set_passphrase",
+      "tests_test_security_testauthmiddleware_test_auth_enabled_when_token_set",
+      "tests_test_security_testauthmiddleware_test_require_auth_dependency_allows_when_disabled",
+      "tests_test_security_testauthmiddleware_test_require_auth_dependency_passes_with_valid_token",
+      "tests_test_security_testauthmiddleware_test_require_auth_dependency_rejects_when_no_token",
+      "tests_test_security_testauthmiddleware_test_verify_token_empty_string_rejected",
+      "tests_test_security_testauthmiddleware_test_verify_token_rejects_wrong_token"
+    ],
+    "42": [
+      "src_api_routes_session_store_boundedsessionstore",
+      "src_api_routes_session_store_boundedsessionstore_clear",
+      "src_api_routes_session_store_boundedsessionstore_contains",
+      "src_api_routes_session_store_boundedsessionstore_get",
+      "src_api_routes_session_store_boundedsessionstore_init",
+      "src_api_routes_session_store_boundedsessionstore_items_snapshot",
+      "src_api_routes_session_store_boundedsessionstore_put",
+      "src_api_routes_session_store_rationale_113",
+      "src_api_routes_session_store_rationale_122",
+      "src_api_routes_session_store_rationale_135",
+      "src_api_routes_session_store_rationale_16",
+      "src_api_routes_session_store_rationale_29",
+      "src_api_routes_session_store_rationale_41",
+      "src_api_routes_session_store_rationale_56"
+    ],
+    "43": [
+      "tests_api_test_ui_content_rationale_130",
+      "tests_api_test_ui_content_rationale_133",
+      "tests_api_test_ui_content_rationale_141",
+      "tests_api_test_ui_content_rationale_162",
+      "tests_api_test_ui_content_rationale_172",
+      "tests_api_test_ui_content_rationale_180",
+      "tests_api_test_ui_content_rationale_206",
+      "tests_api_test_ui_content_testwelcomecontent",
+      "tests_api_test_ui_content_testwelcomecontent_test_counter_cards_present",
+      "tests_api_test_ui_content_testwelcomecontent_test_counter_labels_localized_ru",
+      "tests_api_test_ui_content_testwelcomecontent_test_get_started_button_present",
+      "tests_api_test_ui_content_testwelcomecontent_test_video_placeholder_localized_ru",
+      "tests_api_test_ui_content_testwelcomecontent_test_video_placeholder_present",
+      "tests_api_test_ui_content_testwelcomecontent_test_video_placeholder_still_present"
+    ],
+    "44": [
+      "_agents_skills_langgraph_patterns_agents_openai_yaml",
+      "_agents_skills_langgraph_patterns_skill_doc",
+      "_agents_skills_qdrant_operations_agents_openai_yaml",
+      "_agents_skills_qdrant_operations_skill_doc",
+      "_agents_skills_rag_studio_rag_skill_doc",
+      "readme_fastapi",
+      "readme_langgraph",
+      "readme_qdrant",
+      "readme_sqlite_checkpointer",
+      "src_graph_module",
+      "src_ingestion_module",
+      "src_vector_store_module",
+      "tests_module"
+    ],
+    "45": [
+      "system_spec_md_ac-007-2",
+      "system_spec_md_ac-007-3",
+      "system_spec_md_ac-007-4",
+      "system_spec_md_app_js",
+      "system_spec_md_base_html",
+      "system_spec_md_en_json",
+      "system_spec_md_global_header_status_indicator",
+      "system_spec_md_language_switcher",
+      "system_spec_md_ragstudio",
+      "system_spec_md_responsive_breakpoints",
+      "system_spec_md_ru_json",
+      "system_spec_md_style_css",
+      "system_spec_md_switchlanguage"
+    ],
+    "46": [
+      "system_spec_md_ac-008-1",
+      "system_spec_md_ac-008-2",
+      "system_spec_md_ac-008-3",
+      "system_spec_md_ac_008_10",
+      "system_spec_md_api_key_encryption",
+      "system_spec_md_data_persistence",
+      "system_spec_md_docker",
+      "system_spec_md_fastapi",
+      "system_spec_md_fernet",
+      "system_spec_md_qdrant",
+      "system_spec_md_qdrant_storage_path",
+      "system_spec_md_rag_studio_cache",
+      "system_spec_md_single_docker_container"
+    ],
+    "47": [
+      "tests_api_test_ui_navigation_py_testclient",
+      "tests_api_test_ui_navigation_rationale_239",
+      "tests_api_test_ui_navigation_rationale_242",
+      "tests_api_test_ui_navigation_rationale_251",
+      "tests_api_test_ui_navigation_rationale_264",
+      "tests_api_test_ui_navigation_rationale_276",
+      "tests_api_test_ui_navigation_rationale_285",
+      "tests_api_test_ui_navigation_testglobalheader",
+      "tests_api_test_ui_navigation_testglobalheader_test_all_pages_have_header",
+      "tests_api_test_ui_navigation_testglobalheader_test_header_contains_logo_and_status",
+      "tests_api_test_ui_navigation_testglobalheader_test_header_element_order",
+      "tests_api_test_ui_navigation_testglobalheader_test_lang_param_sets_locale",
+      "tests_api_test_ui_navigation_testglobalheader_test_status_endpoint_returns_json"
+    ],
+    "48": [
+      "tests_ingestion_test_ingestion",
+      "tests_ingestion_test_ingestion_create_temp_csv",
+      "tests_ingestion_test_ingestion_py_path",
+      "tests_ingestion_test_ingestion_rationale_1",
+      "tests_ingestion_test_ingestion_rationale_47",
+      "tests_ingestion_test_ingestion_rationale_486",
+      "tests_ingestion_test_ingestion_rationale_538",
+      "tests_ingestion_test_ingestion_rationale_556",
+      "tests_ingestion_test_ingestion_rationale_559",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_csv_empty_raises_error",
+      "tests_ingestion_test_ingestion_testac0015filetypedetection_test_csv_row_by_row_parsing",
+      "tests_ingestion_test_ingestion_testac0016scannedpdf",
+      "tests_ingestion_test_ingestion_testac0016scannedpdf_test_empty_pdf_raises_value_error"
+    ],
+    "49": [
+      "tests_ingestion_test_ingestion_clear_overrides",
+      "tests_ingestion_test_ingestion_rationale_103",
+      "tests_ingestion_test_ingestion_rationale_117",
+      "tests_ingestion_test_ingestion_rationale_120",
+      "tests_ingestion_test_ingestion_rationale_140",
+      "tests_ingestion_test_ingestion_rationale_173",
+      "tests_ingestion_test_ingestion_rationale_188",
+      "tests_ingestion_test_ingestion_testac0011fileupload",
+      "tests_ingestion_test_ingestion_testac0011fileupload_test_progress_404_for_unknown_file",
+      "tests_ingestion_test_ingestion_testac0011fileupload_test_upload_csv_returns_202",
+      "tests_ingestion_test_ingestion_testac0011fileupload_test_upload_md_returns_202",
+      "tests_ingestion_test_ingestion_testac0011fileupload_test_upload_txt_returns_202",
+      "tests_ingestion_test_ingestion_testac0011fileupload_test_upload_without_filename_returns_422"
+    ],
+    "50": [
+      "src_api_routes_chat_state_rationale_159",
+      "src_api_routes_chat_state_save_session_title",
+      "src_api_routes_session_routes",
+      "src_api_routes_session_routes_create_session",
+      "src_api_routes_session_routes_py_basemodel",
+      "src_api_routes_session_routes_py_post",
+      "src_api_routes_session_routes_rationale_1",
+      "src_api_routes_session_routes_rationale_120",
+      "src_api_routes_session_routes_rationale_38",
+      "src_api_routes_session_routes_rationale_48",
+      "src_api_routes_session_routes_sessioncreate",
+      "src_api_routes_session_routes_sessionrename"
+    ],
+    "51": [
+      "system_spec_md_ac_008_5",
+      "system_spec_md_ac_018_7",
+      "system_spec_md_builder_py",
+      "system_spec_md_duplicate_modal",
+      "system_spec_md_fastembed",
+      "system_spec_md_fr_001",
+      "system_spec_md_graph_config_json",
+      "system_spec_md_nfr_026",
+      "system_spec_md_paraphrase_multilingual_minilm_l12_v2",
+      "system_spec_md_pypdf2",
+      "system_spec_md_python_docx",
+      "system_spec_md_rag_studio_docs_collection"
+    ],
+    "52": [
+      "tests_graph_test_nodes_make_state",
+      "tests_graph_test_nodes_rationale_390",
+      "tests_graph_test_nodes_rationale_394",
+      "tests_graph_test_nodes_rationale_406",
+      "tests_graph_test_nodes_rationale_419",
+      "tests_graph_test_nodes_rationale_448",
+      "tests_graph_test_nodes_rationale_47",
+      "tests_graph_test_nodes_testvalidatenode",
+      "tests_graph_test_nodes_testvalidatenode_test_cache_source_skips_validation",
+      "tests_graph_test_nodes_testvalidatenode_test_low_score_fails_validation",
+      "tests_graph_test_nodes_testvalidatenode_test_no_docs_returns_zero_score",
+      "tests_graph_test_nodes_testvalidatenode_test_retrieval_source_scores_faithfulness"
+    ],
+    "53": [
+      "tests_graph_test_state_rationale_14",
+      "tests_graph_test_state_rationale_17",
+      "tests_graph_test_state_rationale_43",
+      "tests_graph_test_state_rationale_48",
+      "tests_graph_test_state_rationale_76",
+      "tests_graph_test_state_rationale_94",
+      "tests_graph_test_state_testragstateschema",
+      "tests_graph_test_state_testragstateschema_test_all_required_fields_present",
+      "tests_graph_test_state_testragstateschema_test_default_values_create_valid_state",
+      "tests_graph_test_state_testragstateschema_test_field_types_are_correct",
+      "tests_graph_test_state_testragstateschema_test_messages_is_annotated",
+      "tests_graph_test_state_testragstateschema_test_optional_fields_accept_none"
+    ],
+    "54": [
+      "tests_ingestion_test_ingestion_rationale_1486",
+      "tests_ingestion_test_ingestion_rationale_1490",
+      "tests_ingestion_test_ingestion_rationale_1498",
+      "tests_ingestion_test_ingestion_rationale_1506",
+      "tests_ingestion_test_ingestion_rationale_1523",
+      "tests_ingestion_test_ingestion_rationale_1550",
+      "tests_ingestion_test_ingestion_teststalestoredfilescleanup",
+      "tests_ingestion_test_ingestion_teststalestoredfilescleanup_test_failed_ingestion_clears_stored_files",
+      "tests_ingestion_test_ingestion_teststalestoredfilescleanup_test_filename_exactly_200_accepted",
+      "tests_ingestion_test_ingestion_teststalestoredfilescleanup_test_filename_too_long_rejected",
+      "tests_ingestion_test_ingestion_teststalestoredfilescleanup_test_stale_chunk_count_zero_allows_reupload",
+      "tests_ingestion_test_ingestion_teststalestoredfilescleanup_test_upload_filename_too_long_returns_400"
+    ],
+    "55": [
+      "tests_test_deployment_rationale_101",
+      "tests_test_deployment_rationale_106",
+      "tests_test_deployment_rationale_113",
+      "tests_test_deployment_rationale_119",
+      "tests_test_deployment_rationale_125",
+      "tests_test_deployment_rationale_98",
+      "tests_test_deployment_testac0084dockerfilebuild",
+      "tests_test_deployment_testac0084dockerfilebuild_test_docker_compose_exists",
+      "tests_test_deployment_testac0084dockerfilebuild_test_dockerfile_exists",
+      "tests_test_deployment_testac0084dockerfilebuild_test_dockerfile_exposes_port_8000",
+      "tests_test_deployment_testac0084dockerfilebuild_test_dockerfile_has_healthcheck",
+      "tests_test_deployment_testac0084dockerfilebuild_test_dockerfile_has_multi_stage"
+    ],
+    "56": [
+      "tests_test_deployment_rationale_164",
+      "tests_test_deployment_rationale_167",
+      "tests_test_deployment_rationale_173",
+      "tests_test_deployment_rationale_185",
+      "tests_test_deployment_rationale_208",
+      "tests_test_deployment_rationale_225",
+      "tests_test_deployment_testac0086oomprotection",
+      "tests_test_deployment_testac0086oomprotection_setup_method",
+      "tests_test_deployment_testac0086oomprotection_test_is_reranker_available_reflects_state",
+      "tests_test_deployment_testac0086oomprotection_test_reranker_fallback_on_general_error",
+      "tests_test_deployment_testac0086oomprotection_test_reranker_fallback_on_memory_error",
+      "tests_test_deployment_testac0086oomprotection_test_reranker_lazy_loading"
+    ],
+    "57": [
+      "src_api_main",
+      "src_api_main_create_app",
+      "src_api_main_lifespan",
+      "src_api_main_py_fastapi",
+      "src_api_main_rationale_1",
+      "src_api_main_rationale_137",
+      "src_api_main_rationale_56",
+      "src_api_routes_chat_state_py_any",
+      "src_api_routes_chat_state_rationale_29",
+      "src_api_routes_chat_state_set_graph",
+      "src_api_routes_health"
+    ],
+    "58": [
+      "tests_api_test_ui_content",
+      "tests_api_test_ui_content_fixture_client",
+      "tests_api_test_ui_content_py_any",
+      "tests_api_test_ui_content_rationale_1",
+      "tests_api_test_ui_content_rationale_25",
+      "tests_api_test_ui_content_rationale_376",
+      "tests_api_test_ui_content_rationale_381",
+      "tests_api_test_ui_content_rationale_388",
+      "tests_api_test_ui_content_testchunksettingscolumn",
+      "tests_api_test_ui_content_testchunksettingscolumn_test_api_returns_chunk_size_and_overlap",
+      "tests_api_test_ui_content_testchunksettingscolumn_test_settings_page_has_chunk_settings_column_header"
+    ],
+    "59": [
+      "tests_graph_test_builder_py_any",
+      "tests_graph_test_builder_rationale_420",
+      "tests_graph_test_builder_rationale_434",
+      "tests_graph_test_builder_rationale_622",
+      "tests_graph_test_builder_rationale_744",
+      "tests_graph_test_builder_rationale_748",
+      "tests_graph_test_builder_testpersistenceacrossrestarts",
+      "tests_graph_test_builder_testpersistenceacrossrestarts_test_aimessage_persisted_in_messages_channel",
+      "tests_graph_test_builder_testpersistenceacrossrestarts_test_session_persists_across_new_graph_instance",
+      "tests_graph_test_builder_testwalmode",
+      "tests_graph_test_builder_testwalmode_test_wal_mode_enabled"
+    ],
+    "60": [
+      "src_api_routes_chat_state_get_graph",
+      "src_api_routes_chat_state_rationale_41",
+      "src_api_routes_session_routes_clear_session_messages",
+      "src_api_routes_session_routes_delete_session",
+      "src_api_routes_session_routes_list_sessions",
+      "src_api_routes_session_routes_py_delete",
+      "src_api_routes_session_routes_py_get",
+      "src_api_routes_session_routes_rationale_151",
+      "src_api_routes_session_routes_rationale_304",
+      "src_api_routes_session_routes_rationale_60"
+    ],
+    "61": [
+      "src_api_routes_feedback_routes",
+      "src_api_routes_feedback_routes_feedbacksubmit",
+      "src_api_routes_feedback_routes_py_basemodel",
+      "src_api_routes_feedback_routes_py_post",
+      "src_api_routes_feedback_routes_rationale_1",
+      "src_api_routes_feedback_routes_rationale_19",
+      "src_api_routes_feedback_routes_rationale_39",
+      "src_api_routes_feedback_routes_submit_feedback",
+      "src_api_routes_init",
+      "src_api_routes_ui"
+    ],
+    "62": [
+      "tests_api_test_chat_ui_rationale_540",
+      "tests_api_test_chat_ui_rationale_543",
+      "tests_api_test_chat_ui_rationale_555",
+      "tests_api_test_chat_ui_rationale_564",
+      "tests_api_test_chat_ui_rationale_579",
+      "tests_api_test_chat_ui_testinputsanitization",
+      "tests_api_test_chat_ui_testinputsanitization_test_chat_page_renders_xss_safe_html",
+      "tests_api_test_chat_ui_testinputsanitization_test_max_length_boundary_accepted",
+      "tests_api_test_chat_ui_testinputsanitization_test_message_max_length_enforced",
+      "tests_api_test_chat_ui_testinputsanitization_test_sanitize_html_in_response"
+    ],
+    "63": [
+      "tests_api_test_ui_navigation_rationale_106",
+      "tests_api_test_ui_navigation_rationale_109",
+      "tests_api_test_ui_navigation_rationale_122",
+      "tests_api_test_ui_navigation_rationale_137",
+      "tests_api_test_ui_navigation_rationale_152",
+      "tests_api_test_ui_navigation_testlanguageswitcher",
+      "tests_api_test_ui_navigation_testlanguageswitcher_test_invalid_locale_rejected",
+      "tests_api_test_ui_navigation_testlanguageswitcher_test_language_switcher_present",
+      "tests_api_test_ui_navigation_testlanguageswitcher_test_locale_persists_in_cookie",
+      "tests_api_test_ui_navigation_testlanguageswitcher_test_locale_switch_ru_and_en"
+    ],
+    "64": [
+      "tests_test_deployment_rationale_276",
+      "tests_test_deployment_rationale_279",
+      "tests_test_deployment_rationale_307",
+      "tests_test_deployment_rationale_321",
+      "tests_test_deployment_rationale_352",
+      "tests_test_deployment_testac0088auditlogging",
+      "tests_test_deployment_testac0088auditlogging_test_log_audit_includes_required_fields",
+      "tests_test_deployment_testac0088auditlogging_test_log_audit_produces_valid_json",
+      "tests_test_deployment_testac0088auditlogging_test_log_audit_strips_api_keys",
+      "tests_test_deployment_testac0088auditlogging_test_sanitize_nested_dicts"
+    ],
+    "65": [
+      "tests_test_deployment_rationale_374",
+      "tests_test_deployment_rationale_378",
+      "tests_test_deployment_rationale_385",
+      "tests_test_deployment_rationale_404",
+      "tests_test_deployment_rationale_433",
+      "tests_test_deployment_testac0089gracefulshutdown",
+      "tests_test_deployment_testac0089gracefulshutdown_test_lifespan_exists",
+      "tests_test_deployment_testac0089gracefulshutdown_test_pending_tasks_tracking",
+      "tests_test_deployment_testac0089gracefulshutdown_test_shutdown_cancels_stuck_tasks",
+      "tests_test_deployment_testac0089gracefulshutdown_test_shutdown_waits_for_pending_tasks"
+    ],
+    "66": [
+      "tests_test_deployment_rationale_504",
+      "tests_test_deployment_rationale_507",
+      "tests_test_deployment_rationale_512",
+      "tests_test_deployment_rationale_518",
+      "tests_test_deployment_rationale_524",
+      "tests_test_deployment_testdockerignore",
+      "tests_test_deployment_testdockerignore_test_dockerignore_excludes_env",
+      "tests_test_deployment_testdockerignore_test_dockerignore_excludes_git",
+      "tests_test_deployment_testdockerignore_test_dockerignore_excludes_tests",
+      "tests_test_deployment_testdockerignore_test_dockerignore_exists"
+    ],
+    "67": [
+      "_agents_skills_rag_studio_ui_skill_doc",
+      "_agents_skills_ui_design_agents_openai_yaml",
+      "_agents_skills_ui_design_skill_doc",
+      "readme_i18n",
+      "readme_jinja2",
+      "src_api_locales_module",
+      "src_api_module",
+      "src_api_static_module",
+      "src_api_templates_module"
+    ],
+    "68": [
+      "src_api_routes_chat_state",
+      "src_api_routes_chat_state_delete_session_title",
+      "src_api_routes_chat_state_get_session_titles_path",
+      "src_api_routes_chat_state_load_session_titles",
+      "src_api_routes_chat_state_py_path",
+      "src_api_routes_chat_state_rationale_1",
+      "src_api_routes_chat_state_rationale_119",
+      "src_api_routes_chat_state_rationale_134",
+      "src_api_routes_chat_state_rationale_194"
+    ],
+    "69": [
+      "src_graph_builder",
+      "src_graph_init",
+      "src_graph_init_rationale_1",
+      "src_graph_session",
+      "src_graph_state",
+      "tests_graph_test_builder",
+      "tests_graph_test_builder_rationale_1",
+      "tests_graph_test_state",
+      "tests_graph_test_state_rationale_1"
+    ],
+    "70": [
+      "system_spec_md_ac-014_2",
+      "system_spec_md_ac-014_3",
+      "system_spec_md_bm25",
+      "system_spec_md_cross_encoder_reranker",
+      "system_spec_md_fr-014",
+      "system_spec_md_fr_002",
+      "system_spec_md_rrf",
+      "system_spec_md_settings_data",
+      "system_spec_md_src_retrieve_orchestrator_py"
+    ],
+    "71": [
+      "system_spec_md_ac_018_5",
+      "system_spec_md_analyzer",
+      "system_spec_md_cache",
+      "system_spec_md_cache_check",
+      "system_spec_md_cost_estimator",
+      "system_spec_md_generate",
+      "system_spec_md_llm",
+      "system_spec_md_prompts",
+      "system_spec_md_validator"
+    ],
+    "72": [
+      "system_spec_md_api_key_validation",
+      "system_spec_md_get_started",
+      "system_spec_md_model_selection",
+      "system_spec_md_provider_selection",
+      "system_spec_md_settings_tab",
+      "system_spec_md_settings_ui",
+      "system_spec_md_temperature_adjustment",
+      "system_spec_md_welcome_tab",
+      "system_spec_md_welcome_ui"
+    ],
+    "73": [
+      "tests_graph_test_nodes_make_sparse_vector",
+      "tests_graph_test_nodes_py_simplenamespace",
+      "tests_graph_test_nodes_rationale_225",
+      "tests_graph_test_nodes_rationale_229",
+      "tests_graph_test_nodes_rationale_266",
+      "tests_graph_test_nodes_rationale_42",
+      "tests_graph_test_nodes_testretrievenode",
+      "tests_graph_test_nodes_testretrievenode_test_retrieve_empty_on_no_results",
+      "tests_graph_test_nodes_testretrievenode_test_retrieve_returns_documents"
+    ],
+    "74": [
+      "src_api_templates_welcome_counter_hours",
+      "src_api_templates_welcome_counter_privacy",
+      "src_api_templates_welcome_counter_speed",
+      "src_api_templates_welcome_document_chat_assistant",
+      "src_api_templates_welcome_get_started",
+      "src_api_templates_welcome_rag_studio",
+      "src_api_templates_welcome_video_placeholder",
+      "src_api_templates_welcome_welcome"
+    ],
+    "75": [
+      "system_spec_md_ac_008_4",
+      "system_spec_md_ac_008_7",
+      "system_spec_md_docker_compose",
+      "system_spec_md_docker_compose_yml",
+      "system_spec_md_dockerfile",
+      "system_spec_md_dockerignore",
+      "system_spec_md_env_example",
+      "system_spec_md_health_check_endpoints"
+    ],
+    "76": [
+      "system_spec_md_ac_011_1",
+      "system_spec_md_ac_011_2",
+      "system_spec_md_chunking_strategy_library",
+      "system_spec_md_parent_document_chunking",
+      "system_spec_md_recursive_character_text_splitter",
+      "system_spec_md_recursive_chunking",
+      "system_spec_md_sentence_window_retrieval",
+      "system_spec_md_static_chunking"
+    ],
+    "77": [
+      "system_spec_md_ac_017_1",
+      "system_spec_md_ac_017_2",
+      "system_spec_md_ac_017_3",
+      "system_spec_md_ac_017_4",
+      "system_spec_md_ac_017_5",
+      "system_spec_md_education_route",
+      "system_spec_md_education_template",
+      "system_spec_md_fr_017"
+    ],
+    "78": [
+      "tests_api_test_chat_ui_rationale_271",
+      "tests_api_test_chat_ui_rationale_274",
+      "tests_api_test_chat_ui_rationale_288",
+      "tests_api_test_chat_ui_rationale_318",
+      "tests_api_test_chat_ui_testmessagestreaming",
+      "tests_api_test_chat_ui_testmessagestreaming_test_chat_page_has_input",
+      "tests_api_test_chat_ui_testmessagestreaming_test_send_message_returns_sse",
+      "tests_api_test_chat_ui_testmessagestreaming_test_sse_stream_contains_tokens"
+    ],
+    "79": [
+      "tests_api_test_chat_ui_rationale_376",
+      "tests_api_test_chat_ui_rationale_379",
+      "tests_api_test_chat_ui_rationale_399",
+      "tests_api_test_chat_ui_rationale_418",
+      "tests_api_test_chat_ui_testmessagefeedback",
+      "tests_api_test_chat_ui_testmessagefeedback_test_feedback_endpoint_accepts_negative_with_reason",
+      "tests_api_test_chat_ui_testmessagefeedback_test_feedback_endpoint_accepts_positive",
+      "tests_api_test_chat_ui_testmessagefeedback_test_feedback_invalid_type_rejected"
+    ],
+    "80": [
+      "tests_api_test_chat_ui_rationale_491",
+      "tests_api_test_chat_ui_rationale_494",
+      "tests_api_test_chat_ui_rationale_505",
+      "tests_api_test_chat_ui_rationale_520",
+      "tests_api_test_chat_ui_testadversarialpromptrobustness",
+      "tests_api_test_chat_ui_testadversarialpromptrobustness_test_grounding_instruction_in_module",
+      "tests_api_test_chat_ui_testadversarialpromptrobustness_test_grounding_instruction_is_constant",
+      "tests_api_test_chat_ui_testadversarialpromptrobustness_test_user_input_is_not_system_message"
+    ],
+    "81": [
+      "tests_api_test_session_store_rationale_21",
+      "tests_api_test_session_store_rationale_27",
+      "tests_api_test_session_store_rationale_40",
+      "tests_api_test_session_store_rationale_54",
+      "tests_api_test_session_store_testmessagetrimming",
+      "tests_api_test_session_store_testmessagetrimming_test_append_trim_removes_oldest_one_by_one",
+      "tests_api_test_session_store_testmessagetrimming_test_append_trims_to_100_keeping_newest",
+      "tests_api_test_session_store_testmessagetrimming_test_put_trims_to_100_keeping_newest"
+    ],
+    "82": [
+      "tests_api_test_session_store_rationale_65",
+      "tests_api_test_session_store_rationale_71",
+      "tests_api_test_session_store_rationale_84",
+      "tests_api_test_session_store_rationale_99",
+      "tests_api_test_session_store_testsessioneviction",
+      "tests_api_test_session_store_testsessioneviction_test_evicted_session_returns_none",
+      "tests_api_test_session_store_testsessioneviction_test_get_promotes_to_mru",
+      "tests_api_test_session_store_testsessioneviction_test_max_50_sessions_lru_eviction"
+    ],
+    "83": [
+      "tests_api_test_ui_navigation_rationale_52",
+      "tests_api_test_ui_navigation_rationale_55",
+      "tests_api_test_ui_navigation_rationale_71",
+      "tests_api_test_ui_navigation_rationale_84",
+      "tests_api_test_ui_navigation_testtabnavigation",
+      "tests_api_test_ui_navigation_testtabnavigation_test_active_tab_highlighted",
+      "tests_api_test_ui_navigation_testtabnavigation_test_all_tab_pages_return_200_with_active_tab",
+      "tests_api_test_ui_navigation_testtabnavigation_test_tabs_visible_on_homepage"
+    ],
+    "84": [
+      "tests_graph_test_nodes_rationale_118",
+      "tests_graph_test_nodes_rationale_77",
+      "tests_graph_test_nodes_rationale_81",
+      "tests_graph_test_nodes_rationale_99",
+      "tests_graph_test_nodes_testanalyzernode",
+      "tests_graph_test_nodes_testanalyzernode_test_follow_up_question_classification",
+      "tests_graph_test_nodes_testanalyzernode_test_query_extracted_from_last_human_message",
+      "tests_graph_test_nodes_testanalyzernode_test_standalone_question_classification"
+    ],
+    "85": [
+      "tests_graph_test_nodes_rationale_142",
+      "tests_graph_test_nodes_rationale_146",
+      "tests_graph_test_nodes_rationale_177",
+      "tests_graph_test_nodes_rationale_200",
+      "tests_graph_test_nodes_testcachechecknode",
+      "tests_graph_test_nodes_testcachechecknode_test_cache_check_handles_qdrant_error",
+      "tests_graph_test_nodes_testcachechecknode_test_cache_hit_returns_cached_answer",
+      "tests_graph_test_nodes_testcachechecknode_test_cache_miss_returns_false"
+    ],
+    "86": [
+      "tests_graph_test_nodes_rationale_482",
+      "tests_graph_test_nodes_rationale_486",
+      "tests_graph_test_nodes_rationale_497",
+      "tests_graph_test_nodes_rationale_508",
+      "tests_graph_test_nodes_testsavetocachenode",
+      "tests_graph_test_nodes_testsavetocachenode_test_saves_on_retrieval_with_validation_pass",
+      "tests_graph_test_nodes_testsavetocachenode_test_skips_on_cache_source",
+      "tests_graph_test_nodes_testsavetocachenode_test_skips_on_validation_fail"
+    ],
+    "87": [
+      "tests_test_deployment",
+      "tests_test_deployment_rationale_1",
+      "tests_test_deployment_rationale_32",
+      "tests_test_deployment_rationale_35",
+      "tests_test_deployment_rationale_47",
+      "tests_test_deployment_testac0081healthcheck",
+      "tests_test_deployment_testac0081healthcheck_test_health_endpoint_degraded_when_qdrant_unavailable",
+      "tests_test_deployment_testac0081healthcheck_test_health_endpoint_returns_ready"
+    ],
+    "88": [
+      "tests_test_deployment_rationale_247",
+      "tests_test_deployment_rationale_250",
+      "tests_test_deployment_rationale_256",
+      "tests_test_deployment_rationale_262",
+      "tests_test_deployment_testac0087resourceconstraints",
+      "tests_test_deployment_testac0087resourceconstraints_test_docker_compose_documents_recommendations",
+      "tests_test_deployment_testac0087resourceconstraints_test_docker_compose_has_cpus",
+      "tests_test_deployment_testac0087resourceconstraints_test_docker_compose_has_mem_limit"
+    ],
+    "89": [
+      "src_api_routes_chat_state_get_message_content",
+      "src_api_routes_chat_state_get_message_role",
+      "src_api_routes_chat_state_rationale_231",
+      "src_api_routes_chat_state_rationale_253",
+      "src_api_routes_session_routes_get_session_messages",
+      "src_api_routes_session_routes_py_request",
+      "src_api_routes_session_routes_rationale_225"
+    ],
+    "90": [
+      "_agents_skills_langsmith_eval_agents_openai_yaml",
+      "_agents_skills_langsmith_eval_skill_doc",
+      "_agents_skills_qa_agents_openai_yaml",
+      "_agents_skills_qa_skill_doc",
+      "readme_langsmith",
+      "readme_ragas"
+    ],
+    "91": [
+      "src_api_routes_session_store",
+      "src_api_routes_session_store_rationale_1",
+      "tests_api_test_session_store",
+      "tests_api_test_session_store_rationale_1",
+      "tests_api_test_session_store_rationale_16",
+      "tests_api_test_session_store_store"
+    ],
+    "92": [
+      "system_spec_md_ac_018_6",
+      "system_spec_md_ac_018_8",
+      "system_spec_md_generator",
+      "system_spec_md_graph_builder_html",
+      "system_spec_md_graph_builder_py",
+      "system_spec_md_retriever"
+    ],
+    "93": [
+      "tests_api_test_chat_ui_rationale_602",
+      "tests_api_test_chat_ui_rationale_605",
+      "tests_api_test_chat_ui_rationale_628",
+      "tests_api_test_chat_ui_testchatintegration",
+      "tests_api_test_chat_ui_testchatintegration_test_chat_page_has_correct_title",
+      "tests_api_test_chat_ui_testchatintegration_test_full_chat_flow"
+    ],
+    "94": [
+      "tests_api_test_session_store_rationale_106",
+      "tests_api_test_session_store_rationale_110",
+      "tests_api_test_session_store_rationale_121",
+      "tests_api_test_session_store_testpop",
+      "tests_api_test_session_store_testpop_test_pop_existing_session",
+      "tests_api_test_session_store_testpop_test_pop_nonexistent_returns_none"
+    ],
+    "95": [
+      "tests_api_test_ui_navigation_rationale_297",
+      "tests_api_test_ui_navigation_rationale_300",
+      "tests_api_test_ui_navigation_rationale_306",
+      "tests_api_test_ui_navigation_testchatsidebar",
+      "tests_api_test_ui_navigation_testchatsidebar_test_chat_page_has_sidebar_backdrop",
+      "tests_api_test_ui_navigation_testchatsidebar_test_chat_page_sidebar_is_collapsible"
+    ],
+    "96": [
+      "tests_graph_test_builder_rationale_118",
+      "tests_graph_test_builder_rationale_121",
+      "tests_graph_test_builder_rationale_131",
+      "tests_graph_test_builder_testgraphcompilation",
+      "tests_graph_test_builder_testgraphcompilation_test_graph_compiles_without_error",
+      "tests_graph_test_builder_testgraphcompilation_test_graph_has_all_seven_nodes"
+    ],
+    "97": [
+      "tests_graph_test_nodes",
+      "tests_graph_test_nodes_rationale_1",
+      "tests_graph_test_nodes_rationale_288",
+      "tests_graph_test_nodes_rationale_292",
+      "tests_graph_test_nodes_testgeneratefromcachenode",
+      "tests_graph_test_nodes_testgeneratefromcachenode_test_returns_cached_answer_no_llm"
+    ],
+    "98": [
+      "tests_graph_test_nodes_rationale_308",
+      "tests_graph_test_nodes_rationale_312",
+      "tests_graph_test_nodes_rationale_349",
+      "tests_graph_test_nodes_testgeneratefromretrievalnode",
+      "tests_graph_test_nodes_testgeneratefromretrievalnode_test_generates_grounded_answer_with_citations",
+      "tests_graph_test_nodes_testgeneratefromretrievalnode_test_includes_grounding_instruction"
+    ],
+    "99": [
+      "tests_ingestion_test_ingestion_rationale_731",
+      "tests_ingestion_test_ingestion_rationale_734",
+      "tests_ingestion_test_ingestion_rationale_749",
+      "tests_ingestion_test_ingestion_testdocumentlifecycle",
+      "tests_ingestion_test_ingestion_testdocumentlifecycle_test_clear_all_documents",
+      "tests_ingestion_test_ingestion_testdocumentlifecycle_test_list_documents_endpoint"
+    ],
+    "100": [
+      "tests_test_deployment_rationale_136",
+      "tests_test_deployment_rationale_139",
+      "tests_test_deployment_rationale_150",
+      "tests_test_deployment_testac0085modelcaching",
+      "tests_test_deployment_testac0085modelcaching_test_dockerfile_caches_dense_model",
+      "tests_test_deployment_testac0085modelcaching_test_dockerfile_caches_sparse_model"
+    ],
+    "101": [
+      "tests_test_deployment_rationale_446",
+      "tests_test_deployment_rationale_450",
+      "tests_test_deployment_rationale_459",
+      "tests_test_deployment_testnfr023startupintegrity",
+      "tests_test_deployment_testnfr023startupintegrity_test_health_check_failure_raises",
+      "tests_test_deployment_testnfr023startupintegrity_test_qdrant_client_waits_for_ready"
+    ],
+    "102": [
+      "tests_test_deployment_rationale_476",
+      "tests_test_deployment_rationale_479",
+      "tests_test_deployment_rationale_484",
+      "tests_test_deployment_testenvexample",
+      "tests_test_deployment_testenvexample_test_env_example_exists",
+      "tests_test_deployment_testenvexample_test_env_example_no_real_keys"
+    ],
+    "103": [
+      "tests_test_deployment_rationale_61",
+      "tests_test_deployment_rationale_64",
+      "tests_test_deployment_rationale_76",
+      "tests_test_deployment_testac0082datapersistence",
+      "tests_test_deployment_testac0082datapersistence_test_secrets_load_and_save_roundtrip",
+      "tests_test_deployment_testac0082datapersistence_test_secrets_persist_to_disk"
+    ],
+    "104": [
+      "_agents_skills_rag_best_practices_agents_openai_yaml",
+      "_agents_skills_rag_best_practices_skill_doc",
+      "readme_cross_encoder_rerank",
+      "readme_hybrid_search",
+      "src_retrieve_module"
+    ],
+    "105": [
+      "system_spec_md_ac-011_5",
+      "system_spec_md_chunkingconfig",
+      "system_spec_md_settings_html",
+      "system_spec_md_src_ingestion_chunker_py",
+      "system_spec_md_src_ingestion_chunker_strategies_py"
+    ],
+    "106": [
+      "system_spec_md_ac_015_1",
+      "system_spec_md_backend_streaming",
+      "system_spec_md_client_side",
+      "system_spec_md_llm_provider_integration",
+      "system_spec_md_sse_format"
+    ],
+    "107": [
+      "system_spec_md_chunkerprotocol",
+      "system_spec_md_parentdocumentchunker",
+      "system_spec_md_recursivechunker",
+      "system_spec_md_sentencewindowchunker",
+      "system_spec_md_staticchunker"
+    ],
+    "108": [
+      "tests_api_test_ui_navigation",
+      "tests_api_test_ui_navigation_fixture_client",
+      "tests_api_test_ui_navigation_py_any",
+      "tests_api_test_ui_navigation_rationale_1",
+      "tests_api_test_ui_navigation_rationale_26"
+    ],
+    "109": [
+      "docker_compose_yml_dockerfile",
+      "docker_compose_yml_env_file",
+      "docker_compose_yml_rag_data_volume",
+      "docker_compose_yml_rag_studio_service"
+    ],
+    "110": [
+      "docker_entrypoint",
+      "docker_entrypoint_fastembed_cache_path",
+      "docker_entrypoint_flashrank_cache_path",
+      "docker_entrypoint_sh__entry"
+    ],
+    "111": [
+      "scripts_download_models",
+      "scripts_download_models_download_models",
+      "scripts_download_models_rationale_1",
+      "scripts_download_models_rationale_33"
+    ],
+    "112": [
+      "src_api_main_create_task",
+      "src_api_main_py_any",
+      "src_api_main_rationale_47",
+      "task"
+    ],
+    "113": [
+      "src_api_routes_session_store_boundedsessionstore_append",
+      "src_api_routes_session_store_boundedsessionstore_pop",
+      "src_api_routes_session_store_rationale_101",
+      "src_api_routes_session_store_rationale_77"
+    ],
+    "114": [
+      "system_spec_md_ac-012_5",
+      "system_spec_md_ac-013_4",
+      "system_spec_md_src_generate_cost_estimator_py",
+      "system_spec_md_src_generate_llm_py"
+    ],
+    "115": [
+      "system_spec_md_ac_018_1",
+      "system_spec_md_ac_018_2",
+      "system_spec_md_ac_018_4",
+      "system_spec_md_fr_018"
+    ],
+    "116": [
+      "system_spec_md_chunk_overlap",
+      "system_spec_md_chunk_size",
+      "system_spec_md_retrieval_config",
+      "system_spec_md_top_k"
+    ],
+    "117": [
+      "system_spec_md_detect_locale",
+      "system_spec_md_load_locale",
+      "system_spec_md_locale_cache",
+      "system_spec_md_src_api_routes_ui_py"
+    ],
+    "118": [
+      "system_spec_md_post_api_ui_locale",
+      "system_spec_md_rag_studio_translations",
+      "system_spec_md_src_api_static_js_app_js",
+      "system_spec_md_switch_language"
+    ],
+    "119": [
+      "tests_api_test_chat_ui_rationale_470",
+      "tests_api_test_chat_ui_rationale_473",
+      "tests_api_test_chat_ui_testchatcontrols",
+      "tests_api_test_chat_ui_testchatcontrols_test_chat_page_has_header_controls"
+    ],
+    "120": [
+      "tests_api_test_chat_ui_rationale_642",
+      "tests_api_test_chat_ui_rationale_652",
+      "tests_api_test_chat_ui_testcontenttypes",
+      "tests_api_test_chat_ui_testcontenttypes_test_static_js_chat_served"
+    ],
+    "121": [
+      "tests_api_test_session_store_rationale_126",
+      "tests_api_test_session_store_rationale_132",
+      "tests_api_test_session_store_testsnapshot",
+      "tests_api_test_session_store_testsnapshot_test_snapshot_is_copy_not_reference"
+    ],
+    "122": [
+      "tests_api_test_session_store_rationale_144",
+      "tests_api_test_session_store_rationale_150",
+      "tests_api_test_session_store_testappendautocreate",
+      "tests_api_test_session_store_testappendautocreate_test_append_auto_creates_session"
+    ],
+    "123": [
+      "tests_api_test_session_store_rationale_160",
+      "tests_api_test_session_store_rationale_164",
+      "tests_api_test_session_store_testclear",
+      "tests_api_test_session_store_testclear_test_clear_removes_all"
+    ],
+    "124": [
+      "tests_vector_store_test_persistence",
+      "tests_vector_store_test_persistence_rationale_1",
+      "tests_vector_store_test_persistence_rationale_23",
+      "tests_vector_store_test_persistence_test_qdrant_persistence_across_client_restarts"
+    ],
+    "125": [
+      "src_api_auth_authmiddleware",
+      "src_api_auth_py_basehttpmiddleware",
+      "src_api_auth_rationale_138"
+    ],
+    "126": [
+      "src_api_routes_session_store_boundedsessionstore_aiter",
+      "src_api_routes_session_store_py_any",
+      "src_api_routes_session_store_rationale_143"
+    ],
+    "127": [
+      "src_api_templates_chat_html_base_html",
+      "src_api_templates_chat_html_chat_page",
+      "static_js_chat_js"
+    ],
+    "128": [
+      "system_spec_md_ac-013_1",
+      "system_spec_md_src_api_routes_analytics_py",
+      "system_spec_md_src_api_templates_analytics_html"
+    ],
+    "129": [
+      "system_spec_md_ac_008_6",
+      "system_spec_md_cross_encoder",
+      "system_spec_md_flashrank"
+    ],
+    "130": [
+      "system_spec_md_ac_008_9",
+      "system_spec_md_graceful_shutdown",
+      "system_spec_md_graph_state_persistence"
+    ],
+    "131": [
+      "system_spec_md_ac_009_1",
+      "system_spec_md_fr_009",
+      "system_spec_md_internationalization"
+    ],
+    "132": [
+      "system_spec_md_chunker",
+      "system_spec_md_chunker_strategies",
+      "system_spec_md_chunker_test"
+    ],
+    "133": [
+      "system_spec_md_client_test",
+      "system_spec_md_orchestrator",
+      "system_spec_md_search_test"
+    ],
+    "134": [
+      "system_spec_md_src_api_locales_en_json",
+      "system_spec_md_src_api_locales_ru_json",
+      "system_spec_md_tests_i18n_test_locales_py"
+    ],
+    "135": [
+      "_agents_skills_code_review_agents_openai_yaml",
+      "_agents_skills_code_review_skill_doc"
+    ],
+    "136": [
+      "_agents_skills_ponytail_agents_openai_yaml",
+      "_agents_skills_ponytail_skill_doc"
+    ],
+    "137": [
+      "_agents_skills_pr_description_agents_openai_yaml",
+      "_agents_skills_pr_description_skill_doc"
+    ],
+    "138": [
+      "system_spec_md_abort_controller",
+      "system_spec_md_ac_015_3"
+    ],
+    "139": [
+      "system_spec_md_ac-012_2",
+      "system_spec_md_src_generate_prompts_py"
+    ],
+    "140": [
+      "system_spec_md_ac-014_5",
+      "system_spec_md_fr-015"
+    ],
+    "141": [
+      "system_spec_md_ac_008_8",
+      "system_spec_md_audit_logging"
+    ],
+    "142": [
+      "system_spec_md_ac_009_2",
+      "system_spec_md_locale_file_structure"
+    ],
+    "143": [
+      "system_spec_md_ac_009_3",
+      "system_spec_md_default_language_detection"
+    ],
+    "144": [
+      "system_spec_md_ac_009_4",
+      "system_spec_md_locale_aware_system_prompt"
+    ],
+    "145": [
+      "system_spec_md_ac_015_2",
+      "system_spec_md_cursor_animation"
+    ],
+    "146": [
+      "system_spec_md_ac_015_5",
+      "system_spec_md_citation_real_time_rendering"
+    ],
+    "147": [
+      "system_spec_md_document_list",
+      "system_spec_md_pdf_upload"
+    ],
+    "148": [
+      "system_spec_md_embedder",
+      "system_spec_md_embedder_test"
+    ],
+    "149": [
+      "system_spec_md_encrypted_storage",
+      "system_spec_md_fernet_key_derivation"
+    ],
+    "150": [
+      "system_spec_md_new_chat",
+      "system_spec_md_session_creation"
+    ],
+    "151": [
+      "system_spec_md_parser",
+      "system_spec_md_parser_test"
+    ],
+    "152": [
+      "system_spec_md_readme",
+      "system_spec_md_system_spec"
+    ],
+    "153": [
+      "tests_api_test_ui_content_rationale_273",
+      "tests_api_test_ui_content_testsettingscontent_test_document_table_present"
+    ],
+    "154": [
+      "tests_api_test_ui_content_rationale_279",
+      "tests_api_test_ui_content_testsettingscontent_test_langsmith_card_present"
+    ],
+    "155": [
+      "tests_api_test_ui_content_rationale_330",
+      "tests_api_test_ui_content_testsettingscontent_test_save_settings_button_present"
+    ],
+    "156": [
+      "tests_api_test_ui_content_rationale_363",
+      "tests_api_test_ui_content_testsettingscontent_test_chunk_overlap_dropdown_present"
+    ],
+    "157": [
+      "tests_ingestion_test_ingestion_rationale_1274",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_settings_changed_triggers_409"
+    ],
+    "158": [
+      "tests_ingestion_test_ingestion_rationale_1368",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_stored_without_chunk_settings_no_warning"
+    ],
+    "159": [
+      "tests_ingestion_test_ingestion_rationale_810",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_duplicate_cancel_action"
+    ],
+    "160": [
+      "tests_ingestion_test_ingestion_rationale_868",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_duplicate_replace_action"
+    ],
+    "161": [
+      "tests_ingestion_test_ingestion_rationale_935",
+      "tests_ingestion_test_ingestion_testac0018duplicatedetection_test_qdrant_fallback_detects_duplicate"
+    ],
+    "162": [
+      "htmlresponse"
+    ],
+    "163": [
+      "jsonplusserializer"
+    ],
+    "164": [
+      "jsonresponse"
+    ],
+    "165": [
+      "logger"
+    ],
+    "166": [
+      "pkg_rag_studio"
+    ],
+    "167": [
+      "requirements_txt_bandit"
+    ],
+    "168": [
+      "requirements_txt_cryptography"
+    ],
+    "169": [
+      "requirements_txt_fastapi"
+    ],
+    "170": [
+      "requirements_txt_fastembed"
+    ],
+    "171": [
+      "requirements_txt_flashrank"
+    ],
+    "172": [
+      "requirements_txt_httpx"
+    ],
+    "173": [
+      "requirements_txt_jinja2"
+    ],
+    "174": [
+      "requirements_txt_langchain_core"
+    ],
+    "175": [
+      "requirements_txt_langchain_openai"
+    ],
+    "176": [
+      "requirements_txt_langgraph"
+    ],
+    "177": [
+      "requirements_txt_langgraph_checkpoint_sqlite"
+    ],
+    "178": [
+      "requirements_txt_langsmith"
+    ],
+    "179": [
+      "requirements_txt_mypy"
+    ],
+    "180": [
+      "requirements_txt_pydantic"
+    ],
+    "181": [
+      "requirements_txt_pypdf2"
+    ],
+    "182": [
+      "requirements_txt_pytest"
+    ],
+    "183": [
+      "requirements_txt_pytest_asyncio"
+    ],
+    "184": [
+      "requirements_txt_python_docx"
+    ],
+    "185": [
+      "requirements_txt_python_multipart"
+    ],
+    "186": [
+      "requirements_txt_qdrant_client"
+    ],
+    "187": [
+      "requirements_txt_ruff"
+    ],
+    "188": [
+      "requirements_txt_uvicorn"
+    ],
+    "189": [
+      "scripts_update_graph"
+    ],
+    "190": [
+      "scripts_watch_graph"
+    ],
+    "191": [
+      "self"
+    ],
+    "192": [
+      "src_api_dependencies_py_any"
+    ],
+    "193": [
+      "src_api_dependencies_py_asyncqdrantclient"
+    ],
+    "194": [
+      "src_api_dependencies_py_path"
+    ],
+    "195": [
+      "src_api_init"
+    ],
+    "196": [
+      "src_api_rate_limiter_py_asgiapp"
+    ],
+    "197": [
+      "src_api_routes_chat_py_any"
+    ],
+    "198": [
+      "src_api_routes_chat_py_basemodel"
+    ],
+    "199": [
+      "src_api_routes_chat_py_path"
+    ],
+    "200": [
+      "src_api_routes_chat_py_request"
+    ],
+    "201": [
+      "src_api_routes_health_py_asyncqdrantclient"
+    ],
+    "202": [
+      "src_api_routes_health_py_basemodel"
+    ],
+    "203": [
+      "src_api_routes_settings_py_any"
+    ],
+    "204": [
+      "src_api_routes_settings_py_basemodel"
+    ],
+    "205": [
+      "src_api_routes_settings_py_path"
+    ],
+    "206": [
+      "src_api_routes_ui_py_basemodel"
+    ],
+    "207": [
+      "src_api_routes_ui_py_request"
+    ],
+    "208": [
+      "src_api_templates_base_html"
+    ],
+    "209": [
+      "src_api_templates_chat_html"
+    ],
+    "210": [
+      "src_api_templates_welcome_html"
+    ],
+    "211": [
+      "src_generate_init"
+    ],
+    "212": [
+      "src_graph_builder_py_any"
+    ],
+    "213": [
+      "src_graph_session_py_any"
+    ],
+    "214": [
+      "src_ingestion_chunker_py_any"
+    ],
+    "215": [
+      "src_ingestion_router_py_asyncqdrantclient"
+    ],
+    "216": [
+      "src_init"
+    ],
+    "217": [
+      "src_retrieve_init"
+    ],
+    "218": [
+      "src_retrieve_orchestrator_py_any"
+    ],
+    "219": [
+      "src_vector_store_client_py_asyncqdrantclient"
+    ],
+    "220": [
+      "src_vector_store_init"
+    ],
+    "221": [
+      "stategraph"
+    ],
+    "222": [
+      "system_spec_md_ac-011_3"
+    ],
+    "223": [
+      "system_spec_md_ac-011_4"
+    ],
+    "224": [
+      "system_spec_md_ac-011_6"
+    ],
+    "225": [
+      "system_spec_md_ac-012_1"
+    ],
+    "226": [
+      "system_spec_md_ac-012_3"
+    ],
+    "227": [
+      "system_spec_md_ac-012_4"
+    ],
+    "228": [
+      "system_spec_md_ac-013_2"
+    ],
+    "229": [
+      "system_spec_md_ac-013_3"
+    ],
+    "230": [
+      "system_spec_md_ac-013_5"
+    ],
+    "231": [
+      "system_spec_md_ac-013_6"
+    ],
+    "232": [
+      "system_spec_md_ac-014_1"
+    ],
+    "233": [
+      "system_spec_md_ac-014_4"
+    ],
+    "234": [
+      "system_spec_md_ac_015_4"
+    ],
+    "235": [
+      "system_spec_md_chat_ui"
+    ],
+    "236": [
+      "system_spec_md_deployment_test"
+    ],
+    "237": [
+      "system_spec_md_fr-012"
+    ],
+    "238": [
+      "system_spec_md_fr-013"
+    ],
+    "239": [
+      "system_spec_md_fr_004"
+    ],
+    "240": [
+      "system_spec_md_fr_005"
+    ],
+    "241": [
+      "system_spec_md_fr_006"
+    ],
+    "242": [
+      "system_spec_md_fr_007"
+    ],
+    "243": [
+      "system_spec_md_fr_008"
+    ],
+    "244": [
+      "system_spec_md_fr_010"
+    ],
+    "245": [
+      "system_spec_md_layout"
+    ],
+    "246": [
+      "system_spec_md_locales_test"
+    ],
+    "247": [
+      "system_spec_md_nfr_001"
+    ],
+    "248": [
+      "system_spec_md_nfr_002"
+    ],
+    "249": [
+      "system_spec_md_nfr_003"
+    ],
+    "250": [
+      "system_spec_md_nfr_004"
+    ],
+    "251": [
+      "system_spec_md_nfr_005"
+    ],
+    "252": [
+      "system_spec_md_nfr_006"
+    ],
+    "253": [
+      "system_spec_md_nfr_007"
+    ],
+    "254": [
+      "system_spec_md_nfr_008"
+    ],
+    "255": [
+      "system_spec_md_nfr_009"
+    ],
+    "256": [
+      "system_spec_md_nfr_010"
+    ],
+    "257": [
+      "system_spec_md_nfr_011"
+    ],
+    "258": [
+      "system_spec_md_nfr_012"
+    ],
+    "259": [
+      "system_spec_md_nfr_013"
+    ],
+    "260": [
+      "system_spec_md_nfr_014"
+    ],
+    "261": [
+      "system_spec_md_nfr_015"
+    ],
+    "262": [
+      "system_spec_md_nfr_016"
+    ],
+    "263": [
+      "system_spec_md_nfr_017"
+    ],
+    "264": [
+      "system_spec_md_nfr_018"
+    ],
+    "265": [
+      "system_spec_md_nfr_019"
+    ],
+    "266": [
+      "system_spec_md_nfr_020"
+    ],
+    "267": [
+      "system_spec_md_nfr_021"
+    ],
+    "268": [
+      "system_spec_md_nfr_022"
+    ],
+    "269": [
+      "system_spec_md_nfr_023"
+    ],
+    "270": [
+      "system_spec_md_nfr_024"
+    ],
+    "271": [
+      "system_spec_md_nfr_025"
+    ],
+    "272": [
+      "system_spec_md_providers"
+    ],
+    "273": [
+      "system_spec_md_ragas"
+    ],
+    "274": [
+      "system_spec_md_security_test"
+    ],
+    "275": [
+      "system_spec_md_uuid5"
+    ],
+    "276": [
+      "system_spec_md_volume"
+    ],
+    "277": [
+      "tests_api_init"
+    ],
+    "278": [
+      "tests_e2e_init"
+    ],
+    "279": [
+      "tests_graph_init"
+    ],
+    "280": [
+      "tests_i18n_init"
+    ],
+    "281": [
+      "tests_ingestion_init"
+    ],
+    "282": [
+      "tests_init"
+    ],
+    "283": [
+      "tests_retrieve_init"
+    ],
+    "284": [
+      "tests_vector_store_init"
+    ],
+    "285": [
+      "token"
+    ],
+    "286": [
+      "typeddict"
+    ]
+  },
+  "cohesion": {
+    "0": 0.06187202538339503,
+    "1": 0.0519774011299435,
+    "2": 0.06219426974143955,
+    "3": 0.06859903381642513,
+    "4": 0.06829268292682927,
+    "5": 0.0873440285204991,
+    "6": 0.0873440285204991,
+    "7": 0.12433862433862433,
+    "8": 0.09971509971509972,
+    "9": 0.10256410256410256,
+    "10": 0.11333333333333333,
+    "11": 0.08333333333333333,
+    "12": 0.15810276679841898,
+    "13": 0.11067193675889328,
+    "14": 0.11688311688311688,
+    "15": 0.09523809523809523,
+    "16": 0.09090909090909091,
+    "17": 0.19047619047619047,
+    "18": 0.14285714285714285,
+    "19": 0.14736842105263157,
+    "20": 0.15263157894736842,
+    "21": 0.13157894736842105,
+    "22": 0.1,
+    "23": 0.1,
+    "24": 0.1,
+    "25": 0.1503267973856209,
+    "26": 0.1111111111111111,
+    "27": 0.1111111111111111,
+    "28": 0.13970588235294118,
+    "29": 0.16176470588235295,
+    "30": 0.16911764705882354,
+    "31": 0.15,
+    "32": 0.16666666666666666,
+    "33": 0.15,
+    "34": 0.125,
+    "35": 0.125,
+    "36": 0.14166666666666666,
+    "37": 0.125,
+    "38": 0.13333333333333333,
+    "39": 0.1523809523809524,
+    "40": 0.13333333333333333,
+    "41": 0.13333333333333333,
+    "42": 0.14285714285714285,
+    "43": 0.14285714285714285,
+    "44": 0.23076923076923078,
+    "45": 0.15384615384615385,
+    "46": 0.16666666666666666,
+    "47": 0.20512820512820512,
+    "48": 0.16666666666666666,
+    "49": 0.21794871794871795,
+    "50": 0.21212121212121213,
+    "51": 0.16666666666666666,
+    "52": 0.21212121212121213,
+    "53": 0.16666666666666666,
+    "54": 0.16666666666666666,
+    "55": 0.16666666666666666,
+    "56": 0.16666666666666666,
+    "57": 0.2545454545454545,
+    "58": 0.18181818181818182,
+    "59": 0.2,
+    "60": 0.2,
+    "61": 0.2222222222222222,
+    "62": 0.2,
+    "63": 0.2,
+    "64": 0.2,
+    "65": 0.2,
+    "66": 0.2,
+    "67": 0.4166666666666667,
+    "68": 0.2777777777777778,
+    "69": 0.25,
+    "70": 0.2222222222222222,
+    "71": 0.2222222222222222,
+    "72": 0.2222222222222222,
+    "73": 0.25,
+    "74": 0.25,
+    "75": 0.25,
+    "76": 0.25,
+    "77": 0.25,
+    "78": 0.25,
+    "79": 0.25,
+    "80": 0.25,
+    "81": 0.25,
+    "82": 0.25,
+    "83": 0.25,
+    "84": 0.25,
+    "85": 0.25,
+    "86": 0.25,
+    "87": 0.25,
+    "88": 0.25,
+    "89": 0.2857142857142857,
+    "90": 0.4,
+    "91": 0.3333333333333333,
+    "92": 0.3333333333333333,
+    "93": 0.3333333333333333,
+    "94": 0.3333333333333333,
+    "95": 0.3333333333333333,
+    "96": 0.3333333333333333,
+    "97": 0.3333333333333333,
+    "98": 0.3333333333333333,
+    "99": 0.3333333333333333,
+    "100": 0.3333333333333333,
+    "101": 0.3333333333333333,
+    "102": 0.3333333333333333,
+    "103": 0.3333333333333333,
+    "104": 0.5,
+    "105": 0.4,
+    "106": 0.4,
+    "107": 0.4,
+    "108": 0.4,
+    "109": 0.5,
+    "110": 0.5,
+    "111": 0.5,
+    "112": 0.5,
+    "113": 0.5,
+    "114": 0.5,
+    "115": 0.5,
+    "116": 0.5,
+    "117": 0.5,
+    "118": 0.5,
+    "119": 0.5,
+    "120": 0.5,
+    "121": 0.5,
+    "122": 0.5,
+    "123": 0.5,
+    "124": 0.5,
+    "125": 0.6666666666666666,
+    "126": 0.6666666666666666,
+    "127": 0.6666666666666666,
+    "128": 0.6666666666666666,
+    "129": 0.6666666666666666,
+    "130": 0.6666666666666666,
+    "131": 0.6666666666666666,
+    "132": 0.6666666666666666,
+    "133": 0.6666666666666666,
+    "134": 0.6666666666666666,
+    "135": 1.0,
+    "136": 1.0,
+    "137": 1.0,
+    "138": 1.0,
+    "139": 1.0,
+    "140": 1.0,
+    "141": 1.0,
+    "142": 1.0,
+    "143": 1.0,
+    "144": 1.0,
+    "145": 1.0,
+    "146": 1.0,
+    "147": 1.0,
+    "148": 1.0,
+    "149": 1.0,
+    "150": 1.0,
+    "151": 1.0,
+    "152": 1.0,
+    "153": 1.0,
+    "154": 1.0,
+    "155": 1.0,
+    "156": 1.0,
+    "157": 1.0,
+    "158": 1.0,
+    "159": 1.0,
+    "160": 1.0,
+    "161": 1.0,
+    "162": 1.0,
+    "163": 1.0,
+    "164": 1.0,
+    "165": 1.0,
+    "166": 1.0,
+    "167": 1.0,
+    "168": 1.0,
+    "169": 1.0,
+    "170": 1.0,
+    "171": 1.0,
+    "172": 1.0,
+    "173": 1.0,
+    "174": 1.0,
+    "175": 1.0,
+    "176": 1.0,
+    "177": 1.0,
+    "178": 1.0,
+    "179": 1.0,
+    "180": 1.0,
+    "181": 1.0,
+    "182": 1.0,
+    "183": 1.0,
+    "184": 1.0,
+    "185": 1.0,
+    "186": 1.0,
+    "187": 1.0,
+    "188": 1.0,
+    "189": 1.0,
+    "190": 1.0,
+    "191": 1.0,
+    "192": 1.0,
+    "193": 1.0,
+    "194": 1.0,
+    "195": 1.0,
+    "196": 1.0,
+    "197": 1.0,
+    "198": 1.0,
+    "199": 1.0,
+    "200": 1.0,
+    "201": 1.0,
+    "202": 1.0,
+    "203": 1.0,
+    "204": 1.0,
+    "205": 1.0,
+    "206": 1.0,
+    "207": 1.0,
+    "208": 1.0,
+    "209": 1.0,
+    "210": 1.0,
+    "211": 1.0,
+    "212": 1.0,
+    "213": 1.0,
+    "214": 1.0,
+    "215": 1.0,
+    "216": 1.0,
+    "217": 1.0,
+    "218": 1.0,
+    "219": 1.0,
+    "220": 1.0,
+    "221": 1.0,
+    "222": 1.0,
+    "223": 1.0,
+    "224": 1.0,
+    "225": 1.0,
+    "226": 1.0,
+    "227": 1.0,
+    "228": 1.0,
+    "229": 1.0,
+    "230": 1.0,
+    "231": 1.0,
+    "232": 1.0,
+    "233": 1.0,
+    "234": 1.0,
+    "235": 1.0,
+    "236": 1.0,
+    "237": 1.0,
+    "238": 1.0,
+    "239": 1.0,
+    "240": 1.0,
+    "241": 1.0,
+    "242": 1.0,
+    "243": 1.0,
+    "244": 1.0,
+    "245": 1.0,
+    "246": 1.0,
+    "247": 1.0,
+    "248": 1.0,
+    "249": 1.0,
+    "250": 1.0,
+    "251": 1.0,
+    "252": 1.0,
+    "253": 1.0,
+    "254": 1.0,
+    "255": 1.0,
+    "256": 1.0,
+    "257": 1.0,
+    "258": 1.0,
+    "259": 1.0,
+    "260": 1.0,
+    "261": 1.0,
+    "262": 1.0,
+    "263": 1.0,
+    "264": 1.0,
+    "265": 1.0,
+    "266": 1.0,
+    "267": 1.0,
+    "268": 1.0,
+    "269": 1.0,
+    "270": 1.0,
+    "271": 1.0,
+    "272": 1.0,
+    "273": 1.0,
+    "274": 1.0,
+    "275": 1.0,
+    "276": 1.0,
+    "277": 1.0,
+    "278": 1.0,
+    "279": 1.0,
+    "280": 1.0,
+    "281": 1.0,
+    "282": 1.0,
+    "283": 1.0,
+    "284": 1.0,
+    "285": 1.0,
+    "286": 1.0
+  },
+  "gods": [
+    {
+      "id": "src_api_routes_session_store_boundedsessionstore",
+      "label": "BoundedSessionStore",
+      "degree": 30
+    },
+    {
+      "id": "readme_doc",
+      "label": "README.md \u2014 RAG-Studio Overview",
+      "degree": 30
+    },
+    {
+      "id": "tests_ingestion_test_ingestion_setup_mock_qdrant",
+      "label": "_setup_mock_qdrant()",
+      "degree": 28
+    },
+    {
+      "id": "tests_ingestion_test_ingestion_clear_overrides",
+      "label": "_clear_overrides()",
+      "degree": 27
+    },
+    {
+      "id": "agents_doc",
+      "label": "AGENTS.md \u2014 RAG-Studio Contributor Guidance",
+      "degree": 23
+    },
+    {
+      "id": "tests_api_test_ui_content_testsettingscontent",
+      "label": "TestSettingsContent",
+      "degree": 22
+    },
+    {
+      "id": "tests_api_test_body_limit_build_app",
+      "label": "_build_app()",
+      "degree": 20
+    },
+    {
+      "id": "tests_graph_test_nodes_make_state",
+      "label": "_make_state()",
+      "degree": 20
+    },
+    {
+      "id": "src_ingestion_router_upload_document",
+      "label": "upload_document()",
+      "degree": 19
+    },
+    {
+      "id": "system_spec_md_rag_studio",
+      "label": "RAG-Studio",
+      "degree": 19
+    }
+  ],
+  "surprises": [
+    {
+      "source": "QA Skill",
+      "target": "Pytest",
+      "source_files": [
+        ".agents/skills/qa/SKILL.md",
+        "AGENTS.md"
+      ],
+      "confidence": "INFERRED",
+      "relation": "conceptually_related_to",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities; peripheral node `Pytest` unexpectedly reaches hub `QA Skill`"
+    },
+    {
+      "source": "TestAppendAutoCreate",
+      "target": "BoundedSessionStore",
+      "source_files": [
+        "tests/api/test_session_store.py",
+        "src/api/routes/session_store.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "TestClear",
+      "target": "BoundedSessionStore",
+      "source_files": [
+        "tests/api/test_session_store.py",
+        "src/api/routes/session_store.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "TestMessageTrimming",
+      "target": "BoundedSessionStore",
+      "source_files": [
+        "tests/api/test_session_store.py",
+        "src/api/routes/session_store.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "TestPop",
+      "target": "BoundedSessionStore",
+      "source_files": [
+        "tests/api/test_session_store.py",
+        "src/api/routes/session_store.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    }
+  ],
+  "tokens": {
+    "input": 19214,
+    "output": 45197
+  }
+}
