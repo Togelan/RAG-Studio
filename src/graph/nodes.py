@@ -13,6 +13,7 @@ Seven nodes implementing the full RAG pipeline:
 from __future__ import annotations
 
 import logging
+import math
 import os
 import uuid
 from datetime import datetime, timezone
@@ -50,6 +51,45 @@ CACHE_VECTOR_SIZE = 384
 
 # Default classifier model (can be overridden via env)
 DEFAULT_CLASSIFIER_MODEL = os.getenv("LLM_CLASSIFIER_MODEL", "gpt-4o-mini")
+
+# Keep LLM requests bounded even when the environment is misconfigured.
+DEFAULT_LLM_REQUEST_TIMEOUT = 60.0  # seconds
+
+
+def get_llm_request_timeout() -> float:
+    """Return a finite, positive LLM request timeout from the environment.
+
+    Invalid values (including ``nan`` and ``inf``) use the safe default so a
+    configuration typo cannot disable request timeouts or fail application
+    startup.
+    """
+    raw_timeout = os.getenv("LLM_REQUEST_TIMEOUT")
+    if raw_timeout is None:
+        return DEFAULT_LLM_REQUEST_TIMEOUT
+
+    try:
+        timeout = float(raw_timeout)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid LLM_REQUEST_TIMEOUT=%r; using default %.1fs",
+            raw_timeout,
+            DEFAULT_LLM_REQUEST_TIMEOUT,
+        )
+        return DEFAULT_LLM_REQUEST_TIMEOUT
+
+    if not math.isfinite(timeout) or timeout <= 0:
+        logger.warning(
+            "LLM_REQUEST_TIMEOUT must be a finite positive value; got %r. "
+            "Using default %.1fs",
+            raw_timeout,
+            DEFAULT_LLM_REQUEST_TIMEOUT,
+        )
+        return DEFAULT_LLM_REQUEST_TIMEOUT
+
+    return timeout
+
+
+LLM_REQUEST_TIMEOUT = get_llm_request_timeout()
 
 # Hardcoded grounding instruction (AC-006.7, FR-003)
 GROUNDING_INSTRUCTION = (
@@ -130,6 +170,7 @@ async def analyzer_node(state: RAGState) -> dict[str, Any]:
         temperature=0,
         api_key=SecretStr(api_key) if api_key else None,
         base_url=base_url,
+        timeout=LLM_REQUEST_TIMEOUT,
     )
 
     system_prompt = (
@@ -368,6 +409,7 @@ async def generate_from_retrieval_node(state: RAGState) -> dict[str, Any]:
         temperature=llm_temperature,
         api_key=SecretStr(api_key) if api_key else None,
         base_url=base_url,
+        timeout=LLM_REQUEST_TIMEOUT,
     )
 
     retrieved_docs: list[dict[str, Any]] = state["retrieved_docs"]
@@ -456,6 +498,7 @@ async def validate_node(state: RAGState) -> dict[str, Any]:
         temperature=0,
         api_key=SecretStr(api_key) if api_key else None,
         base_url=base_url,
+        timeout=LLM_REQUEST_TIMEOUT,
     )
 
     # Build context for validation
