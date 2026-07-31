@@ -235,9 +235,16 @@ async def validate_api_key(request: ValidateKeyRequest) -> ValidateKeyResponse:
             valid = resp.status_code == 200
             if valid:
                 # Save the API key to secrets store
-                secrets = load_secrets()
-                secrets[f"{provider}_api_key"] = encrypt_api_key(request.api_key)
-                save_secrets(secrets)
+                try:
+                    secrets = load_secrets()
+                    secrets[f"{provider}_api_key"] = encrypt_api_key(request.api_key)
+                    save_secrets(secrets)
+                except Exception:
+                    logger.exception("Validated API key could not be saved for provider: %s", provider)
+                    raise HTTPException(
+                        status_code=500,
+                        detail="API key was validated but could not be saved. Check the application data-directory permissions and try again.",
+                    ) from None
                 logger.info("API key validated and saved for provider: %s", provider)
 
             return ValidateKeyResponse(

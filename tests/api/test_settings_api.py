@@ -115,6 +115,32 @@ class TestSettingsAPI:
         assert data["provider"] == "openai"
         assert data["error"] is None
 
+    def test_validate_key_returns_json_when_secret_persistence_fails(
+        self, client: TestClient
+    ) -> None:
+        """A storage failure after validation returns a safe JSON API error."""
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        with patch("httpx.AsyncClient", return_value=mock_client), patch(
+            "src.api.routes.settings.save_secrets",
+            side_effect=OSError("read-only data directory"),
+        ):
+            response = client.post(
+                "/api/settings/validate-key",
+                json={"provider": "openai", "api_key": "sk-valid-test-key"},
+            )
+
+        assert response.status_code == 500
+        payload = response.json()
+        assert "could not be saved" in payload["detail"]
+        assert "sk-valid-test-key" not in payload["detail"]
+
     def test_validate_key_ollama_skips(self, client: TestClient) -> None:
         """POST /api/settings/validate-key for Ollama always returns valid=true."""
         resp = client.post(

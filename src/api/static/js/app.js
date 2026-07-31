@@ -992,6 +992,20 @@
     var btn = document.getElementById('btn-save-settings');
     if (!btn) return;
 
+    function throwResponseError(response, fallbackMessage) {
+      return response.text().then(function (body) {
+        var data = null;
+        try {
+          data = JSON.parse(body);
+        } catch (_) {
+          // A proxy or an unhandled server exception can return plain text.
+        }
+
+        var message = data && (data.detail || data.error);
+        throw new Error(message || fallbackMessage + ' (HTTP ' + response.status + ').');
+      });
+    }
+
     btn.addEventListener('click', async function () {
       var statusEl = document.getElementById('settings-save-status');
       var provider = document.getElementById('settings-provider');
@@ -1042,9 +1056,7 @@
       })
         .then(function (resp) {
           if (!resp.ok) {
-            return resp.json().then(function (data) {
-              throw new Error(data.detail || 'Save failed');
-            });
+            return throwResponseError(resp, 'Settings could not be saved');
           }
           return resp.json();
         })
@@ -1059,6 +1071,9 @@
                 api_key: apiKeyInput.value.trim()
               })
             }).then(function (resp) {
+              if (!resp.ok) {
+                return throwResponseError(resp, 'API key validation could not be completed');
+              }
               return resp.json();
             }).then(function (data) {
               if (!data.valid) {
