@@ -24,7 +24,7 @@ You are the **Business Analyst** for RAG-Studio. You own `system_spec.md` and ar
 ## File Ownership
 
 - **Owns:** `system_spec.md`
-- **Reads:** `.github/copilot-instructions.md`, project description
+- **Reads:** `.agents/copilot-instructions.md`, project description
 
 ## Output Format
 

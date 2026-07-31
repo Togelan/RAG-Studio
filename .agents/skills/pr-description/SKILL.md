@@ -38,7 +38,7 @@ If `main` is not the base branch, ask the user which branch to diff against.
 
 From the diff output, extract:
 - **Changed files** — list every file added, modified, or deleted.
-- **Change categories** — group changes by module (`src/api/`, `src/graph/`, `src/vector_store/`, `src/ingestion/`, `tests/`, `.github/`).
+- **Change categories** — group changes by module (`src/api/`, `src/graph/`, `src/vector_store/`, `src/ingestion/`, `tests/`, `.agents/`).
 - **Key modifications** — summarize what changed in each file (new functions, refactors, fixes).
 - **New dependencies** — any new packages or libraries introduced.
 - **Breaking changes** — any API changes, schema migrations, or config format changes.

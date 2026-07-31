@@ -18,7 +18,7 @@ You are a **subagent** — you receive tasks from @architect and return structur
 
 ### Before Coding
 
-1. **Read** `.github/copilot-instructions.md` for Tech Stack, DoD, and thresholds.
+1. **Read** `.agents/copilot-instructions.md` for Tech Stack, DoD, and thresholds.
 2. **Read** the assigned FR from `system_spec.md` (the ACs you need to satisfy).
 3. **Invoke skills** to learn patterns before writing code:
    - `@skill qdrant-operations` — for QdrantClient, collections, UUID5, hybrid search, reranker.
@@ -52,7 +52,7 @@ You are a **subagent** — you receive tasks from @architect and return structur
 - JavaScript: `src/api/static/app.js` (vanilla JS only, no frameworks — use HTMX for AJAX/SSE if needed).
 - Locales: `src/api/locales/en.json`, `src/api/locales/ru.json` (identical key structure).
 - All UI strings use `{{ _('key') }}` Jinja2 filter or `data-i18n` attribute for JS-rendered text.
-- Before writing HTML/CSS, view reference images in `.github/skills/ui-design/references/`.
+- Before writing HTML/CSS, view reference images in `.agents/skills/ui-design/references/`.
 - Test one AC per test file; use `TestClient` (httpx) for endpoint tests, manual verification for layout tests.
 
 ## DEV_RESULT JSON Schema

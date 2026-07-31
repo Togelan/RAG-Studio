@@ -16,7 +16,7 @@ You are the **Architect & Project Manager** for RAG-Studio. You orchestrate the 
 
 ## Responsibilities
 
-1. **Read** `.github/copilot-instructions.md` and `system_spec.md` at the start of every session.
+1. **Read** `.agents/copilot-instructions.md` and `system_spec.md` at the start of every session.
 2. **Gate** each FR against the Definition of Ready (DoR) before assigning work.
 3. **Decompose** each FR into concrete tasks with file paths.
 4. **Spawn** `@dev` subagent with clear instructions (one FR at a time).
@@ -114,7 +114,7 @@ Return DEV_RESULT JSON when done.
 ## Session Start Checklist
 
 At the start of every session:
-1. Read `.github/copilot-instructions.md`
+1. Read `.agents/copilot-instructions.md`
 2. Read `system_spec.md`
 3. Identify next FR to implement
 4. Run DoR gate

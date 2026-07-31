@@ -2,6 +2,8 @@
 
 > **Rule:** All agents (@ba, @architect, @dev, @qa) MUST read this file before acting.
 
+> **Live-checkout rule:** MUST USE ONLY THE ACTUAL CODE IN THE CURRENT CHECKOUT. Do not inspect, modify, create, switch, or rely on alternate, stale, prunable, or deleted branches/worktrees—or cached session memory—as the source of truth unless the user explicitly requests it.
+
 ---
 #fetch https://masteringllm.medium.com/best-practices-for-rag-pipeline-8c12a8096453
 #fetch https://cloud.google.com/blog/products/ai-machine-learning/optimizing-rag-retrieval
@@ -28,8 +30,8 @@
 | `src/` | Production code (FastAPI, LangGraph, Qdrant) | @dev |
 | `tests/` | Pytest unit + integration tests | @dev + @qa |
 | `system_spec.md` | Functional Requirements & Acceptance Criteria | @ba |
-| `.github/agents/` | Custom agent definitions | @architect |
-| `.github/skills/` | Reusable skill modules | @architect |
+| `.agents/agents/` | Custom agent definitions | @architect |
+| `.agents/skills/` | Reusable skill modules | @architect |
 
 **Rule:** `src/` contains ONLY production code. `tests/` contains ONLY test code. Never mix them.
 
@@ -191,6 +193,44 @@ A Functional Requirement is **done** when:
 ---
 
 ## Agent Workflow
+
+### Codex + LazyCodex orchestration (canonical)
+
+For Codex sessions, LazyCodex is the orchestration layer and the existing roles below remain the project-domain workflow. The canonical sequence is **understand → plan with LazyCodex → implement → test → review → update Graphify → commit**. Use this sequence for work that changes the application:
+
+```
+understand the actual current checkout ($init-deep when project memory needs refresh)
+    -> plan with LazyCodex: $ulw-plan "<feature or bug>" (plan only)
+    -> implement: $start-work (execute the approved plan)
+    -> test: $ulw-loop "Verify the implementation, run all relevant tests, and fix remaining issues"
+    -> review: $review-work
+    -> update Graphify with the team's existing local graph workflow when needed
+    -> commit only after verification
+```
+
+- LazyCodex must not replace the project agents, skills, quality gates, or Graphify. It is the Codex harness for planning, execution, verification, and review.
+- Keep the existing `@ba -> @architect -> @dev -> @qa` responsibilities for requirements and specialist project review. Do not create duplicate roles or hooks for LazyCodex.
+- Use `$remove-ai-slops` only for behavior-preserving cleanup after relevant tests pass.
+- Never report an implementation complete without recorded results from the relevant tests and quality checks.
+
+### `$architect` entry point
+
+For a one-prompt architect-led workflow, accept this form:
+
+```text
+$architect Check FR-XXX for Definition of Ready.
+If it is ready, create a bounded implementation subtask using the dev role.
+After implementation, create an independent verification subtask using the qa role.
+Return the DoR verdict, plan, test results, and blockers. Do not commit or discard changes.
+```
+
+The architect must perform the DoR gate first. If it passes, it uses LazyCodex
+planning and execution where available, dispatches the existing developer
+responsibilities for a non-overlapping file scope, then dispatches independent
+QA against the actual diff. If it fails, it returns the missing requirements
+and creates no implementation subtask.
+
+### Existing project roles
 
 ```
 @ba writes system_spec.md

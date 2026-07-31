@@ -192,7 +192,7 @@ Return findings in this structure:
 
 ## How to Perform the Review
 
-1. **Read** `.github/copilot-instructions.md` for current conventions.
+1. **Read** `.agents/copilot-instructions.md` for current conventions.
 2. **Run** `git diff main --name-only` to identify changed files.
 3. **Read** each changed file in full.
 4. **Apply** the checklist above to each file.

@@ -309,6 +309,22 @@ uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 pytest tests/ -v
 ```
 
+### Codex workflow
+
+LazyCodex is installed as a **Codex harness**, not an application dependency. It complements the project agents in `.agents/agents/`, the reusable skills in `.agents/skills/`, and the Graphify workflow; it does not replace them.
+
+The canonical sequence is **understand → plan with LazyCodex → implement → test → review → update Graphify → commit**.
+
+```text
+$init-deep
+$ulw-plan "Describe the feature or bug"
+$start-work
+$ulw-loop "Verify the implementation, run all relevant tests, and fix remaining issues"
+$review-work
+```
+
+After review, refresh Graphify through the team's existing local workflow when the code graph needs updating, then commit only after applicable checks pass. See `AGENTS.md` for operating rules and verification commands.
+
 ### Code Quality
 
 ```bash

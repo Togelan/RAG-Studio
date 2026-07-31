@@ -20,7 +20,7 @@ You are a **subagent** — you receive tasks from @architect and return structur
 
 ### Before Testing
 
-1. **Read** `.github/copilot-instructions.md` for DoD, RAGAS thresholds, and coding standards.
+1. **Read** `.agents/copilot-instructions.md` for DoD, RAGAS thresholds, and coding standards.
 2. **Read** the assigned FR from `system_spec.md` (the ACs you need to verify).
 3. **Review** the `DEV_RESULT` JSON from @dev (changedFiles, testFiles, acResults).
 
