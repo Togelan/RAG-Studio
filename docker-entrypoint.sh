@@ -2,15 +2,17 @@
 set -e
 
 # --- 1. Clean up stale Qdrant lock file ---
-LOCK_FILE="/app/data/qdrant_storage/.lock"
+DATA_ROOT="${RAG_STUDIO_DATA_ROOT:-/app/data}"
+QDRANT_STORAGE="${QDRANT_PATH:-$DATA_ROOT/qdrant_storage}"
+LOCK_FILE="$QDRANT_STORAGE/.lock"
 if [ -f "$LOCK_FILE" ]; then
   echo "⚠️  Removing stale Qdrant lock file..."
   rm -f "$LOCK_FILE"
 fi
 
 # --- 2. Ensure required directories exist ---
-mkdir -p /app/data/qdrant_storage
-mkdir -p /app/data/checkpoints
+mkdir -p "$QDRANT_STORAGE"
+mkdir -p "$DATA_ROOT/checkpoints"
 
 # --- 3. Set cache paths for pre-downloaded models ---
 export FASTEMBED_CACHE_PATH=/root/.cache/fastembed

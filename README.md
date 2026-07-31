@@ -94,6 +94,17 @@ cross-origin browser access, set `RAG_STUDIO_CORS_ORIGINS` to an empty value.
 When deploying behind a reverse proxy, list the public browser origin (for
 example, `https://rag.example.com`), not the container's internal URL.
 
+### Data-root override
+
+Runtime data defaults to the repository's absolute `data/` directory, so it is
+independent of the directory from which the server is launched. Set
+`RAG_STUDIO_DATA_ROOT` to an absolute path, or to a project-root-relative path,
+to relocate application-managed data (uploads, settings, checkpoints, session
+titles, Qdrant, and model caches). Existing component overrides such as
+`QDRANT_PATH`, `RAG_STUDIO_SETTINGS_PATH`, `FASTEMBED_CACHE_PATH`, and
+`FLASHRANK_CACHE_PATH` still take precedence; relative values for them are now
+resolved from the project root.
+
 ### Volumes
 
 All persistent data lives in `./rag-data/` on your host:

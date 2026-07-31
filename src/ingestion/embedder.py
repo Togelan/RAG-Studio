@@ -10,13 +10,13 @@ All embeddings are 100% local — no external API calls.
 from __future__ import annotations
 
 import logging
-import os
-from pathlib import Path
 from threading import Lock
 from typing import Any, cast
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
+
+from src.paths import configured_path
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +28,6 @@ DENSE_VECTOR_SIZE = 384
 
 # Qdrant namespace UUID for UUID5 deterministic IDs
 RAG_STUDIO_NAMESPACE_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
-
-# Path to the fastembed cache directory (relative to project root)
-_FASTEMBED_CACHE_DIR = os.getenv(
-    "FASTEMBED_CACHE_PATH",
-    str(
-        Path(__file__).resolve().parent.parent.parent
-        / "data"
-        / "models"
-        / "fastembed_cache"
-    ),
-)
 
 # Module-level lazy-loaded embedding models
 _dense_model: Any = None
@@ -56,7 +45,7 @@ def _get_cache_dir() -> str:
     Returns:
         Absolute path to the models/fastembed_cache/ directory.
     """
-    return _FASTEMBED_CACHE_DIR
+    return str(configured_path("FASTEMBED_CACHE_PATH", "models", "fastembed_cache"))
 
 
 def _get_dense_model() -> Any:

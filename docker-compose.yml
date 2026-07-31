@@ -34,6 +34,7 @@ services:
       - .env
 
     environment:
+      - RAG_STUDIO_DATA_ROOT=/app/data
       - QDRANT_PATH=/data/qdrant
       - RAG_STUDIO_SECRETS_PATH=/root/.rag-studio/secrets/secrets.enc
       - RAG_STUDIO_LOGS_PATH=/root/.rag-studio/logs

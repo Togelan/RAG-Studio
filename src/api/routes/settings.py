@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -34,16 +33,11 @@ from src.api.routes.model_fetcher import (
     load_models_cache,
     save_models_cache,
 )
+from src.paths import configured_path
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 logger = logging.getLogger(__name__)
-
-# ============================================================
-# Settings file path (configurable via env)
-# ============================================================
-
-_SETTINGS_PATH = Path(os.getenv("RAG_STUDIO_SETTINGS_PATH", "data/settings.enc.json"))
 
 # ============================================================
 # Provider validation endpoint URLs
@@ -148,7 +142,7 @@ def _get_settings_path() -> Path:
     Returns:
         Path to settings.enc.json.
     """
-    path = _SETTINGS_PATH
+    path = configured_path("RAG_STUDIO_SETTINGS_PATH", "settings.enc.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 

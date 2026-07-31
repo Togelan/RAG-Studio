@@ -28,6 +28,7 @@ from src.api.routes.settings import router as settings_router
 from src.api.routes.ui import router as ui_router
 from src.graph import create_graph
 from src.ingestion.router import router as ingestion_router
+from src.paths import data_path
 from src.vector_store.client import close_qdrant_client, wait_for_qdrant_ready
 
 logger = logging.getLogger(__name__)
@@ -149,12 +150,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     log_audit("settings_change", success=True, extra={"event": "application_start"})
     logger.info("RAG-Studio is ready.")
 
-    # Create the LangGraph graph with AsyncSqliteSaver checkpointer.
-    # Use an absolute path derived from the project root so that sessions
-    # persist across reloads regardless of the current working directory.
-    # __file__ → src/api/main.py → src/api/ → src/ → project root (RAG-Studio/)
-    _project_root = Path(__file__).resolve().parent.parent.parent
-    _checkpoints_db = str(_project_root / "data" / "checkpoints" / "checkpoints.db")
+    # This is absolute and independent of the process working directory.
+    _checkpoints_db = str(data_path("checkpoints", "checkpoints.db"))
 
     async with create_graph(db_path=_checkpoints_db) as graph:
         app.state.graph = graph

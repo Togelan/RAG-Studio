@@ -16,13 +16,18 @@ from typing import Any, cast
 
 import httpx
 
+from src.paths import data_path
+
 logger = logging.getLogger(__name__)
 
 # ============================================================
 # Models cache
 # ============================================================
 
-_MODELS_CACHE_PATH = Path("data/models_cache.json")
+def _models_cache_path() -> Path:
+    """Return the provider-model cache location under the data root."""
+    return data_path("models_cache.json")
+
 
 _FALLBACK_MODELS: dict[str, list[str]] = {
     "openai": [
@@ -93,10 +98,11 @@ def load_models_cache() -> dict[str, Any]:
     Returns:
         Cache dictionary, or empty dict if not available.
     """
-    if not _MODELS_CACHE_PATH.exists():
+    cache_path = _models_cache_path()
+    if not cache_path.exists():
         return {}
     try:
-        with open(_MODELS_CACHE_PATH, encoding="utf-8") as f:
+        with open(cache_path, encoding="utf-8") as f:
             return cast("dict[str, Any]", json.load(f))
     except json.JSONDecodeError, OSError:
         return {}
@@ -108,8 +114,9 @@ def save_models_cache(cache: dict[str, Any]) -> None:
     Args:
         cache: Cache dictionary to persist.
     """
-    _MODELS_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(_MODELS_CACHE_PATH, "w", encoding="utf-8") as f:
+    cache_path = _models_cache_path()
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(cache, f, indent=2)
 
 

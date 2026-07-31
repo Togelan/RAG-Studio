@@ -10,9 +10,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from qdrant_client import AsyncQdrantClient
+
+from src.paths import configured_path
 
 if TYPE_CHECKING:
     from typing import Self
@@ -22,6 +25,11 @@ logger = logging.getLogger(__name__)
 # Default Qdrant URL (in-process/embedded mode)
 _QDRANT_DEFAULT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 _QDRANT_DEFAULT_API_KEY = os.getenv("QDRANT_API_KEY")  # None if unset
+
+
+def _qdrant_path() -> Path:
+    """Return the embedded Qdrant storage path, honoring ``QDRANT_PATH``."""
+    return configured_path("QDRANT_PATH", "qdrant_storage")
 
 
 class QdrantClientManager:
@@ -51,7 +59,7 @@ class QdrantClientManager:
         Supports two modes:
         - Remote: QDRANT_URL set to a remote server
         - Local: QDRANT_URL unset → uses in-process Qdrant with persistent
-          disk storage at QDRANT_PATH (default: data/qdrant_storage)
+          disk storage at QDRANT_PATH (default: <data-root>/qdrant_storage)
         """  # noqa: D205
         if self._client is None:
             assert self._lock is not None
@@ -68,12 +76,10 @@ class QdrantClientManager:
                         logger.info("Qdrant client initialized: url=%s", qdrant_url)
                     else:
                         # In-process (embedded) Qdrant with persistent disk storage
-                        from pathlib import Path
-
-                        qdrant_path = os.getenv("QDRANT_PATH", "data/qdrant_storage")
-                        Path(qdrant_path).mkdir(parents=True, exist_ok=True)
+                        qdrant_path = _qdrant_path()
+                        qdrant_path.mkdir(parents=True, exist_ok=True)
                         self._client = AsyncQdrantClient(
-                            path=qdrant_path,
+                            path=str(qdrant_path),
                             prefer_grpc=False,
                         )
                         logger.info(

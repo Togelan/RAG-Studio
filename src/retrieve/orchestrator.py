@@ -11,17 +11,20 @@ and low-score threshold filtering.
 from __future__ import annotations
 
 import logging
-import os
 from threading import Lock
 from typing import Any
+
+from src.paths import configured_path
 
 logger = logging.getLogger(__name__)
 
 # FlashRank model config — multilingual cross-encoder, locally cached
 _FLASHRANK_MODEL_NAME = "ms-marco-MultiBERT-L-12"
-_FLASHRANK_CACHE_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "..", "data", "models", "flashrank"
-)
+
+
+def _flashrank_cache_dir() -> str:
+    """Return the reranker cache, honoring the existing environment override."""
+    return str(configured_path("FLASHRANK_CACHE_PATH", "models", "flashrank"))
 # Score threshold: FlashRank scores are sigmoid probabilities in [0,1].
 # 0.0 effectively disables filtering — any score above pure noise passes.
 # Keep at 0.0 to avoid dropping low-confidence but valid multilingual passages.
@@ -61,7 +64,7 @@ def _get_reranker() -> Any | None:
 
             _reranker = Ranker(
                 model_name=_FLASHRANK_MODEL_NAME,
-                cache_dir=_FLASHRANK_CACHE_DIR,
+                cache_dir=_flashrank_cache_dir(),
                 max_length=512,
             )
             _reranker_available = True

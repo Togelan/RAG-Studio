@@ -52,9 +52,17 @@ from src.ingestion.parser import (
     parse_csv_as_rows,
     validate_file,
 )
+from src.paths import configured_path, data_path
 
-# Directory for storing raw uploads for re-ingestion
-_RAW_UPLOADS_DIR = Path("data/raw_uploads")
+
+def _raw_uploads_dir() -> Path:
+    """Return the persistent raw-upload directory under the data root."""
+    return data_path("raw_uploads")
+
+
+def _settings_path() -> Path:
+    """Return the same settings location used by the settings API."""
+    return configured_path("RAG_STUDIO_SETTINGS_PATH", "settings.enc.json")
 
 # In-memory store of ingested file metadata for duplicate detection (AC-001.8–001.10)
 # Key: normalized filename (lowercase), Value: dict with hash, chunk_settings, chunk_count
@@ -271,7 +279,7 @@ def _get_current_chunk_settings() -> tuple[int, int]:
     """
     import json
 
-    settings_path = Path("data/settings.enc.json")
+    settings_path = _settings_path()
     try:
         if settings_path.exists():
             data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -934,8 +942,9 @@ async def upload_document(
 
     # Also store a persistent copy in data/raw_uploads/ for re-ingestion (AC-010.4).
     doc_id = make_document_doc_id(original_filename)
-    _RAW_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    raw_path = _RAW_UPLOADS_DIR / f"{doc_id}{suffix}"
+    raw_uploads_dir = _raw_uploads_dir()
+    raw_uploads_dir.mkdir(parents=True, exist_ok=True)
+    raw_path = raw_uploads_dir / f"{doc_id}{suffix}"
     raw_path.write_bytes(content)
     logger.debug("Raw upload saved for re-ingestion: %s (doc_id=%s)", raw_path, doc_id)
 
@@ -1273,7 +1282,7 @@ async def reingest_document(
     # Read current chunk settings from saved settings
     _cur_chunk_size = 512
     _cur_chunk_overlap = 64
-    settings_path = Path("data/settings.enc.json")
+    settings_path = _settings_path()
     if settings_path.exists():
         try:
             with open(settings_path, encoding="utf-8") as f:
@@ -1286,7 +1295,7 @@ async def reingest_document(
     # Find the stored file in data/raw_uploads/ by doc_id.
     # Files are stored as {doc_id}{suffix} during upload (BUG-010-1 fix).
     suffix = Path(request.filename).suffix
-    raw_path = _RAW_UPLOADS_DIR / f"{request.doc_id}{suffix}"
+    raw_path = _raw_uploads_dir() / f"{request.doc_id}{suffix}"
 
     if not raw_path.exists():
         logger.warning(

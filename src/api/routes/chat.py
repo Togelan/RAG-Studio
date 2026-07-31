@@ -31,6 +31,7 @@ from src.graph import (
 )
 from src.graph.session import delete_session as delete_graph_session
 from src.graph.session import list_all_sessions
+from src.paths import data_path
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -92,22 +93,15 @@ _session_messages: dict[str, list[dict[str, object]]] = {}
 # Session Title Persistence (JSON file — survives restarts)
 # ============================================================
 
-_session_titles_file: Path | None = None
-
-
 def _get_session_titles_path() -> Path:
     """Resolve the session titles JSON file path (lazy init).
 
     Returns:
         Absolute path to data/session_titles.json.
     """
-    global _session_titles_file
-    if _session_titles_file is None:
-        project_root = Path(__file__).resolve().parent.parent.parent.parent
-        data_dir = project_root / "data"
-        data_dir.mkdir(parents=True, exist_ok=True)
-        _session_titles_file = data_dir / "session_titles.json"
-    return _session_titles_file
+    path = data_path("session_titles.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _load_session_titles() -> dict[str, str]:
@@ -625,10 +619,7 @@ async def list_sessions() -> list[dict[str, object]]:
     #    Also load persisted session titles from JSON file so renames survive.
     saved_titles = _load_session_titles()
     try:
-        # Resolve checkpoints path relative to project root
-        # __file__ → src/api/routes/chat.py → parent x4 → project root
-        project_root = Path(__file__).resolve().parent.parent.parent.parent
-        checkpoints_db = str(project_root / "data" / "checkpoints" / "checkpoints.db")
+        checkpoints_db = str(data_path("checkpoints", "checkpoints.db"))
         checkpoint_sessions = await list_all_sessions(
             compiled_graph=get_graph(),
             db_path=checkpoints_db,
