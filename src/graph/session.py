@@ -9,16 +9,34 @@ AC-003.6: Session deletion must clean up all checkpointed state with no orphans.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+class SessionPersistenceError(RuntimeError):
+    """Raised when persisted session state cannot be safely changed."""
+
+
+def _checkpoint_messages(checkpoint: object) -> list[object]:
+    """Return checkpoint messages only when the persisted shape is valid."""
+    if not isinstance(checkpoint, Mapping):
+        return []
+    channel_values = checkpoint.get("channel_values")
+    if not isinstance(channel_values, Mapping):
+        return []
+    messages = channel_values.get("messages", [])
+    if not isinstance(messages, Sequence) or isinstance(messages, (str, bytes)):
+        return []
+    return list(messages)
 
 
 async def delete_session(
     thread_id: str,
     *,
     compiled_graph: Any | None = None,
-    db_path: str = "checkpoints.db",
+    db_path: str | None = None,
 ) -> bool:
     """Delete a chat session and all its state from the checkpointer.
 
@@ -34,7 +52,11 @@ async def delete_session(
     Returns:
         True if the session was found and deleted, False otherwise.
     """
-    # If compiled graph is provided, use its checkpointer directly
+    if not isinstance(thread_id, str) or not thread_id:
+        logger.warning("Refused deletion for an invalid session identifier")
+        return False
+
+    # If compiled graph is provided, use its checkpointer directly.
     if compiled_graph is not None:
         checkpointer = getattr(compiled_graph, "checkpointer", None)
         if checkpointer is not None:
@@ -42,12 +64,15 @@ async def delete_session(
                 await checkpointer.adelete_thread(thread_id)
                 logger.info("Deleted session thread_id=%s via checkpointer", thread_id)
                 return True
-            except Exception as e:
+            except Exception as exc:
                 logger.warning(
-                    "Checkpointer delete_thread failed for %s: %s",
+                    "Checkpointer delete_thread failed for %s (%s)",
                     thread_id,
-                    e,
+                    type(exc).__name__,
                 )
+
+    if db_path is None:
+        return False
 
     # Fallback: direct SQLite deletion
     try:
@@ -60,26 +85,34 @@ async def delete_session(
             )
             tables = [row[0] async for row in cursor]
             if "checkpoints" in tables:
-                await conn.execute(
+                checkpoint_cursor = await conn.execute(
                     "DELETE FROM checkpoints WHERE thread_id = ?",
                     (thread_id,),
                 )
+                deleted_rows = checkpoint_cursor.rowcount
+            else:
+                deleted_rows = 0
             if "writes" in tables:
-                await conn.execute(
+                writes_cursor = await conn.execute(
                     "DELETE FROM writes WHERE thread_id = ?",
                     (thread_id,),
                 )
+                deleted_rows += writes_cursor.rowcount
             await conn.commit()
             logger.info(
                 "Deleted session thread_id=%s from SQLite (db=%s)",
                 thread_id,
                 db_path,
             )
-            return True
-    except Exception as e:
-        logger.warning("SQLite deletion failed for thread_id=%s: %s", thread_id, e)
+            return deleted_rows > 0
+    except Exception as exc:
+        logger.warning(
+            "SQLite deletion failed for thread_id=%s (%s)",
+            thread_id,
+            type(exc).__name__,
+        )
+        raise SessionPersistenceError("Unable to delete persisted session state") from exc
 
-    return False
 
 
 async def get_session_metadata(
@@ -114,17 +147,13 @@ async def get_session_metadata(
             checkpoint_tuple = await checkpointer.aget_tuple(config)
             if checkpoint_tuple:
                 checkpoint = checkpoint_tuple.checkpoint
-                state: dict[str, Any] = (
-                    checkpoint.get("channel_values", {})
-                    if isinstance(checkpoint.get("channel_values"), dict)
-                    else {}
-                )
-                raw_messages = state.get("messages", [])
-                messages: list[Any] = (
-                    raw_messages if isinstance(raw_messages, list) else []
-                )
+                messages = _checkpoint_messages(checkpoint)
 
-                created_at = str(checkpoint.get("ts", ""))
+                created_at = (
+                    str(checkpoint.get("ts", ""))
+                    if isinstance(checkpoint, Mapping)
+                    else ""
+                )
                 message_count = len(messages)
 
                 # Derive title from first user message
@@ -143,11 +172,11 @@ async def get_session_metadata(
                     "created_at": created_at,
                     "message_count": message_count,
                 }
-    except Exception as e:
+    except Exception as exc:
         logger.warning(
-            "Failed to get session metadata for thread_id=%s: %s",
+            "Failed to get session metadata for thread_id=%s (%s)",
             thread_id,
-            e,
+            type(exc).__name__,
         )
 
     return None
@@ -189,7 +218,7 @@ async def list_all_sessions(
 
         logger.info("Listed %d sessions from SQLite", len(sessions))
         return sessions
-    except Exception as e:
-        logger.debug("Could not list sessions from SQLite: %s", e)
+    except Exception as exc:
+        logger.debug("Could not list sessions from SQLite (%s)", type(exc).__name__)
 
     return sessions

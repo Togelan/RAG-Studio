@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import uuid
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, cast
@@ -31,11 +32,17 @@ from src.graph import (
 )
 from src.graph.session import delete_session as delete_graph_session
 from src.graph.session import list_all_sessions
+from src.graph.session import SessionPersistenceError
 from src.paths import data_path
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 logger = logging.getLogger(__name__)
+
+_PERSISTENCE_ERROR_MESSAGE = (
+    "I'm sorry, chat session persistence is temporarily unavailable. Please retry."
+)
+_DELETE_ERROR_MESSAGE = "Session could not be deleted safely. Please retry."
 
 # ============================================================
 # Module-level compiled graph holder (set during startup)
@@ -334,11 +341,9 @@ async def _sse_stream(
             max_tokens=max_tokens,
             system_prompt=system_prompt,
         )
-    except Exception as e:
-        logger.error("LangGraph pipeline failed: %s", e, exc_info=True)
-        error_message = (
-            f"I'm sorry, an error occurred while processing your question: {e}"
-        )
+    except Exception as exc:
+        logger.error("LangGraph pipeline failed (%s)", type(exc).__name__, exc_info=True)
+        error_message = _PERSISTENCE_ERROR_MESSAGE
 
     final_answer = error_message or str(result.get("final_answer", ""))
     citations = result.get("citations", [])
@@ -709,20 +714,25 @@ async def delete_session(session_id: str) -> dict[str, str]:
     if session_id not in _session_meta:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    _session_meta.pop(session_id, None)
-    _session_messages.pop(session_id, None)
-
-    # Also clean up persistent checkpointer state and saved title
-    _delete_session_title(session_id)
-
-    # Also clean up persistent checkpointer state (BUG 2 fix)
+    # Delete persisted state before removing local metadata. This prevents the
+    # API from reporting success when checkpoint cleanup fails.
     try:
         await delete_graph_session(
             session_id,
             compiled_graph=get_graph(),
+            db_path=str(data_path("checkpoints", "checkpoints.db")),
         )
-    except Exception as e:
-        logger.warning("Failed to delete session from checkpointer: %s", e)
+    except SessionPersistenceError as exc:
+        logger.warning(
+            "Failed to delete persisted session %s (%s)",
+            session_id,
+            type(exc).__name__,
+        )
+        raise HTTPException(status_code=503, detail=_DELETE_ERROR_MESSAGE) from exc
+
+    _session_meta.pop(session_id, None)
+    _session_messages.pop(session_id, None)
+    _delete_session_title(session_id)
 
     return {"status": "deleted", "session_id": session_id}
 
@@ -800,16 +810,17 @@ async def get_session_messages(
             checkpoint_tuple = await checkpointer.aget_tuple(config)
             if checkpoint_tuple:
                 checkpoint = checkpoint_tuple.checkpoint
-                state: dict[str, Any] = (
-                    checkpoint.get("channel_values", {})
-                    if isinstance(checkpoint.get("channel_values"), dict)
-                    else {}
+                state: Mapping[str, object] = (
+                    checkpoint if isinstance(checkpoint, Mapping) else {}
                 )
-                raw_messages: list[object] = (
-                    state.get("messages", [])
-                    if isinstance(state.get("messages"), list)
+                channel_values = state.get("channel_values", {})
+                raw_messages: Sequence[object] = (
+                    channel_values.get("messages", [])
+                    if isinstance(channel_values, Mapping)
                     else []
                 )
+                if isinstance(raw_messages, (str, bytes)):
+                    raw_messages = []
 
                 # Convert LangChain messages to plain dicts for JSON serialization
                 result: list[dict[str, object]] = []
