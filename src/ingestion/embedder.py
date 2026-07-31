@@ -263,7 +263,8 @@ async def delete_document_points(
     )
     point_count = count_result.count
 
-    # Delete points with matching doc_id
+    # Wait for deletion before returning.  A replacement upsert that follows
+    # must not be overtaken by this delete in Qdrant's asynchronous queue.
     await client.delete(
         collection_name=COLLECTION_NAME,
         points_selector=qmodels.FilterSelector(
@@ -276,6 +277,7 @@ async def delete_document_points(
                 ],
             ),
         ),
+        wait=True,
     )
     logger.info("Deleted %d points for doc_id=%s", point_count, doc_id)
     return point_count

@@ -17,8 +17,10 @@ import shutil
 import tempfile
 import time
 import uuid
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, AsyncIterator, cast
 
 from fastapi import (
     APIRouter,
@@ -58,6 +60,51 @@ _RAW_UPLOADS_DIR = Path("data/raw_uploads")
 # Key: normalized filename (lowercase), Value: dict with hash, chunk_settings, chunk_count
 stored_files: dict[str, dict[str, object]] = {}
 stored_files_lock = asyncio.Lock()
+
+
+@dataclass
+class _DocumentLockState:
+    """A per-document lock plus the number of operations using it."""
+
+    lock: asyncio.Lock
+    users: int = 0
+
+
+# A replacement consists of a delete followed by an upsert.  Those operations
+# must be serialized per doc_id, including deletion requests and re-ingestion.
+# The reference count lets us discard unused locks instead of retaining one for
+# every filename ever uploaded.
+_document_locks: dict[str, _DocumentLockState] = {}
+_document_locks_guard = asyncio.Lock()
+
+
+@asynccontextmanager
+async def document_operation_lock(doc_id: str) -> AsyncIterator[None]:
+    """Serialize vector-changing operations for one document.
+
+    A caller reserves the lock before waiting, so it cannot be removed while a
+    queued operation still needs it.  Different documents continue to ingest
+    concurrently.
+    """
+    async with _document_locks_guard:
+        state = _document_locks.get(doc_id)
+        if state is None:
+            state = _DocumentLockState(lock=asyncio.Lock())
+            _document_locks[doc_id] = state
+        state.users += 1
+
+    acquired = False
+    try:
+        await state.lock.acquire()
+        acquired = True
+        yield
+    finally:
+        if acquired:
+            state.lock.release()
+        async with _document_locks_guard:
+            state.users -= 1
+            if state.users == 0 and _document_locks.get(doc_id) is state:
+                del _document_locks[doc_id]
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +298,7 @@ def _safe_int(value: object) -> int | None:
     try:
         v = int(str(value))
         return v if v > 0 else None
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return None
 
 
@@ -414,7 +461,38 @@ async def _ingest_file(
     chunk_overlap: int | None = None,
     file_hash: str = "",
 ) -> None:
-    """Background task: parse, chunk, embed, and upsert a file.
+    """Background task entry point serialized by parent document ID.
+
+    The lock spans parsing through metadata updates, not just the Qdrant
+    request.  This keeps the final vectors and ``stored_files`` metadata from
+    the same completed ingestion when upload and re-ingest overlap.
+    """
+    doc_id = make_document_doc_id(original_filename)
+    async with document_operation_lock(doc_id):
+        await _ingest_file_locked(
+            file_id=file_id,
+            file_path=file_path,
+            original_filename=original_filename,
+            content_type=content_type,
+            client=client,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            file_hash=file_hash,
+        )
+
+
+async def _ingest_file_locked(
+    file_id: str,
+    file_path: str,
+    original_filename: str,
+    content_type: str | None,
+    client: AsyncQdrantClient,
+    *,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
+    file_hash: str = "",
+) -> None:
+    """Parse, chunk, embed, and replace a document while its lock is held.
 
     Args:
         file_id: UUID for this ingestion job.
@@ -689,12 +767,13 @@ async def upload_document(
         logger.info("Renamed duplicate file to: %s", original_filename)
 
     if action == "replace" and stored is not None:
-        # User chose "Replace" — delete existing points first
+        # The background operation deletes and upserts while holding the
+        # per-document lock.  Deleting here would race that operation (or a
+        # concurrent re-ingest) and can leave the document temporarily empty.
         doc_id = make_document_doc_id(original_filename)
-        deleted = await delete_document_points(client, doc_id)
-        await remove_stored_file(original_filename)
         logger.info(
-            "Replace action: deleted %d existing points for doc_id=%s", deleted, doc_id
+            "Replace action queued; vector replacement will run under lock for doc_id=%s",
+            doc_id,
         )
 
     # --- Duplicate detection (AC-001.8) ---
@@ -1088,27 +1167,26 @@ async def delete_document(
     Returns:
         Confirmation with count of deleted points.
     """
-    from src.ingestion.embedder import delete_document_points
+    async with document_operation_lock(file_id):
+        await ensure_collection_exists(client)
 
-    await ensure_collection_exists(client)
+        deleted = await delete_document_points(client, file_id)
+        if deleted == 0:
+            logger.warning("No points found for doc_id=%s", file_id)
 
-    deleted = await delete_document_points(client, file_id)
-    if deleted == 0:
-        logger.warning("No points found for doc_id=%s", file_id)
-
-    # Also remove matching entries from the in-memory stored_files dict
-    # so re-uploading the same file doesn't trigger a false 409 duplicate.
-    filenames_to_remove: list[str] = []
-    async with stored_files_lock:
-        for key, meta in list(stored_files.items()):
-            # Use original_filename for UUID comparison — stored_files keys
-            # are lowercased, but make_document_doc_id is case-sensitive.
-            original_name = str(meta.get("original_filename", key))
-            if str(make_document_doc_id(original_name)) == file_id:
-                filenames_to_remove.append(key)
-    for key in filenames_to_remove:
-        await remove_stored_file(key)
-        logger.info("Removed stored_file metadata for '%s' after deletion", key)
+        # Also remove matching entries from the in-memory stored_files dict
+        # so re-uploading the same file doesn't trigger a false 409 duplicate.
+        filenames_to_remove: list[str] = []
+        async with stored_files_lock:
+            for key, meta in list(stored_files.items()):
+                # Use original_filename for UUID comparison — stored_files keys
+                # are lowercased, but make_document_doc_id is case-sensitive.
+                original_name = str(meta.get("original_filename", key))
+                if str(make_document_doc_id(original_name)) == file_id:
+                    filenames_to_remove.append(key)
+        for key in filenames_to_remove:
+            await remove_stored_file(key)
+            logger.info("Removed stored_file metadata for '%s' after deletion", key)
 
     log_audit(
         "delete_document",
@@ -1202,7 +1280,7 @@ async def reingest_document(
                 saved: dict[str, object] = json.load(f)
             _cur_chunk_size = int(str(saved.get("chunk_size", 512)))
             _cur_chunk_overlap = int(str(saved.get("chunk_overlap", 64)))
-        except json.JSONDecodeError, OSError, ValueError:
+        except (json.JSONDecodeError, OSError, ValueError):
             pass
 
     # Find the stored file in data/raw_uploads/ by doc_id.
@@ -1235,6 +1313,10 @@ async def reingest_document(
     # Initialize progress
     await _set_progress(file_id, "processing", "Re-ingestion started...")
 
+    # Preserve accurate duplicate metadata after re-ingestion.  Without the
+    # hash, a completed re-ingest could leave metadata from an older upload.
+    file_hash = compute_sha256(raw_path.read_bytes())
+
     # Schedule background ingestion with current chunk settings
     background_tasks.add_task(
         _ingest_file,
@@ -1245,6 +1327,7 @@ async def reingest_document(
         client=client,
         chunk_size=_cur_chunk_size,
         chunk_overlap=_cur_chunk_overlap,
+        file_hash=file_hash,
     )
 
     logger.info(
