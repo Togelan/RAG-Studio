@@ -34,6 +34,9 @@ You are a **subagent** — you receive tasks from @architect and return structur
    - Check that each AC has a corresponding test.
    - Confirm test evidence matches the expected behavior.
    - Note any discrepancies.
+   - Reject unmeasured scalability/safety claims; require the stated load
+     threshold, bounded overload behavior, two alternatives, and explicit
+     data/secret/cancellation/rollback evidence.
 
 ### Phase 2 — Code Quality Checks
 

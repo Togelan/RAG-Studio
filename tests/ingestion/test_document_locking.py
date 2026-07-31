@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+from importlib import import_module
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 
 @pytest.mark.asyncio
-async def test_same_document_ingestions_are_serialized(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_same_document_ingestions_are_serialized(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Upload and re-ingest jobs for one filename never overlap their writes."""
-    from src.ingestion import router
+    router = import_module("src.ingestion.router")
 
     active = 0
     max_active = 0
@@ -40,7 +43,7 @@ async def test_same_document_ingestions_are_serialized(monkeypatch: pytest.Monke
 @pytest.mark.asyncio
 async def test_different_documents_do_not_share_a_lock() -> None:
     """Per-document locking retains concurrency for independent documents."""
-    from src.ingestion import router
+    router = import_module("src.ingestion.router")
 
     both_entered = asyncio.Event()
     release = asyncio.Event()

@@ -1355,6 +1355,18 @@ input[type="range"]:focus::-moz-range-track {
   line-height: 1;
 }
 
+.btn-stop {
+  background: var(--color-error);
+}
+
+.btn-stop[hidden] {
+  display: none;
+}
+
+.btn-stop:hover {
+  filter: brightness(0.92);
+}
+
 /* ---- Modal Overlay ---- */
 
 .modal-overlay {

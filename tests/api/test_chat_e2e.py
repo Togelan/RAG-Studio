@@ -70,7 +70,7 @@ _MOCK_RESPONSE: dict[str, object] = {
 
 
 @pytest.fixture(name="client")
-def fixture_client() -> Generator[TestClient, Any, None]:
+def fixture_client() -> Generator[TestClient, Any]:
     """Pytest fixture providing a TestClient with mocked Qdrant and LangGraph."""
     with (
         patch(
@@ -84,7 +84,7 @@ def fixture_client() -> Generator[TestClient, Any, None]:
             return_value=None,
         ),
         patch(
-            "src.api.routes.chat.run_rag_graph",
+            "src.api.routes.chat.stream_rag_graph",
             new_callable=AsyncMock,
             return_value=_MOCK_RESPONSE,
         ),
@@ -97,7 +97,7 @@ def fixture_client() -> Generator[TestClient, Any, None]:
 
 
 @pytest.fixture(autouse=True)
-def _reset_chat_state() -> Generator[None, Any, None]:  # pyright: ignore[reportUnusedFunction]
+def _reset_chat_state() -> Generator[None, Any]:  # pyright: ignore[reportUnusedFunction]
     """Reset in-memory chat session state before each test."""
     import src.api.routes.chat as chat_module
 
@@ -280,32 +280,31 @@ class TestFeedbackButtons:
         assert data["feedback"] == "negative"
 
     def test_feedback_persisted_to_jsonl(
-        self, client: TestClient, tmp_path: Path
+        self,
+        client: TestClient,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Mock Path.home() to temp, submit feedback, verify JSONL record."""
-        feedback_dir = tmp_path / ".rag-studio"
-        feedback_dir.mkdir(parents=True)
+        """Use a temporary data root, submit feedback, and verify JSONL."""
+        monkeypatch.setenv("RAG_STUDIO_DATA_ROOT", str(tmp_path))
+        resp = client.post(
+            "/api/chat/feedback",
+            json={
+                "session_id": "test-sess",
+                "message_id": "test-msg",
+                "feedback": "positive",
+            },
+        )
+        assert resp.status_code == 201
 
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            resp = client.post(
-                "/api/chat/feedback",
-                json={
-                    "session_id": "test-sess",
-                    "message_id": "test-msg",
-                    "feedback": "positive",
-                },
-            )
-            assert resp.status_code == 201
-
-            feedback_file = feedback_dir / "feedback.jsonl"
-            assert feedback_file.exists()
-
-            with open(feedback_file, encoding="utf-8") as f:
-                record = json.loads(f.readline())
-            assert record["session_id"] == "test-sess"
-            assert record["message_id"] == "test-msg"
-            assert record["feedback"] == "positive"
-            assert "timestamp" in record
+        feedback_file = tmp_path / "feedback.jsonl"
+        assert feedback_file.exists()
+        with open(feedback_file, encoding="utf-8") as f:
+            record = json.loads(f.readline())
+        assert record["session_id"] == "test-sess"
+        assert record["message_id"] == "test-msg"
+        assert record["feedback"] == "positive"
+        assert "timestamp" in record
 
 
 # ============================================================

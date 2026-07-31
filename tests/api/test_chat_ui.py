@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture(name="client")
-def fixture_client() -> Generator[TestClient, Any, None]:
+def fixture_client() -> Generator[TestClient, Any]:
     """Pytest fixture providing a TestClient with mocked Qdrant and LangGraph."""
     with (
         patch(
@@ -39,7 +39,7 @@ def fixture_client() -> Generator[TestClient, Any, None]:
             return_value=None,
         ),
         patch(
-            "src.api.routes.chat.run_rag_graph",
+            "src.api.routes.chat.stream_rag_graph",
             new_callable=AsyncMock,
             return_value={
                 "final_answer": (
@@ -96,7 +96,7 @@ def fixture_client() -> Generator[TestClient, Any, None]:
 
 
 @pytest.fixture(autouse=True)
-def _reset_chat_state() -> Generator[None, Any, None]:  # pyright: ignore[reportUnusedFunction]
+def _reset_chat_state() -> Generator[None, Any]:  # pyright: ignore[reportUnusedFunction]
     """Reset in-memory chat session state before each test."""
     import src.api.routes.chat as chat_module
 
@@ -294,9 +294,7 @@ class TestMessageStreaming:
         ) as stream_resp:
             assert stream_resp.status_code == 200
 
-            body_lines: list[str] = []
-            for line in stream_resp.iter_lines():
-                body_lines.append(line)
+            body_lines = list(stream_resp.iter_lines())
 
         # Should have data: lines
         data_lines = [line for line in body_lines if line.startswith("data: ")]
@@ -344,9 +342,7 @@ class TestSourceCitations:
             "/api/chat/send",
             json={"content": "Test"},
         ) as stream_resp:
-            body_lines: list[str] = []
-            for line in stream_resp.iter_lines():
-                body_lines.append(line)
+            body_lines = list(stream_resp.iter_lines())
 
         data_lines = [item for item in body_lines if item.startswith("data: ")]
         import json
@@ -423,39 +419,37 @@ class TestMessageFeedback:
         )
         assert resp.status_code == 422
 
-    def test_feedback_writes_to_jsonl(self, client: TestClient, tmp_path: Any) -> None:
+    def test_feedback_writes_to_jsonl(
+        self,
+        client: TestClient,
+        tmp_path: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Feedback is appended to feedback.jsonl.
 
-        AC-006.4: Stored in ~/.rag-studio/feedback.jsonl.
+        AC-006.4: Stored below the configured application data root.
         """
         import json
 
-        # Override home directory for test
-        feedback_dir = tmp_path / ".rag-studio"
-        feedback_dir.mkdir(parents=True)
+        monkeypatch.setenv("RAG_STUDIO_DATA_ROOT", str(tmp_path))
+        resp = client.post(
+            "/api/chat/feedback",
+            json={
+                "session_id": "test-sess",
+                "message_id": "test-msg",
+                "feedback": "positive",
+            },
+        )
+        assert resp.status_code == 201
 
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            resp = client.post(
-                "/api/chat/feedback",
-                json={
-                    "session_id": "test-sess",
-                    "message_id": "test-msg",
-                    "feedback": "positive",
-                },
-            )
-            assert resp.status_code == 201
-
-            # Check file exists
-            feedback_file = feedback_dir / "feedback.jsonl"
-            assert feedback_file.exists()
-
-            # Check content
-            with open(feedback_file, encoding="utf-8") as f:
-                line = f.readline()
-                record = json.loads(line)
-                assert record["session_id"] == "test-sess"
-                assert record["message_id"] == "test-msg"
-                assert record["feedback"] == "positive"
+        feedback_file = tmp_path / "feedback.jsonl"
+        assert feedback_file.exists()
+        with open(feedback_file, encoding="utf-8") as f:
+            line = f.readline()
+            record = json.loads(line)
+            assert record["session_id"] == "test-sess"
+            assert record["message_id"] == "test-msg"
+            assert record["feedback"] == "positive"
 
 
 # ============================================================

@@ -102,12 +102,12 @@ class TestAC0084DockerfileBuild:
         dockerfile = Path(__file__).parent.parent / "Dockerfile"
         assert dockerfile.exists(), f"Dockerfile not found at {dockerfile}"
 
-    def test_dockerfile_has_multi_stage(self) -> None:
-        """Dockerfile uses multi-stage builds (FROM ... AS ...)."""
+    def test_dockerfile_has_single_stage(self) -> None:
+        """Dockerfile follows the single-stage contract from AC-008.4."""
         dockerfile = Path(__file__).parent.parent / "Dockerfile"
         content = dockerfile.read_text()
-        assert "AS builder" in content, "Dockerfile missing builder stage"
-        assert "AS runtime" in content, "Dockerfile missing runtime stage"
+        from_lines = [line for line in content.splitlines() if line.startswith("FROM ")]
+        assert from_lines == ["FROM python:3.14-slim"]
 
     def test_dockerfile_exposes_port_8000(self) -> None:
         """Dockerfile exposes port 8000."""
@@ -140,9 +140,9 @@ class TestAC0085ModelCaching:
         dockerfile = Path(__file__).parent.parent / "Dockerfile"
         content = dockerfile.read_text()
         assert (
-            "TextEmbedding('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')"
+            "TextEmbedding(model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'"
             in content
-            or 'TextEmbedding("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")'
+            or 'TextEmbedding(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"'
             in content
         ), "Dockerfile must pre-cache dense embedding model"
 
@@ -150,7 +150,7 @@ class TestAC0085ModelCaching:
         """Dockerfile pre-caches Qdrant/bm25 sparse model."""
         dockerfile = Path(__file__).parent.parent / "Dockerfile"
         content = dockerfile.read_text()
-        assert "SparseTextEmbedding('Qdrant/bm25')" in content, (
+        assert "SparseTextEmbedding(model_name='Qdrant/bm25'" in content, (
             "Dockerfile must pre-cache BM25 sparse model"
         )
 

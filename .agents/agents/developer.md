@@ -32,11 +32,14 @@ You are a **subagent** — you receive tasks from @architect and return structur
 5. Write unit tests in `tests/<module>/test_<file>.py` — **one test per AC**.
 6. Run `pytest` and make all tests pass.
 7. Verify all type hints and docstrings are present.
+8. Record why the implementation was selected, measured behavior at the FR's
+   load threshold, at least two alternatives and their rejection/revisit
+   criteria, plus data, secret, cancellation, and rollback safety evidence.
 
 ### After Implementation
 
-8. Run the full test suite: `pytest tests/ -v`
-9. Return a **structured `DEV_RESULT` JSON** to @architect.
+9. Run the full test suite: `pytest tests/ -v`
+10. Return a **structured `DEV_RESULT` JSON** to @architect.
 
 ## File Boundary Rules
 

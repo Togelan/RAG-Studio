@@ -15,7 +15,7 @@ import logging
 import os
 import platform
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,7 @@ from typing import Any
 from cryptography.fernet import Fernet
 from qdrant_client import AsyncQdrantClient
 
+from src.paths import data_path
 from src.vector_store.client import get_qdrant_client as _get_qdrant_client
 
 # ============================================================
@@ -138,7 +139,7 @@ def load_secrets() -> dict[str, str]:
         plaintext = decrypt_api_key(ciphertext)
         secrets: dict[str, str] = json.loads(plaintext)
         return secrets
-    except Exception:
+    except Exception:  # noqa: BLE001 - decryption backends raise provider-specific errors
         return {}
 
 
@@ -197,10 +198,7 @@ def _get_audit_logger() -> logging.Logger:
         return _audit_logger
 
     logs_path = os.getenv("RAG_STUDIO_LOGS_PATH")
-    if logs_path:
-        log_dir = Path(logs_path)
-    else:
-        log_dir = Path.home() / ".rag-studio" / "logs"
+    log_dir = Path(logs_path) if logs_path else data_path("logs")
 
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -256,7 +254,7 @@ def log_audit(
         action_type = "unknown"
 
     entry: dict[str, Any] = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "action": action_type,
         "success": success,
     }

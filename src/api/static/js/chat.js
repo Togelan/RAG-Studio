@@ -20,6 +20,16 @@
   let isStreaming = false;
   /** @type {AbortController|null} */
   let streamAbort = null;
+  /** @type {number} */
+  let streamRequestId = 0;
+  /** @type {number} */
+  let sessionLoadRequestId = 0;
+  /** @type {number|null} */
+  let streamRenderFrame = null;
+  /** @type {string} */
+  let pendingStreamingContent = '';
+  /** @type {HTMLElement|null} */
+  let streamingNode = null;
   /** @type {boolean} */
   let userHasScrolledUp = false;
   /** @type {Map<string, string>} — messageId → 'positive' | 'negative' */
@@ -83,10 +93,82 @@
   // Message Sending (SSE Streaming)
   // ============================================================
 
+  function isCurrentStream(requestId, sessionId) {
+    return requestId === streamRequestId && (activeSessionId || 'default') === sessionId;
+  }
+
+  function setStreamingControls(active) {
+    var sendButton = el('btnSend');
+    var stopButton = el('btnStop');
+    var input = el('chatInput');
+    if (sendButton) sendButton.hidden = active;
+    if (stopButton) stopButton.hidden = !active;
+    if (input) input.disabled = active;
+  }
+
+  function removeStreamingMessage() {
+    if (streamRenderFrame !== null) {
+      cancelAnimationFrame(streamRenderFrame);
+      streamRenderFrame = null;
+    }
+    pendingStreamingContent = '';
+    if (streamingNode) streamingNode.remove();
+    streamingNode = null;
+  }
+
+  function cancelActiveStream(showNotice) {
+    if (!streamAbort) return;
+    var controller = streamAbort;
+    streamAbort = null;
+    streamRequestId += 1;
+    controller.abort();
+    isStreaming = false;
+    hideLoadingIndicator();
+    removeStreamingMessage();
+    setStreamingControls(false);
+    if (showNotice) showToast(t('chat_stream_cancelled') || 'Response stopped.');
+  }
+
+  function updateStreamingMessage(content, requestId, sessionId) {
+    if (!isCurrentStream(requestId, sessionId)) return;
+    pendingStreamingContent = content;
+    if (streamRenderFrame !== null) return;
+    streamRenderFrame = requestAnimationFrame(function () {
+      streamRenderFrame = null;
+      if (!isCurrentStream(requestId, sessionId)) return;
+      if (!streamingNode) {
+        streamingNode = document.createElement('div');
+        streamingNode.className = 'message assistant streaming';
+        streamingNode.dataset.requestId = String(requestId);
+        var bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        streamingNode.appendChild(bubble);
+        el('chatMessages').appendChild(streamingNode);
+      }
+      streamingNode.querySelector('.message-bubble').textContent = pendingStreamingContent;
+      scrollToBottom();
+    });
+  }
+
+  async function responseErrorMessage(response) {
+    if (response.status === 409) {
+      return t('chat_stream_conflict') || 'This chat already has a response in progress.';
+    }
+    if (response.status === 503) {
+      var retryAfter = response.headers.get('Retry-After');
+      var capacity = t('chat_stream_capacity') || 'Chat is busy. Please retry shortly.';
+      return retryAfter ? capacity + ' (' + retryAfter + 's)' : capacity;
+    }
+    return t('chat_stream_failed') || 'The response could not be completed. Please retry.';
+  }
+
   async function sendMessage(text) {
     if (!text.trim() || isStreaming) return;
 
-    // Add user message locally
+    var requestSessionId = activeSessionId || 'default';
+    var requestId = ++streamRequestId;
+    var controller = new AbortController();
+    streamAbort = controller;
     var userMsg = {
       id: 'local-' + Date.now(),
       role: 'user',
@@ -100,97 +182,94 @@
     autoResizeTextarea();
     scrollToBottom();
 
-    // Start streaming
     isStreaming = true;
-    el('btnSend').disabled = true;
+    setStreamingControls(true);
     showLoadingIndicator();
+
+    var assistantContent = '';
+    var assistantMsgId = null;
+    var citations = null;
+    var completed = false;
+    var streamFailure = null;
 
     try {
       var resp = await fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text, session_id: activeSessionId || 'default' })
+        body: JSON.stringify({ content: text, session_id: requestSessionId }),
+        signal: controller.signal
       });
-      if (!resp.ok) throw new Error('Message send failed');
+      if (!resp.ok) {
+        var responseError = new Error(await responseErrorMessage(resp));
+        responseError.name = 'HttpResponseError';
+        throw responseError;
+      }
+      if (!resp.body || !window.RAGSse) throw new Error('Streaming unavailable');
 
       var reader = resp.body.getReader();
       var decoder = new TextDecoder();
-      var assistantContent = '';
-      var assistantMsgId = null;
-      var citations = null;
-      var firstToken = true;
+      var parser = new window.RAGSse.SseParser(function (frame) {
+        if (!isCurrentStream(requestId, requestSessionId)) return;
+        var data = frame.data || {};
+        if (frame.event === 'token' && typeof data.token === 'string') {
+          hideLoadingIndicator();
+          assistantContent += data.token;
+          assistantMsgId = data.message_id || assistantMsgId;
+          updateStreamingMessage(assistantContent, requestId, requestSessionId);
+        } else if (frame.event === 'done') {
+          completed = true;
+          assistantContent = data.full_response || assistantContent;
+          assistantMsgId = data.message_id || assistantMsgId;
+          citations = data.citations || null;
+        } else if (frame.event === 'error') {
+          streamFailure = new Error(
+            data.message || t('chat_stream_failed') || 'The response could not be completed.'
+          );
+          streamFailure.name = 'StreamResponseError';
+        }
+      }, function () {
+        streamFailure = new Error(t('chat_stream_failed') || 'Malformed stream response.');
+        streamFailure.name = 'MalformedStreamError';
+      });
 
       while (true) {
         var chunk = await reader.read();
         if (chunk.done) break;
-        var chunkStr = decoder.decode(chunk.value, { stream: true });
-        var lines = chunkStr.split('\n');
-
-        for (var i = 0; i < lines.length; i++) {
-          var line = lines[i].trim();
-          if (!line.startsWith('data: ')) continue;
-          var jsonStr = line.substring(6);
-          try {
-            var data = JSON.parse(jsonStr);
-            if (data.token) {
-              if (firstToken) {
-                hideLoadingIndicator();
-                firstToken = false;
-              }
-              assistantContent += data.token;
-              assistantMsgId = data.message_id;
-              // Update or create assistant bubble
-              updateStreamingMessage(assistantContent, assistantMsgId);
-            }
-            if (data.done) {
-              assistantContent = data.full_response || assistantContent;
-              assistantMsgId = data.message_id || assistantMsgId;
-              citations = data.citations || null;
-            }
-          } catch (parseErr) {
-            // Skip unparseable lines
-          }
-        }
+        parser.push(decoder.decode(chunk.value, { stream: true }));
+        if (streamFailure) throw streamFailure;
       }
+      parser.push(decoder.decode());
+      parser.finish();
+      if (streamFailure) throw streamFailure;
+      if (!completed || !assistantMsgId) throw new Error('Incomplete stream');
+      if (!isCurrentStream(requestId, requestSessionId)) return;
 
-      // Finalize assistant message
-      if (assistantMsgId) {
-        messages = messages.filter(function (m) { return m.id !== '_streaming'; });
-        messages.push({
-          id: assistantMsgId,
-          role: 'assistant',
-          content: assistantContent,
-          created_at: new Date().toISOString(),
-          citations: citations
-        });
-      }
-
+      removeStreamingMessage();
+      messages.push({
+        id: assistantMsgId,
+        role: 'assistant',
+        content: assistantContent,
+        created_at: new Date().toISOString(),
+        citations: citations
+      });
       hideLoadingIndicator();
       renderMessages();
       scrollToBottom();
-
-    } catch (e) {
-      console.error('sendMessage error:', e);
+    } catch (error) {
+      removeStreamingMessage();
       hideLoadingIndicator();
+      if (error.name !== 'AbortError' && isCurrentStream(requestId, requestSessionId)) {
+        console.error('sendMessage failed:', error.name || 'Error');
+        showToast(error.message || t('chat_stream_failed') || 'Response failed.');
+      }
     } finally {
-      isStreaming = false;
-      el('btnSend').disabled = false;
-      el('chatInput').focus();
+      if (requestId === streamRequestId) {
+        streamAbort = null;
+        isStreaming = false;
+        setStreamingControls(false);
+        if (el('chatInput')) el('chatInput').focus();
+      }
     }
-  }
-
-  function updateStreamingMessage(content, msgId) {
-    // Remove any previous streaming placeholder
-    messages = messages.filter(function (m) { return m.id !== '_streaming'; });
-    messages.push({
-      id: '_streaming',
-      role: 'assistant',
-      content: content,
-      created_at: new Date().toISOString(),
-      citations: null
-    });
-    renderMessages();
-    scrollToBottom();
   }
 
   function showLoadingIndicator() {
@@ -512,6 +591,7 @@
     showConfirm(
       t('chat_clear_confirm') || 'Clear all messages?',
       async function () {
+        cancelActiveStream(false);
         if (activeSessionId) {
           try {
             await fetch('/api/chat/sessions/' + encodeURIComponent(activeSessionId) + '/messages', {
@@ -635,6 +715,11 @@
     var btnRegenerate = el('btnRegenerate');
     if (btnRegenerate) btnRegenerate.addEventListener('click', regenerateLast);
 
+    var btnStop = el('btnStop');
+    if (btnStop) {
+      btnStop.addEventListener('click', function () { cancelActiveStream(true); });
+    }
+
     // Scroll tracking
     var chatMessages = el('chatMessages');
     if (chatMessages) {
@@ -700,6 +785,7 @@
 
     // Close context menu on scroll
     window.addEventListener('scroll', closeContextMenu, { passive: true });
+    window.addEventListener('pagehide', function () { cancelActiveStream(false); });
 
     // Confirm dialog cancel
     var confirmCancel = el('confirmCancel');
@@ -750,6 +836,7 @@
   }
 
   async function createSession() {
+    cancelActiveStream(false);
     try {
       var resp = await fetch('/api/chat/sessions', {
         method: 'POST',
@@ -767,6 +854,7 @@
   }
 
   async function deleteSession(id) {
+    if (activeSessionId === id) cancelActiveStream(false);
     try {
       var resp = await fetch('/api/chat/sessions/' + encodeURIComponent(id), {
         method: 'DELETE'
@@ -870,7 +958,9 @@
   }
 
   async function switchToSession(id) {
+    if (id !== activeSessionId) cancelActiveStream(false);
     activeSessionId = id;
+    var loadRequestId = ++sessionLoadRequestId;
     // Update session title in header
     var session = sessions.find(function (s) { return s.id === id; });
     if (el('sessionTitle')) {
@@ -880,6 +970,7 @@
     // Load messages for this session
     try {
       var resp = await fetch('/api/chat/sessions/' + encodeURIComponent(id) + '/messages');
+      if (activeSessionId !== id || loadRequestId !== sessionLoadRequestId) return;
       if (resp.ok) {
         var msgs = await resp.json();
         messages = msgs;
@@ -887,6 +978,7 @@
         messages = [];
       }
     } catch (e) {
+      if (activeSessionId !== id || loadRequestId !== sessionLoadRequestId) return;
       messages = [];
     }
     renderMessages();
@@ -1021,6 +1113,7 @@
     createSession: createSession,
     deleteSession: deleteSession,
     renameSession: renameSession,
+    cancelActiveStream: cancelActiveStream,
     getActiveSessionId: function () { return activeSessionId; },
     getSessions: function () { return sessions; }
   };

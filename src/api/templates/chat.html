@@ -39,6 +39,9 @@
           <button type="submit" class="btn-primary btn-send" id="btnSend" aria-label="Send message" data-i18n-aria="aria_send_message">
             <span class="send-icon">➤</span>
           </button>
+          <button type="button" class="btn-primary btn-send btn-stop" id="btnStop" aria-label="Stop generation" data-i18n-aria="aria_stop_generation" hidden>
+            <span aria-hidden="true">■</span>
+          </button>
         </form>
       </div>
     </section>
@@ -91,5 +94,6 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script src="/static/js/sse.js"></script>
 <script src="/static/js/chat.js"></script>
 {% endblock %}

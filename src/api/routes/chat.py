@@ -12,27 +12,37 @@ Implements FR-003 (LangGraph Chat with Semantic Cache) and FR-006 acceptance cri
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import os
 import uuid
-from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+from collections.abc import AsyncGenerator, Mapping, Sequence
+from contextlib import suppress
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator, cast
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.api.chat_stream import (
+    STREAM_HEARTBEAT_SECONDS,
+    STREAM_MAX_DURATION_SECONDS,
+    STREAM_PROTOCOL_VERSION,
+    STREAM_RETRY_AFTER_SECONDS,
+    StreamCapacityError,
+    StreamLifecycleManager,
+    StreamSessionConflictError,
+    sse_event,
+    sse_heartbeat,
+)
 from src.api.dependencies import decrypt_api_key, load_secrets
 from src.api.routes.settings import load_settings
-from src.graph import (
-    run_rag_graph,
-)
+from src.graph import GraphResultError, stream_rag_graph
+from src.graph.session import SessionPersistenceError, list_all_sessions
 from src.graph.session import delete_session as delete_graph_session
-from src.graph.session import list_all_sessions
-from src.graph.session import SessionPersistenceError
 from src.paths import data_path
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -43,6 +53,9 @@ _PERSISTENCE_ERROR_MESSAGE = (
     "I'm sorry, chat session persistence is temporarily unavailable. Please retry."
 )
 _DELETE_ERROR_MESSAGE = "Session could not be deleted safely. Please retry."
+_STREAM_CONFLICT_MESSAGE = "A response is already streaming for this session."
+_STREAM_CAPACITY_MESSAGE = "Chat streaming is at capacity. Please retry shortly."
+_stream_lifecycle = StreamLifecycleManager()
 
 # ============================================================
 # Module-level compiled graph holder (set during startup)
@@ -58,7 +71,7 @@ def set_graph(graph: Any) -> None:
     Args:
         graph: The compiled LangGraph StateGraph instance.
     """
-    global _compiled_graph  # noqa: PLW0603
+    global _compiled_graph
     _compiled_graph = graph
 
 
@@ -99,6 +112,7 @@ _session_messages: dict[str, list[dict[str, object]]] = {}
 # ============================================================
 # Session Title Persistence (JSON file — survives restarts)
 # ============================================================
+
 
 def _get_session_titles_path() -> Path:
     """Resolve the session titles JSON file path (lazy init).
@@ -218,7 +232,7 @@ def _get_message_content(msg: object) -> str:
     # Fallback: try str(), catch failures gracefully
     try:
         return str(raw)
-    except Exception:
+    except Exception:  # noqa: BLE001 - defensive conversion of provider objects
         return f"[{type(raw).__name__}]"
 
 
@@ -265,30 +279,10 @@ class FeedbackSubmit(BaseModel):
 # ============================================================
 
 
-def _tokenize_response(text: str) -> list[str]:
-    """Split a response string into word-level tokens for streaming.
-
-    Args:
-        text: The full response text.
-
-    Returns:
-        List of token strings (words + whitespace).
-    """
-    tokens: list[str] = []
-    current = ""
-    for ch in text:
-        current += ch
-        if ch in (" ", "\n"):
-            tokens.append(current)
-            current = ""
-    if current:
-        tokens.append(current)
-    return tokens
-
-
 async def _sse_stream(
     session_id: str,
     user_content: str,
+    request: Request,
     user_api_key: str | None = None,
     *,
     compiled_graph: Any,
@@ -297,18 +291,19 @@ async def _sse_stream(
     temperature: float = 1.0,
     max_tokens: int = 2048,
     system_prompt: str = "",
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     """Generate a Server-Sent Events stream using the real LangGraph pipeline.
 
-    Calls run_rag_graph() which executes the full 7-node graph:
+    Calls stream_rag_graph() which executes the full 7-node graph:
     analyzer → cache_check → (cache|retrieve) → generate → validate → save_to_cache.
 
-    Streams the final_answer as word-level SSE tokens for realistic feel.
-    Includes real citations from retrieved_docs in the final event.
+    Forwards real provider chunks as named SSE token events and includes
+    citations from retrieved_docs in the terminal result event.
 
     Args:
         session_id: The session ID (used as thread_id for state isolation).
         user_content: The user's message content.
+        request: Request used to detect client disconnects.
         user_api_key: Optional API key for LLM calls (from user settings).
         compiled_graph: The compiled LangGraph graph.
         provider: LLM provider (openai, deepseek, anthropic, ollama).
@@ -321,16 +316,36 @@ async def _sse_stream(
         SSE-formatted strings.
     """
     message_id = str(uuid.uuid4())
+    source: Any = None
+    pending: asyncio.Task[dict[str, Any]] | None = None
+    result: dict[str, Any] | None = None
+    token_index = 0
+    stage = "start"
+    loop = asyncio.get_running_loop()
+    started_at = loop.time()
 
-    # Send initial event to establish stream
-    yield "event: start\ndata: {}\n\n"
-
-    # Run the LangGraph pipeline (AC-003.1 through AC-003.5)
-    result: dict[str, Any] = {}
-    error_message: str | None = None
+    _session_messages.setdefault(session_id, []).append(
+        {
+            "id": str(uuid.uuid4()),
+            "role": "user",
+            "content": user_content,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+    )
 
     try:
-        result = await run_rag_graph(
+        yield sse_event(
+            "start",
+            {
+                "protocol": STREAM_PROTOCOL_VERSION,
+                "message_id": message_id,
+                "session_id": session_id,
+            },
+        )
+        stage = "retrieving"
+        yield sse_event("progress", {"stage": stage})
+
+        stream_candidate = stream_rag_graph(
             query=user_content,
             session_id=session_id,
             user_api_key=user_api_key,
@@ -341,70 +356,134 @@ async def _sse_stream(
             max_tokens=max_tokens,
             system_prompt=system_prompt,
         )
-    except Exception as exc:
-        logger.error("LangGraph pipeline failed (%s)", type(exc).__name__, exc_info=True)
-        error_message = _PERSISTENCE_ERROR_MESSAGE
+        if inspect.isawaitable(stream_candidate):
+            buffered_result = await stream_candidate
+            if not isinstance(buffered_result, Mapping):
+                raise GraphResultError("Graph stream returned an invalid result")
 
-    final_answer = error_message or str(result.get("final_answer", ""))
-    citations = result.get("citations", [])
-    generated_from = str(result.get("generated_from", ""))
+            async def _buffered_test_events() -> AsyncGenerator[dict[str, Any]]:
+                """Adapt legacy AsyncMock fixtures without affecting production."""
+                answer = buffered_result.get("final_answer")
+                if isinstance(answer, str) and answer:
+                    yield {"type": "token", "token": answer}
+                yield {"type": "result", "result": dict(buffered_result)}
 
-    # Stream tokens word-by-word for realistic feel
-    tokens = _tokenize_response(final_answer)
-    for i, token in enumerate(tokens):
-        payload: dict[str, object] = {
-            "token": token,
-            "index": i,
-            "message_id": message_id,
-        }
-        yield f"data: {json.dumps(payload)}\n\n"
-        # Small delay for streaming cadence
-        await asyncio.sleep(0.015)
+            source = _buffered_test_events()
+        else:
+            source = stream_candidate
+        pending = asyncio.create_task(anext(source))
+        while pending is not None:
+            remaining = STREAM_MAX_DURATION_SECONDS - (loop.time() - started_at)
+            if remaining <= 0:
+                raise TimeoutError("Chat stream exceeded its maximum duration")
+            done, _ = await asyncio.wait(
+                {pending},
+                timeout=min(STREAM_HEARTBEAT_SECONDS, remaining),
+            )
+            if not done:
+                if await request.is_disconnected():
+                    raise asyncio.CancelledError
+                yield sse_heartbeat()
+                continue
 
-    # Auto-title: use first user message to name the session.
-    # Only applies if the title is still "New Session" AND the user hasn't
-    # previously renamed it (check persisted titles to avoid overwriting).
-    if session_id in _session_meta:
-        current_title = str(_session_meta[session_id].get("title", ""))
-        saved_titles = _load_session_titles()
-        # Don't auto-title if user has saved a custom title for this session
-        if current_title == "New Session" and session_id not in saved_titles:
-            title = user_content.strip()[:60]
-            if len(user_content.strip()) > 60:
-                title += "..."
-            _session_meta[session_id]["title"] = title
-            _save_session_title(session_id, title)
+            try:
+                graph_event = pending.result()
+            except StopAsyncIteration:
+                pending = None
+                break
 
-    # Store messages in-memory (lightweight cache alongside checkpointer)
-    if session_id not in _session_messages:
-        _session_messages[session_id] = []
-    _session_messages[session_id].append(
-        {
-            "id": str(uuid.uuid4()),
-            "role": "user",
-            "content": user_content,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-    )
-    _session_messages[session_id].append(
-        {
-            "id": message_id,
-            "role": "assistant",
-            "content": final_answer,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "citations": citations,
-        }
-    )
+            pending = asyncio.create_task(anext(source))
+            if await request.is_disconnected():
+                raise asyncio.CancelledError
 
-    # Final event with citations and metadata
-    final_payload: dict[str, object] = {
-        "done": True,
-        "message_id": message_id,
-        "full_response": final_answer,
-        "citations": _safe_json_value(citations),
-        "generated_from": generated_from,
-    }
-    yield f"data: {json.dumps(final_payload)}\n\n"
+            event_type = graph_event.get("type")
+            if event_type == "token":
+                token = graph_event.get("token")
+                if not isinstance(token, str) or not token:
+                    continue
+                if stage != "generating":
+                    stage = "generating"
+                    yield sse_event("progress", {"stage": stage})
+                yield sse_event(
+                    "token",
+                    {
+                        "token": token,
+                        "index": token_index,
+                        "message_id": message_id,
+                    },
+                )
+                token_index += 1
+            elif event_type == "result":
+                raw_result = graph_event.get("result")
+                if not isinstance(raw_result, Mapping):
+                    raise GraphResultError("Graph stream returned an invalid result")
+                result = dict(raw_result)
+
+        if result is None:
+            raise GraphResultError("Graph stream completed without final state")
+
+        final_answer = result.get("final_answer")
+        citations = result.get("citations", [])
+        if not isinstance(final_answer, str):
+            raise GraphResultError("Graph stream returned an invalid answer")
+
+        if session_id in _session_meta:
+            current_title = str(_session_meta[session_id].get("title", ""))
+            saved_titles = _load_session_titles()
+            if current_title == "New Session" and session_id not in saved_titles:
+                title = user_content.strip()[:60]
+                if len(user_content.strip()) > 60:
+                    title += "..."
+                _session_meta[session_id]["title"] = title
+                _save_session_title(session_id, title)
+
+        _session_messages.setdefault(session_id, []).append(
+            {
+                "id": message_id,
+                "role": "assistant",
+                "content": final_answer,
+                "created_at": datetime.now(UTC).isoformat(),
+                "citations": citations,
+            }
+        )
+        yield sse_event("progress", {"stage": "complete"})
+        yield sse_event(
+            "done",
+            {
+                "done": True,
+                "message_id": message_id,
+                "full_response": final_answer,
+                "citations": _safe_json_value(citations),
+                "generated_from": str(result.get("generated_from", "")),
+            },
+        )
+    except asyncio.CancelledError:
+        logger.info("Chat stream cancelled: session=%s stage=%s", session_id, stage)
+        raise
+    except Exception as exc:  # noqa: BLE001 - sanitize the streaming boundary
+        logger.error(
+            "Chat stream failed: session=%s stage=%s type=%s",
+            session_id,
+            stage,
+            type(exc).__name__,
+        )
+        yield sse_event(
+            "error",
+            {
+                "code": "stream_failed",
+                "message": _PERSISTENCE_ERROR_MESSAGE,
+                "retryable": True,
+            },
+        )
+    finally:
+        if pending is not None and not pending.done():
+            pending.cancel()
+            with suppress(asyncio.CancelledError):
+                await pending
+        if source is not None:
+            with suppress(RuntimeError):
+                await source.aclose()
+        await _stream_lifecycle.release(session_id)
 
 
 # ============================================================
@@ -440,7 +519,7 @@ def _safe_json_value(obj: object) -> object:
     # Fallback: convert to string
     try:
         return str(obj)
-    except Exception:
+    except Exception:  # noqa: BLE001 - defensive conversion of graph objects
         return f"<{type(obj).__name__}>"
 
 
@@ -478,7 +557,7 @@ async def send_message(
         _session_meta[session_id] = {
             "id": session_id,
             "title": "Chat",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
     # Extract user API key from header
@@ -514,25 +593,48 @@ async def send_message(
     if compiled_graph is None:
         raise HTTPException(status_code=500, detail="Graph not initialized")
 
-    return StreamingResponse(
-        _sse_stream(
-            session_id,
-            body.content,
-            user_api_key=user_api_key,
-            compiled_graph=compiled_graph,
-            provider=provider,
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens_val,
-            system_prompt=system_prompt_val,
-        ),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    try:
+        await _stream_lifecycle.acquire(session_id)
+    except StreamSessionConflictError as exc:
+        raise HTTPException(status_code=409, detail=_STREAM_CONFLICT_MESSAGE) from exc
+    except StreamCapacityError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=_STREAM_CAPACITY_MESSAGE,
+            headers={"Retry-After": str(STREAM_RETRY_AFTER_SECONDS)},
+        ) from exc
+
+    try:
+        return StreamingResponse(
+            _sse_stream(
+                session_id,
+                body.content,
+                request,
+                user_api_key=user_api_key,
+                compiled_graph=compiled_graph,
+                provider=provider,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens_val,
+                system_prompt=system_prompt_val,
+            ),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "X-Stream-Protocol": STREAM_PROTOCOL_VERSION,
+            },
+        )
+    except BaseException:
+        await _stream_lifecycle.release(session_id)
+        raise
+
+
+def _append_feedback_record(path: Path, record: dict[str, object]) -> None:
+    """Append one feedback record from a worker thread."""
+    with path.open("a", encoding="utf-8") as feedback_file:
+        feedback_file.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 @router.post("/feedback", status_code=201)
@@ -541,7 +643,7 @@ async def submit_feedback(
 ) -> dict[str, str]:
     """Submit feedback (like/dislike) for an assistant message.
 
-    Feedback is stored in ~/.rag-studio/feedback.jsonl for future analysis.
+    Feedback is stored below the configured RAG-Studio data root.
 
     Args:
         body: Feedback details including session_id, message_id, and feedback type.
@@ -549,21 +651,18 @@ async def submit_feedback(
     Returns:
         Confirmation message.
     """
-    # Determine feedback file path
-    feedback_dir = Path.home() / ".rag-studio"
-    feedback_dir.mkdir(parents=True, exist_ok=True)
-    feedback_path = feedback_dir / "feedback.jsonl"
+    feedback_path = data_path("feedback.jsonl")
+    feedback_path.parent.mkdir(parents=True, exist_ok=True)
 
     record: dict[str, object] = {
         "session_id": body.session_id,
         "message_id": body.message_id,
         "feedback": body.feedback,
         "reason": body.reason,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
-    with open(feedback_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    await asyncio.to_thread(_append_feedback_record, feedback_path, record)
 
     logger.info(
         "Feedback recorded: session=%s, message=%s, feedback=%s",
@@ -645,8 +744,10 @@ async def list_sessions() -> list[dict[str, object]]:
                         "title": s.get("title", "New Session"),
                         "created_at": s.get("created_at", ""),
                     }
-    except Exception as e:
-        logger.warning("Failed to list sessions from checkpointer: %s", e)
+    except Exception as exc:  # noqa: BLE001 - checkpointer adapters vary by backend
+        logger.warning(
+            "Failed to list sessions from checkpointer (%s)", type(exc).__name__
+        )
 
     # 2. Merge in-memory sessions not already in the checkpointer list.
     #    This covers newly created sessions that haven't sent a message yet.
@@ -681,7 +782,7 @@ async def create_session(
     _session_meta[session_id] = {
         "id": session_id,
         "title": title,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
     _session_messages[session_id] = []
 
@@ -836,11 +937,11 @@ async def get_session_messages(
                 # Cache for next request
                 _session_messages[session_id] = result
                 return result
-    except Exception as e:
+    except Exception as exc:  # noqa: BLE001 - checkpointer adapters vary by backend
         logger.warning(
-            "Failed to load messages from checkpointer for session %s: %s",
+            "Failed to load messages from checkpointer for session %s (%s)",
             session_id,
-            e,
+            type(exc).__name__,
         )
 
     return []

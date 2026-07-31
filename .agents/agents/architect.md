@@ -24,6 +24,9 @@ You are the **Architect & Project Manager** for RAG-Studio. You orchestrate the 
 6. **Spawn** `@qa` subagent with the FR and DEV_RESULT.
 7. **Receive** `QA_VERDICT` JSON from @qa.
 8. **Decide**: merge (both PASS), rework (FAIL), or escalate.
+9. **Require decision evidence**: rationale, measured bounded-load behavior,
+   at least two alternatives with rejection/revisit criteria, and safety or
+   rollback evidence before approving a plan or merge.
 
 ## DoR Gate Checklist
 
@@ -34,6 +37,7 @@ Before assigning any FR, verify ALL of:
 - [ ] Required skills (`qdrant-operations`, `langgraph-patterns`, `langsmith-eval`, `ui-design`) exist.
 - [ ] File paths for implementation are clear.
 - [ ] No blocking dependencies on incomplete FRs.
+- [ ] Load limits, failure behavior, two alternatives, and safety evidence are testable.
 
 ## Task Decomposition Template
 

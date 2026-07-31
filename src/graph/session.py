@@ -64,7 +64,7 @@ async def delete_session(
                 await checkpointer.adelete_thread(thread_id)
                 logger.info("Deleted session thread_id=%s via checkpointer", thread_id)
                 return True
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - checkpointer backends vary
                 logger.warning(
                     "Checkpointer delete_thread failed for %s (%s)",
                     thread_id,
@@ -111,8 +111,9 @@ async def delete_session(
             thread_id,
             type(exc).__name__,
         )
-        raise SessionPersistenceError("Unable to delete persisted session state") from exc
-
+        raise SessionPersistenceError(
+            "Unable to delete persisted session state"
+        ) from exc
 
 
 async def get_session_metadata(
@@ -159,8 +160,9 @@ async def get_session_metadata(
                 # Derive title from first user message
                 title = "New Session"
                 for msg in messages:
-                    if hasattr(msg, "type") and msg.type == "human":
-                        content = str(msg.content) if msg.content else ""
+                    if getattr(msg, "type", None) == "human":
+                        raw_content = getattr(msg, "content", "")
+                        content = str(raw_content) if raw_content else ""
                         title = content.strip()[:60]
                         if len(content.strip()) > 60:
                             title += "..."
@@ -172,7 +174,7 @@ async def get_session_metadata(
                     "created_at": created_at,
                     "message_count": message_count,
                 }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - SQLite adapter boundary
         logger.warning(
             "Failed to get session metadata for thread_id=%s (%s)",
             thread_id,
@@ -218,7 +220,7 @@ async def list_all_sessions(
 
         logger.info("Listed %d sessions from SQLite", len(sessions))
         return sessions
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - SQLite adapter boundary
         logger.debug("Could not list sessions from SQLite (%s)", type(exc).__name__)
 
     return sessions

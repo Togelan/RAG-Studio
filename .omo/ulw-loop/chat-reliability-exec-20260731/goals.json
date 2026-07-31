@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "evidenceLayoutVersion": 2,
+  "createdAt": "2026-07-31T20:20:38.871Z",
+  "updatedAt": "2026-07-31T22:40:00.000Z",
+  "briefPath": ".omo/ulw-loop/chat-reliability-exec-20260731/brief.md",
+  "goalsPath": ".omo/ulw-loop/chat-reliability-exec-20260731/goals.json",
+  "ledgerPath": ".omo/ulw-loop/chat-reliability-exec-20260731/ledger.jsonl",
+  "codexGoalMode": "aggregate",
+  "goals": [
+    {
+      "id": "G001-implement-the-approved-chat-reliabil",
+      "title": "Implement the approved chat-reliability-streaming work plan as one co...",
+      "objective": "Implement the approved chat-reliability-streaming work plan as one coordinated delivery: preserve existing runtime data; fix new-session persistence errors; deliver genuine bounded SSE streaming with cancellation-safe UI; and add the requested engineering decision-evidence guidance, with automated UI and load verification.",
+      "status": "complete",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "Run deterministic fresh and restarted Unicode session flows against a fake provider; verify complete SSE output, persisted messages, checkpointer/session deletion behavior, and no internal error disclosure.",
+          "userModel": "happy",
+          "expectedEvidence": ".omo/evidence/chat-reliability-streaming/criterion-C001-persistence-http.txt containing HTTP/SSE transcript plus restart/state assertions at the captured git tree.",
+          "essential": true,
+          "capturedEvidence": ".omo/evidence/chat-reliability-streaming/criterion-C001-persistence-http.txt",
+          "status": "complete"
+        },
+        {
+          "id": "C002",
+          "scenario": "Run a real local browser flow and deterministic delayed-provider tests proving token-before-completion, fragmented SSE parsing, Stop/pagehide/session-switch cancellation, no cross-session UI update, 409 same-session conflict, and 503 Retry-After capacity response.",
+          "userModel": "edge",
+          "expectedEvidence": ".omo/evidence/chat-reliability-streaming/criterion-C002-browser-load.md with browser screenshot/action log, HTTP headers, and ten-session benchmark metrics at the captured git tree.",
+          "essential": true,
+          "capturedEvidence": ".omo/evidence/chat-reliability-streaming/criterion-C002-browser-load.md",
+          "status": "complete"
+        },
+        {
+          "id": "C003",
+          "scenario": "Inspect the final diff and canonical guidance to confirm decision-evidence policy is present, dirty user hunks are preserved, no automatic data deletion or raw secret/traceback exposure exists, and required full quality gates pass.",
+          "userModel": "regression",
+          "expectedEvidence": ".omo/evidence/chat-reliability-streaming/criterion-C003-scope-quality.md with diff audit, command transcripts, and cleanup receipts at the captured git tree.",
+          "essential": false,
+          "capturedEvidence": ".omo/evidence/chat-reliability-streaming/criterion-C003-scope-quality.md",
+          "status": "complete"
+        }
+      ],
+      "attempt": 1,
+      "createdAt": "2026-07-31T20:20:38.871Z",
+      "updatedAt": "2026-07-31T22:40:00.000Z",
+      "startedAt": "2026-07-31T20:21:44.403Z",
+      "completedAt": "2026-07-31T22:40:00.000Z"
+    }
+  ],
+  "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/chat-reliability-exec-20260731/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/chat-reliability-exec-20260731/ledger.jsonl as the audit trail.",
+  "activeGoalId": "G001-implement-the-approved-chat-reliabil"
+}

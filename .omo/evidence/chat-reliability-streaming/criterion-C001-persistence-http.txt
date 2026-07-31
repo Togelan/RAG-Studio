@@ -1,0 +1,6 @@
+Criterion C001: PASS
+
+Named SSE sequence observed and asserted: start -> progress -> token(s) -> progress(complete) -> done.
+Complete assistant output and citations are persisted only after successful completion. Cancellation retains the user turn and no partial assistant turn. Fresh/restarted Unicode checkpoint tests, safe deletion failure tests, malformed graph-result tests, and sanitized stream-error tests passed in the isolated 337-test regression.
+
+Supporting evidence: task-2.md, task-3.md, task-4.md.

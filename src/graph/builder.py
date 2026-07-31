@@ -9,7 +9,7 @@ HumanMessage objects in writes.__start__.messages.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, cast
 
@@ -250,8 +250,6 @@ async def create_graph(
         db_path_resolved = str(Path(db_path).resolve())
         Path(db_path_resolved).parent.mkdir(parents=True, exist_ok=True)
 
-        from collections.abc import Sequence
-
         import aiosqlite
 
         async with aiosqlite.connect(db_path_resolved) as conn:
@@ -291,7 +289,9 @@ async def create_graph(
 
                     channel_values: object = checkpoint.get("channel_values", {})
                     raw_msgs: object = (
-                        channel_values.get("messages", [])  # type: ignore[union-attr]
+                        channel_values.get("messages", [])
+                        if isinstance(channel_values, Mapping)
+                        else []
                     )
                     msg_count = (
                         len(cast("list[object]", raw_msgs))
@@ -384,12 +384,11 @@ async def create_graph(
                             # Wrap in try/except with sanitize fallback for bytes
                             try:
                                 type_, serialized_value = self.serde.dumps_typed(value)
-                            except Exception as exc:
+                            except Exception as exc:  # noqa: BLE001 - serializer boundary
                                 logger.warning(
                                     "aput_writes: value serialization failed "
-                                    "(%s: %s), attempting sanitize fallback.",
+                                    "(%s), attempting sanitize fallback.",
                                     type(exc).__name__,
-                                    exc,
                                 )
                                 sanitized_value = _sanitize_for_json(value)
                                 type_, serialized_value = self.serde.dumps_typed(
@@ -490,15 +489,14 @@ async def create_graph(
                                     metadata = self.serde.loads_typed(
                                         (type_, metadata_blob)
                                     )
-                                except Exception as meta_err:
+                                except Exception as meta_err:  # noqa: BLE001 - compatibility boundary
                                     import json as _json
 
                                     logger.warning(
                                         "aget_tuple: metadata serde.loads_typed "
-                                        "failed (%s: %s), trying json.loads() "
+                                        "failed (%s), trying json.loads() "
                                         "for backward compat.",
                                         type(meta_err).__name__,
-                                        meta_err,
                                     )
                                     try:
                                         # Handle both str and bytes
@@ -508,11 +506,11 @@ async def create_graph(
                                             else str(metadata_blob)
                                         )
                                         metadata = _json.loads(meta_str)
-                                    except Exception as json_err:
+                                    except Exception as json_err:  # noqa: BLE001 - corrupt legacy metadata
                                         logger.error(
                                             "aget_tuple: json.loads fallback "
-                                            "also failed: %s",
-                                            json_err,
+                                            "also failed (%s)",
+                                            type(json_err).__name__,
                                         )
                                         metadata = {}
                             # Read pending writes
@@ -592,6 +590,211 @@ async def create_graph(
 # ============================================================
 
 
+class GraphResultError(RuntimeError):
+    """Raised when a graph emits a result with an unsafe or invalid shape."""
+
+
+def _graph_inputs(
+    query: str,
+    session_id: str,
+    user_api_key: str | None,
+    *,
+    provider: str,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    system_prompt: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build isolated LangGraph config and initial state for one user turn."""
+    from langchain_core.messages import HumanMessage
+
+    config: dict[str, Any] = {
+        "configurable": {"thread_id": session_id},
+    }
+    initial_state: dict[str, Any] = {
+        "messages": [HumanMessage(content=query)],
+        "query": query,
+        "intent": "",
+        "cache_hit": False,
+        "cached_answer": None,
+        "retrieved_docs": [],
+        "reranked_docs": [],
+        "generated_from": "",
+        "final_answer": None,
+        "faithfulness_score": 0.0,
+        "validation_passed": False,
+        "session_id": session_id,
+        "user_api_key": user_api_key,
+        "provider": provider,
+        "model_name": model,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "system_prompt": system_prompt,
+    }
+    return config, initial_state
+
+
+def _normalize_graph_result(result: object, *, session_id: str) -> dict[str, Any]:
+    """Validate graph output boundaries and construct safe citation metadata."""
+    if not isinstance(result, Mapping):
+        logger.error(
+            "Invalid graph result: session=%s type=%s",
+            session_id,
+            type(result).__name__,
+        )
+        raise GraphResultError("Graph returned an invalid result")
+
+    final_answer = result.get("final_answer")
+    if not isinstance(final_answer, str):
+        logger.error(
+            "Invalid graph final_answer: session=%s type=%s",
+            session_id,
+            type(final_answer).__name__,
+        )
+        raise GraphResultError("Graph returned an invalid answer")
+
+    raw_docs = result.get("retrieved_docs", [])
+    if not isinstance(raw_docs, Sequence) or isinstance(raw_docs, (str, bytes)):
+        logger.error(
+            "Invalid graph retrieved_docs: session=%s type=%s",
+            session_id,
+            type(raw_docs).__name__,
+        )
+        raise GraphResultError("Graph returned invalid retrieval data")
+
+    retrieved_docs: list[dict[str, Any]] = []
+    citations: list[dict[str, object]] = []
+    for index, raw_doc in enumerate(raw_docs):
+        if not isinstance(raw_doc, Mapping):
+            logger.error(
+                "Invalid graph document: session=%s index=%d type=%s",
+                session_id,
+                index,
+                type(raw_doc).__name__,
+            )
+            raise GraphResultError("Graph returned invalid retrieval data")
+        doc = dict(raw_doc)
+        raw_metadata = doc.get("metadata", {})
+        if not isinstance(raw_metadata, Mapping):
+            raise GraphResultError("Graph returned invalid document metadata")
+        metadata = dict(raw_metadata)
+        try:
+            score = float(doc.get("score", 0.0))
+        except (TypeError, ValueError) as exc:
+            raise GraphResultError("Graph returned an invalid document score") from exc
+        retrieved_docs.append(doc)
+        citations.append(
+            {
+                "index": index + 1,
+                "chunk_text": str(doc.get("text", "")),
+                "filename": str(metadata.get("filename", "unknown")),
+                "chunk_index": str(metadata.get("chunk_index", "?")),
+                "score": score,
+            }
+        )
+
+    try:
+        faithfulness_score = float(result.get("faithfulness_score", 0.0))
+    except (TypeError, ValueError) as exc:
+        raise GraphResultError("Graph returned an invalid faithfulness score") from exc
+
+    normalized = {
+        "final_answer": final_answer,
+        "generated_from": str(result.get("generated_from", "")),
+        "faithfulness_score": faithfulness_score,
+        "retrieved_docs": retrieved_docs,
+        "citations": citations,
+    }
+    logger.info(
+        "Graph result normalized: session=%s source=%s docs=%d",
+        session_id,
+        normalized["generated_from"],
+        len(citations),
+    )
+    return normalized
+
+
+def _stream_chunk_text(message: object) -> str:
+    """Extract text from a LangChain message chunk without stringifying metadata."""
+    content = getattr(message, "content", "")
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, Sequence) or isinstance(content, (str, bytes)):
+        return ""
+    parts: list[str] = []
+    for item in content:
+        if isinstance(item, str):
+            parts.append(item)
+        elif isinstance(item, Mapping):
+            text = item.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return "".join(parts)
+
+
+async def stream_rag_graph(
+    query: str,
+    session_id: str,
+    user_api_key: str | None = None,
+    *,
+    compiled_graph: Any,
+    provider: str = "openai",
+    model: str = "gpt-4o-mini",
+    temperature: float = 1.0,
+    max_tokens: int = 2048,
+    system_prompt: str = "",
+) -> AsyncIterator[dict[str, Any]]:
+    """Yield genuine generation chunks followed by one validated graph result.
+
+    LangGraph's ``messages`` stream relays provider chunks even when a node uses
+    ``ainvoke``. Tokens from analyzer/validator LLMs are excluded by node name,
+    so only the grounded answer reaches the browser. The ``values`` stream is
+    retained until validation and cache persistence complete.
+    """
+    config, initial_state = _graph_inputs(
+        query,
+        session_id,
+        user_api_key,
+        provider=provider,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        system_prompt=system_prompt,
+    )
+
+    final_state: object | None = None
+    emitted_provider_token = False
+    async for mode, payload in compiled_graph.astream(
+        initial_state,
+        config,
+        stream_mode=["messages", "values"],
+    ):
+        if mode == "values":
+            final_state = payload
+            continue
+        if mode != "messages" or not isinstance(payload, tuple) or len(payload) != 2:
+            continue
+        message, raw_metadata = payload
+        if not isinstance(raw_metadata, Mapping):
+            continue
+        if raw_metadata.get("langgraph_node") != "generate_from_retrieval":
+            continue
+        token = _stream_chunk_text(message)
+        if token:
+            emitted_provider_token = True
+            yield {"type": "token", "token": token}
+
+    if final_state is None:
+        raise GraphResultError("Graph stream completed without a result")
+    normalized = _normalize_graph_result(final_state, session_id=session_id)
+    if normalized["generated_from"] == "cache" and normalized["final_answer"]:
+        yield {"type": "token", "token": normalized["final_answer"]}
+    elif normalized["generated_from"] == "retrieval" and not emitted_provider_token:
+        logger.error("Provider stream emitted no tokens: session=%s", session_id)
+        raise GraphResultError("Provider stream completed without tokens")
+    yield {"type": "result", "result": normalized}
+
+
 async def run_rag_graph(
     query: str,
     session_id: str,
@@ -624,69 +827,15 @@ async def run_rag_graph(
         Dict with keys: final_answer, generated_from, faithfulness_score,
         retrieved_docs, citations.
     """
-    from langchain_core.messages import HumanMessage
-
-    config: dict[str, Any] = {
-        "configurable": {
-            "thread_id": session_id,  # isolates state per session (AC-003.4)
-        }
-    }
-
-    initial_state: dict[str, Any] = {
-        "messages": [HumanMessage(content=query)],
-        "query": query,
-        "intent": "",
-        "cache_hit": False,
-        "cached_answer": None,
-        "retrieved_docs": [],
-        "reranked_docs": [],
-        "generated_from": "",
-        "final_answer": None,
-        "faithfulness_score": 0.0,
-        "validation_passed": False,
-        "session_id": session_id,
-        "user_api_key": user_api_key,
-        "provider": provider,
-        "model_name": model,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "system_prompt": system_prompt,
-    }
-
-    result = await compiled_graph.ainvoke(initial_state, config)
-
-    # Build citations from retrieved docs
-    citations: list[dict[str, object]] = []
-    raw_docs: object = result.get("retrieved_docs", [])
-    retrieved_docs: list[dict[str, Any]] = (
-        [dict(d) for d in cast("list[dict[str, Any]]", raw_docs)]
-        if isinstance(raw_docs, list)
-        else []
-    )
-    for i, doc in enumerate(retrieved_docs):
-        metadata: dict[str, Any] = dict(doc.get("metadata", {}))
-        citations.append(
-            {
-                "index": i + 1,
-                "chunk_text": str(doc.get("text", "")),
-                "filename": str(metadata.get("filename", "unknown")),
-                "chunk_index": str(metadata.get("chunk_index", "?")),
-                "score": float(doc.get("score", 0.0)),
-            }
-        )
-
-    logger.info(
-        "run_rag_graph: session=%s, generated_from=%s, faithfulness=%.3f, docs=%d",
+    config, initial_state = _graph_inputs(
+        query,
         session_id,
-        result.get("generated_from", ""),
-        result.get("faithfulness_score", 0.0),
-        len(citations),
+        user_api_key,
+        provider=provider,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        system_prompt=system_prompt,
     )
-
-    return {
-        "final_answer": result.get("final_answer"),
-        "generated_from": str(result.get("generated_from", "")),
-        "faithfulness_score": float(result.get("faithfulness_score", 0.0)),
-        "retrieved_docs": retrieved_docs,
-        "citations": citations,
-    }
+    result = await compiled_graph.ainvoke(initial_state, config)
+    return _normalize_graph_result(result, session_id=session_id)

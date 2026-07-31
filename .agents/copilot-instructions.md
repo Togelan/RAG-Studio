@@ -194,6 +194,16 @@ A Functional Requirement is **done** when:
 
 ## Agent Workflow
 
+### Mandatory engineering decision evidence
+
+Every non-trivial change MUST record: (1) why the selected solution fits this
+architecture, (2) its measured behavior and bounded failure mode under the
+applicable load threshold, (3) at least two considered alternatives with
+rejection reasons and revisit conditions, and (4) safety evidence covering
+data preservation, secret/error redaction, cancellation or rollback, and the
+exact automated checks run. Unmeasured claims that a design is scalable, safe,
+or best do not satisfy Definition of Done.
+
 ### Codex + LazyCodex orchestration (canonical)
 
 For Codex sessions, LazyCodex is the orchestration layer and the existing roles below remain the project-domain workflow. The canonical sequence is **understand → plan with LazyCodex → implement → test → review → update Graphify → commit**. Use this sequence for work that changes the application:

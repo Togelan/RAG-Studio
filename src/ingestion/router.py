@@ -671,8 +671,10 @@ async def _ingest_file_locked(
         # Clean up temp file (raw copy persists in data/raw_uploads/)
         try:
             Path(file_path).unlink(missing_ok=True)
-        except Exception:
-            pass
+        except OSError as exc:
+            logger.warning(
+                "Could not remove ingestion temp file (%s)", type(exc).__name__
+            )
 
 
 # ============================================================

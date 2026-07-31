@@ -117,6 +117,13 @@ All persistent data lives in `./rag-data/` on your host:
 | `./rag-data/raw_uploads/` | Original uploaded files (for re-ingestion) | ✅ |
 | `./rag-data/logs/` | Audit logs (rotated daily) | ✅ |
 
+Files or chat titles that appear after a fresh container start are normally
+existing volume data, not bundled demo content. For example, a file under
+`raw_uploads/` and an old session title reappear because Compose binds the host
+`rag-data/` directory into the container. Delete individual documents and
+sessions through the UI/API so Qdrant, raw-file metadata, and checkpoints stay
+consistent; RAG-Studio never resets persistent data automatically.
+
 ### Resource Limits
 
 Configured in `docker-compose.yml`:
@@ -211,7 +218,19 @@ All user data is stored in volume-mounted directories and survives `docker compo
 | Original uploaded files | `./rag-data/raw_uploads/` | Used for re-ingestion after settings changes |
 | Language preference | Browser cookie + localStorage | 1-year expiry |
 
-> **To fully reset**: delete the `./rag-data/` directory and restart the container.
+For a recoverable full reset, first stop the application, move `rag-data/` to a
+timestamped backup, and then restart:
+
+```powershell
+docker compose down
+Move-Item -LiteralPath .\rag-data -Destination .\rag-data-backup-YYYYMMDD
+docker compose up -d
+```
+
+Inspect the new empty instance before deleting the backup. Never edit
+`checkpoints.db` or Qdrant files while the container is running. Restoring the
+backup requires `docker compose down`, moving the new `rag-data/` aside, and
+moving the backup back to `rag-data/` before restart.
 
 ---
 

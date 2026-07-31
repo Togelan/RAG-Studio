@@ -1,0 +1,1 @@
+Implement the approved chat-reliability-streaming work plan as one coordinated delivery: preserve existing runtime data; fix new-session persistence errors; deliver genuine bounded SSE streaming with cancellation-safe UI; and add the requested engineering decision-evidence guidance, with automated UI and load verification.

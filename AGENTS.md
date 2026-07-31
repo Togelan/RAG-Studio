@@ -67,6 +67,22 @@ If the FR is not ready, stop after the DoR verdict and list the exact missing
 requirements. Do not create implementation or QA subtasks. Keep subtasks
 non-overlapping and do not let parallel agents edit the same files.
 
+## Mandatory engineering decision evidence
+
+For every non-trivial implementation, the plan, developer handoff, and QA
+verdict must answer all of the following with measured or testable evidence:
+
+1. Why this solution fits the current architecture and requirement.
+2. How it behaves under the stated concurrency/load threshold, including the
+   bounded failure mode when capacity is exhausted.
+3. At least two considered alternatives, why they were rejected, and what
+   future condition would justify revisiting them.
+4. Why the change is safe: data preservation, secret/error redaction,
+   cancellation/rollback behavior, and the exact automated checks performed.
+
+Assertions such as "scalable", "safe", or "best" without a benchmark, limit,
+test, or explicit trade-off are not completion evidence.
+
 ## Verification
 
 Never claim completion without running the checks relevant to the change. The

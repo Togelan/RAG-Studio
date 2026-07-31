@@ -26,7 +26,7 @@ from src.api.dependencies import get_qdrant_client
 
 
 @pytest.fixture(name="client")
-def fixture_client() -> Generator[TestClient, Any, None]:
+def fixture_client() -> Generator[TestClient, Any]:
     """Pytest fixture providing a TestClient with mocked Qdrant and no settings file."""
     with (
         patch(
@@ -181,10 +181,11 @@ class TestSettingsReingest:
 
     def test_reingest_endpoint_accepts_request(self, client: TestClient) -> None:
         """AC-010.4: POST /api/ingest/reingest accepts doc_id and filename, returns file_id."""
-        from pathlib import Path
 
         # Create a mock raw upload file keyed by doc_id (BUG-010-1 fix)
-        raw_dir = Path("data/raw_uploads")
+        from src.paths import data_path
+
+        raw_dir = data_path("raw_uploads")
         raw_dir.mkdir(parents=True, exist_ok=True)
         test_doc_id = "test-doc-id-123"
         raw_path = raw_dir / f"{test_doc_id}.txt"

@@ -62,8 +62,10 @@ class QdrantClientManager:
           disk storage at QDRANT_PATH (default: <data-root>/qdrant_storage)
         """  # noqa: D205
         if self._client is None:
-            assert self._lock is not None
-            async with self._lock:
+            lock = self._lock
+            if lock is None:
+                raise RuntimeError("Qdrant client lock is not initialized")
+            async with lock:
                 if self._client is None:
                     qdrant_url = os.getenv("QDRANT_URL", "")
 

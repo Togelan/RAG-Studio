@@ -1,0 +1,1229 @@
+{
+  "version": 1,
+  "evidenceLayoutVersion": 2,
+  "createdAt": "2026-07-31T20:20:17.530Z",
+  "updatedAt": "2026-07-31T20:20:17.530Z",
+  "briefPath": ".omo/ulw-loop/019fb86a-312c-7662-bbc6-5262815d4d8b/brief.md",
+  "goalsPath": ".omo/ulw-loop/019fb86a-312c-7662-bbc6-5262815d4d8b/goals.json",
+  "ledgerPath": ".omo/ulw-loop/019fb86a-312c-7662-bbc6-5262815d4d8b/ledger.jsonl",
+  "codexGoalMode": "aggregate",
+  "goals": [
+    {
+      "id": "G001-preserve-and-explain-persistent-docu",
+      "title": "Preserve and explain persistent documents/sessions; provide only expl...",
+      "objective": "Preserve and explain persistent documents/sessions; provide only explicit, non-destructive cleanup guidance.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Preserve and explain persistent documents/sessions; provide only explicit, no...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 1.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Preserve and explain persistent documents/sessions; provide only explicit, no....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Preserve and explain persistent documents/sessions; provide only explicit, no....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G002-reproduce-and-correct-new-session-ch",
+      "title": "Reproduce and correct new-session checkpoint/state failures without e...",
+      "objective": "Reproduce and correct new-session checkpoint/state failures without exposing prompt text, keys, or traces.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Reproduce and correct new-session checkpoint/state failures without exposing...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 2.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Reproduce and correct new-session checkpoint/state failures without exposing....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Reproduce and correct new-session checkpoint/state failures without exposing....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G003-implement-true-provider-token-sse-wi",
+      "title": "Implement true provider-token SSE without bypassing retrieval, ground...",
+      "objective": "Implement true provider-token SSE without bypassing retrieval, grounding, validation, citations, or caching.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Implement true provider-token SSE without bypassing retrieval, grounding, val...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 3.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Implement true provider-token SSE without bypassing retrieval, grounding, val....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Implement true provider-token SSE without bypassing retrieval, grounding, val....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G004-enforce-10-global-in-flight-streams",
+      "title": "Enforce 10 global in-flight streams in the single-process Docker depl...",
+      "objective": "Enforce 10 global in-flight streams in the single-process Docker deployment; reject a second stream for the same session with `409`; return `503` and integer `Retry-After` at global capacity.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Enforce 10 global in-flight streams in the single-process Docker deployment;...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 4.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Enforce 10 global in-flight streams in the single-process Docker deployment;....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Enforce 10 global in-flight streams in the single-process Docker deployment;....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G005-ensure-abort-navigation-session-chan",
+      "title": "Ensure abort/navigation/session changes cancel safely, release capaci...",
+      "objective": "Ensure abort/navigation/session changes cancel safely, release capacity, prevent cross-session rendering, and never persist partial assistant output.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Ensure abort/navigation/session changes cancel safely, release capacity, prev...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 5.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Ensure abort/navigation/session changes cancel safely, release capacity, prev....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Ensure abort/navigation/session changes cancel safely, release capacity, prev....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G006-make-the-requested-decision-evidence",
+      "title": "Make the requested decision-evidence policy enforceable in canonical...",
+      "objective": "Make the requested decision-evidence policy enforceable in canonical guidance and relevant roles.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Make the requested decision-evidence policy enforceable in canonical guidance...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 6.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Make the requested decision-evidence policy enforceable in canonical guidance....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Make the requested decision-evidence policy enforceable in canonical guidance....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G007-no-automatic-deletion-reset-of-rag-d",
+      "title": "No automatic deletion/reset of `rag-data`, Qdrant, raw uploads, SQLit...",
+      "objective": "No automatic deletion/reset of `rag-data`, Qdrant, raw uploads, SQLite, or existing sessions.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: No automatic deletion/reset of `rag-data`, Qdrant, raw uploads, SQLite, or ex...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 7.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: No automatic deletion/reset of `rag-data`, Qdrant, raw uploads, SQLite, or ex....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: No automatic deletion/reset of `rag-data`, Qdrant, raw uploads, SQLite, or ex....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G008-no-websocket-replacement-new-client",
+      "title": "No WebSocket replacement, new client framework, raw exception disclos...",
+      "objective": "No WebSocket replacement, new client framework, raw exception disclosure, unbounded queue/task creation, or real-key test traffic.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: No WebSocket replacement, new client framework, raw exception disclosure, unb...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 8.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: No WebSocket replacement, new client framework, raw exception disclosure, unb....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: No WebSocket replacement, new client framework, raw exception disclosure, unb....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G009-no-direct-mutation-of-live-sqlite-fo",
+      "title": "No direct mutation of live SQLite for cleanup; retain a documented ba...",
+      "objective": "No direct mutation of live SQLite for cleanup; retain a documented backup/reset operator procedure.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: No direct mutation of live SQLite for cleanup; retain a documented backup/res...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 9.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: No direct mutation of live SQLite for cleanup; retain a documented backup/res....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: No direct mutation of live SQLite for cleanup; retain a documented backup/res....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G010-test-decision-tests-after-using-pyte",
+      "title": "Test decision: tests-after using pytest plus deterministic fake-provi...",
+      "objective": "Test decision: tests-after using pytest plus deterministic fake-provider socket integration and browser automation.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Test decision: tests-after using pytest plus deterministic fake-provider sock...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 10.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Test decision: tests-after using pytest plus deterministic fake-provider sock....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Test decision: tests-after using pytest plus deterministic fake-provider sock....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G011-evidence-omo-evidence-chat-reliabili",
+      "title": "Evidence: `.omo/evidence/chat-reliability-streaming/task-1.md` throug...",
+      "objective": "Evidence: `.omo/evidence/chat-reliability-streaming/task-1.md` through `task-6.md`, plus final-verification evidence, generated by the worker; no human-only assertions.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Evidence: `.omo/evidence/chat-reliability-streaming/task-1.md` through `task-...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 11.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Evidence: `.omo/evidence/chat-reliability-streaming/task-1.md` through `task-....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Evidence: `.omo/evidence/chat-reliability-streaming/task-1.md` through `task-....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G012-required-targeted-proof-first-true-p",
+      "title": "Required targeted proof: first true provider token arrives before com...",
+      "objective": "Required targeted proof: first true provider token arrives before completion; fragmented SSE is parsed; new and restarted Unicode sessions persist; cancellation/no partial persistence; same-session and global admission behavior; ten-session benchmark records p50/p95 TTFT, end-to-end p95, 429/503 count, active stream maximum, and RSS.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Required targeted proof: first true provider token arrives before completion;...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 12.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Required targeted proof: first true provider token arrives before completion;....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Required targeted proof: first true provider token arrives before completion;....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G013-required-repository-gates-pytest-tes",
+      "title": "Required repository gates: `pytest tests/ -v`, `ruff check .`, `ruff...",
+      "objective": "Required repository gates: `pytest tests/ -v`, `ruff check .`, `ruff format --check .`, `mypy --strict src/`, `bandit -r src/`, `docker compose build`; record LangSmith/RAGAS evidence where a configured environment is available, otherwise record the configuration blocker without fabricating results.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Required repository gates: `pytest tests/ -v`, `ruff check .`, `ruff format -...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 13.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Required repository gates: `pytest tests/ -v`, `ruff check .`, `ruff format -....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Required repository gates: `pytest tests/ -v`, `ruff check .`, `ruff format -....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G014-wave-1-requirements-guidance-persist",
+      "title": "Wave 1: requirements/guidance, persistence reproduction, persistent-d...",
+      "objective": "Wave 1: requirements/guidance, persistence reproduction, persistent-data documentation.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Wave 1: requirements/guidance, persistence reproduction, persistent-data docu...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 14.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Wave 1: requirements/guidance, persistence reproduction, persistent-data docu....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Wave 1: requirements/guidance, persistence reproduction, persistent-data docu....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G015-wave-2-streaming-graph-runner-and-bo",
+      "title": "Wave 2: streaming graph runner and bounded lifecycle manager after th...",
+      "objective": "Wave 2: streaming graph runner and bounded lifecycle manager after the Wave 1 compatibility contract.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Wave 2: streaming graph runner and bounded lifecycle manager after the Wave 1...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 15.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Wave 2: streaming graph runner and bounded lifecycle manager after the Wave 1....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Wave 2: streaming graph runner and bounded lifecycle manager after the Wave 1....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G016-wave-3-route-sse-protocol-and-browse",
+      "title": "Wave 3: route SSE protocol and browser lifecycle/parser after Wave 2.",
+      "objective": "Wave 3: route SSE protocol and browser lifecycle/parser after Wave 2.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Wave 3: route SSE protocol and browser lifecycle/parser after Wave 2.",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 16.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Wave 3: route SSE protocol and browser lifecycle/parser after Wave 2..",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Wave 3: route SSE protocol and browser lifecycle/parser after Wave 2..",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G017-wave-4-integration-load-browser-qa-a",
+      "title": "Wave 4: integration/load/browser QA after Waves 1-3.",
+      "objective": "Wave 4: integration/load/browser QA after Waves 1-3.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Wave 4: integration/load/browser QA after Waves 1-3.",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 17.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Wave 4: integration/load/browser QA after Waves 1-3..",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Wave 4: integration/load/browser QA after Waves 1-3..",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G018-1-define-testable-streaming-reliabil",
+      "title": "[ ] 1. Define testable streaming, reliability, and decision-evidence...",
+      "objective": "[ ] 1. Define testable streaming, reliability, and decision-evidence contracts",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] 1. Define testable streaming, reliability, and decision-evidence contracts",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 18.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] 1. Define testable streaming, reliability, and decision-evidence contracts.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] 1. Define testable streaming, reliability, and decision-evidence contracts.",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G019-2-preserve-runtime-data-provenance-a",
+      "title": "[ ] 2. Preserve runtime-data provenance and make cleanup behavior saf...",
+      "objective": "[ ] 2. Preserve runtime-data provenance and make cleanup behavior safe and explicit",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] 2. Preserve runtime-data provenance and make cleanup behavior safe and ex...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 19.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] 2. Preserve runtime-data provenance and make cleanup behavior safe and ex....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] 2. Preserve runtime-data provenance and make cleanup behavior safe and ex....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G020-3-replace-risky-checkpoint-protocol",
+      "title": "[ ] 3. Replace risky checkpoint protocol divergence with a compatibil...",
+      "objective": "[ ] 3. Replace risky checkpoint protocol divergence with a compatibility-tested adapter",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] 3. Replace risky checkpoint protocol divergence with a compatibility-test...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 20.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] 3. Replace risky checkpoint protocol divergence with a compatibility-test....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] 3. Replace risky checkpoint protocol divergence with a compatibility-test....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G021-4-implement-real-rag-preserving-prov",
+      "title": "[ ] 4. Implement real RAG-preserving provider-token streaming with bo...",
+      "objective": "[ ] 4. Implement real RAG-preserving provider-token streaming with bounded admission",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] 4. Implement real RAG-preserving provider-token streaming with bounded ad...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 21.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] 4. Implement real RAG-preserving provider-token streaming with bounded ad....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] 4. Implement real RAG-preserving provider-token streaming with bounded ad....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G022-5-make-sse-consumption-frame-safe-an",
+      "title": "[ ] 5. Make SSE consumption frame-safe and navigation/session changes...",
+      "objective": "[ ] 5. Make SSE consumption frame-safe and navigation/session changes cancellation-safe",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] 5. Make SSE consumption frame-safe and navigation/session changes cancell...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 22.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] 5. Make SSE consumption frame-safe and navigation/session changes cancell....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] 5. Make SSE consumption frame-safe and navigation/session changes cancell....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G023-6-build-repeatable-integration-brows",
+      "title": "[ ] 6. Build repeatable integration, browser, load, and architect/QA...",
+      "objective": "[ ] 6. Build repeatable integration, browser, load, and architect/QA evidence",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] 6. Build repeatable integration, browser, load, and architect/QA evidence",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 23.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] 6. Build repeatable integration, browser, load, and architect/QA evidence.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] 6. Build repeatable integration, browser, load, and architect/QA evidence.",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G024-f1-plan-compliance-audit",
+      "title": "[ ] F1. Plan compliance audit",
+      "objective": "[ ] F1. Plan compliance audit",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] F1. Plan compliance audit",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 24.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] F1. Plan compliance audit.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] F1. Plan compliance audit.",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G025-f2-code-quality-and-security-review",
+      "title": "[ ] F2. Code quality and security review",
+      "objective": "[ ] F2. Code quality and security review",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] F2. Code quality and security review",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 25.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] F2. Code quality and security review.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] F2. Code quality and security review.",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G026-f3-automated-browser-and-load-qa",
+      "title": "[ ] F3. Automated browser and load QA",
+      "objective": "[ ] F3. Automated browser and load QA",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] F3. Automated browser and load QA",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 26.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] F3. Automated browser and load QA.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] F3. Automated browser and load QA.",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G027-f4-scope-fidelity-and-data-safety-au",
+      "title": "[ ] F4. Scope fidelity and data-safety audit",
+      "objective": "[ ] F4. Scope fidelity and data-safety audit",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: [ ] F4. Scope fidelity and data-safety audit",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 27.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: [ ] F4. Scope fidelity and data-safety audit.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: [ ] F4. Scope fidelity and data-safety audit.",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G028-a-fresh-session-and-a-restarted-sess",
+      "title": "A fresh session and a restarted session complete deterministic Unicod...",
+      "objective": "A fresh session and a restarted session complete deterministic Unicode chat turns without the reported TypeError.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: A fresh session and a restarted session complete deterministic Unicode chat t...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 28.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: A fresh session and a restarted session complete deterministic Unicode chat t....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: A fresh session and a restarted session complete deterministic Unicode chat t....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G029-leaving-or-switching-sessions-during",
+      "title": "Leaving or switching sessions during a response is cleanly cancelled,...",
+      "objective": "Leaving or switching sessions during a response is cleanly cancelled, does not crash the server/client, and cannot write into another session.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Leaving or switching sessions during a response is cleanly cancelled, does no...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 29.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Leaving or switching sessions during a response is cleanly cancelled, does no....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Leaving or switching sessions during a response is cleanly cancelled, does no....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G030-the-browser-receives-genuine-provide",
+      "title": "The browser receives genuine provider chunks before complete generati...",
+      "objective": "The browser receives genuine provider chunks before complete generation while grounding/citations/validation/cache semantics remain intact.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: The browser receives genuine provider chunks before complete generation while...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 30.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: The browser receives genuine provider chunks before complete generation while....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: The browser receives genuine provider chunks before complete generation while....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G031-sustained-ten-session-tests-stay-bou",
+      "title": "Sustained ten-session tests stay bounded with defined overload behavi...",
+      "objective": "Sustained ten-session tests stay bounded with defined overload behavior and evidence.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: Sustained ten-session tests stay bounded with defined overload behavior and e...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 31.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: Sustained ten-session tests stay bounded with defined overload behavior and e....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: Sustained ten-session tests stay bounded with defined overload behavior and e....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    },
+    {
+      "id": "G032-the-requested-rationale-alternatives",
+      "title": "The requested rationale, alternatives, heavy-load resilience, and saf...",
+      "objective": "The requested rationale, alternatives, heavy-load resilience, and safety policy is enforceable in project guidance and independently checked by QA.",
+      "status": "pending",
+      "successCriteria": [
+        {
+          "id": "C001",
+          "scenario": "happy path for: The requested rationale, alternatives, heavy-load resilience, and safety poli...",
+          "userModel": "happy",
+          "expectedEvidence": "Replace via revise_criterion with observable happy-path proof for goal 32.",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C002",
+          "scenario": "edge case (boundary/empty/malformed)",
+          "userModel": "edge",
+          "expectedEvidence": "Replace via revise_criterion with boundary or malformed-input proof for: The requested rationale, alternatives, heavy-load resilience, and safety poli....",
+          "essential": true,
+          "capturedEvidence": null,
+          "status": "pending"
+        },
+        {
+          "id": "C003",
+          "scenario": "regression: adjacent surface still works",
+          "userModel": "regression",
+          "expectedEvidence": "Replace via revise_criterion with regression proof for neighboring behavior after: The requested rationale, alternatives, heavy-load resilience, and safety poli....",
+          "essential": false,
+          "capturedEvidence": null,
+          "status": "pending"
+        }
+      ],
+      "attempt": 0,
+      "createdAt": "2026-07-31T20:20:17.530Z",
+      "updatedAt": "2026-07-31T20:20:17.530Z"
+    }
+  ],
+  "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/019fb86a-312c-7662-bbc6-5262815d4d8b/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/019fb86a-312c-7662-bbc6-5262815d4d8b/ledger.jsonl as the audit trail."
+}
