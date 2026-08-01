@@ -1,7 +1,7 @@
 """Canonical filesystem paths for RAG-Studio runtime data.
 
 Runtime code must not depend on the process working directory for persisted
-data. By default application data is kept in ``<project-root>/data``. Set
+data. By default application data is kept in ``<project-root>/rag-data``. Set
 ``RAG_STUDIO_DATA_ROOT`` to move that tree; relative overrides are resolved
 from the project root so they are deterministic too.
 """
@@ -33,7 +33,7 @@ def data_root() -> Path:
     configured = os.getenv(DATA_ROOT_ENV)
     if configured:
         return resolve_project_path(configured)
-    return project_root() / "data"
+    return project_root() / "rag-data"
 
 
 def data_path(*parts: str | Path) -> Path:

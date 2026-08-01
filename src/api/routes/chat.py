@@ -27,13 +27,14 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.api.chat_jobs import ChatJobManager, ChatJobNotFoundError, PublishEvent
 from src.api.chat_stream import (
+    MAX_CONCURRENT_STREAMS,
     STREAM_HEARTBEAT_SECONDS,
     STREAM_MAX_DURATION_SECONDS,
     STREAM_PROTOCOL_VERSION,
     STREAM_RETRY_AFTER_SECONDS,
     StreamCapacityError,
-    StreamLifecycleManager,
     StreamSessionConflictError,
     sse_event,
     sse_heartbeat,
@@ -55,7 +56,7 @@ _PERSISTENCE_ERROR_MESSAGE = (
 _DELETE_ERROR_MESSAGE = "Session could not be deleted safely. Please retry."
 _STREAM_CONFLICT_MESSAGE = "A response is already streaming for this session."
 _STREAM_CAPACITY_MESSAGE = "Chat streaming is at capacity. Please retry shortly."
-_stream_lifecycle = StreamLifecycleManager()
+_chat_jobs = ChatJobManager(MAX_CONCURRENT_STREAMS)
 
 # ============================================================
 # Module-level compiled graph holder (set during startup)
@@ -87,6 +88,11 @@ def get_graph() -> Any:
     if _compiled_graph is None:
         raise RuntimeError("Graph not initialized. Call set_graph() during startup.")
     return _compiled_graph
+
+
+async def shutdown_chat_jobs() -> None:
+    """Cancel and await chat producers before graph resources close."""
+    await _chat_jobs.shutdown()
 
 
 # ============================================================
@@ -255,6 +261,28 @@ class MessageSend(BaseModel):
         description="Optional session ID. Defaults to 'default'.",
         max_length=200,
     )
+    message_id: str | None = Field(
+        default=None,
+        description="Client-generated idempotency key for the user message.",
+        max_length=200,
+    )
+
+
+class MessageCommit(BaseModel):
+    """Validated payload for persisting a user message before SSE starts."""
+
+    content: str = Field(
+        ...,
+        description="The user's message content.",
+        min_length=1,
+        max_length=10000,
+    )
+    message_id: str = Field(
+        ...,
+        description="Client-generated idempotency key for the user message.",
+        min_length=1,
+        max_length=200,
+    )
 
 
 class FeedbackSubmit(BaseModel):
@@ -282,9 +310,9 @@ class FeedbackSubmit(BaseModel):
 async def _sse_stream(
     session_id: str,
     user_content: str,
-    request: Request,
     user_api_key: str | None = None,
     *,
+    user_message_id: str | None = None,
     compiled_graph: Any,
     provider: str = "openai",
     model: str = "gpt-4o-mini",
@@ -303,7 +331,6 @@ async def _sse_stream(
     Args:
         session_id: The session ID (used as thread_id for state isolation).
         user_content: The user's message content.
-        request: Request used to detect client disconnects.
         user_api_key: Optional API key for LLM calls (from user settings).
         compiled_graph: The compiled LangGraph graph.
         provider: LLM provider (openai, deepseek, anthropic, ollama).
@@ -323,15 +350,6 @@ async def _sse_stream(
     stage = "start"
     loop = asyncio.get_running_loop()
     started_at = loop.time()
-
-    _session_messages.setdefault(session_id, []).append(
-        {
-            "id": str(uuid.uuid4()),
-            "role": "user",
-            "content": user_content,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-    )
 
     try:
         yield sse_event(
@@ -381,8 +399,6 @@ async def _sse_stream(
                 timeout=min(STREAM_HEARTBEAT_SECONDS, remaining),
             )
             if not done:
-                if await request.is_disconnected():
-                    raise asyncio.CancelledError
                 yield sse_heartbeat()
                 continue
 
@@ -393,9 +409,6 @@ async def _sse_stream(
                 break
 
             pending = asyncio.create_task(anext(source))
-            if await request.is_disconnected():
-                raise asyncio.CancelledError
-
             event_type = graph_event.get("type")
             if event_type == "token":
                 token = graph_event.get("token")
@@ -444,6 +457,8 @@ async def _sse_stream(
                 "content": final_answer,
                 "created_at": datetime.now(UTC).isoformat(),
                 "citations": citations,
+                "in_reply_to": user_message_id,
+                "generated_from": str(result.get("generated_from", "")),
             }
         )
         yield sse_event("progress", {"stage": "complete"})
@@ -483,7 +498,6 @@ async def _sse_stream(
         if source is not None:
             with suppress(RuntimeError):
                 await source.aclose()
-        await _stream_lifecycle.release(session_id)
 
 
 # ============================================================
@@ -523,6 +537,39 @@ def _safe_json_value(obj: object) -> object:
         return f"<{type(obj).__name__}>"
 
 
+def _store_user_message(
+    session_id: str,
+    content: str,
+    message_id: str,
+) -> dict[str, object]:
+    stored_messages = _session_messages.setdefault(session_id, [])
+    for message in stored_messages:
+        if message.get("id") == message_id:
+            return message
+    message = {
+        "id": message_id,
+        "role": "user",
+        "content": content,
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    stored_messages.append(message)
+    return message
+
+
+def _find_completed_response(
+    session_id: str,
+    user_message_id: str,
+) -> dict[str, object] | None:
+    """Return the stored assistant response for one idempotent user turn."""
+    for message in _session_messages.get(session_id, []):
+        if (
+            message.get("role") == "assistant"
+            and message.get("in_reply_to") == user_message_id
+        ):
+            return message
+    return None
+
+
 # ============================================================
 # Session Management Endpoints
 # ============================================================
@@ -551,6 +598,7 @@ async def send_message(
     """
     # Use session_id from body or default
     session_id = body.session_id or "default"
+    client_message_id = body.message_id or str(uuid.uuid4())
 
     # Initialize default session metadata if not present
     if session_id not in _session_meta:
@@ -559,6 +607,63 @@ async def send_message(
             "title": "Chat",
             "created_at": datetime.now(UTC).isoformat(),
         }
+    existing_user = next(
+        (
+            message
+            for message in _session_messages.get(session_id, [])
+            if message.get("id") == client_message_id
+        ),
+        None,
+    )
+    if existing_user is not None and (
+        existing_user.get("role") != "user"
+        or existing_user.get("content") != body.content
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Message id is already associated with different content.",
+        )
+
+    completed_response = _find_completed_response(session_id, client_message_id)
+    if completed_response is not None:
+        response_message_id = str(completed_response.get("id", ""))
+        full_response = str(completed_response.get("content", ""))
+        citations = completed_response.get("citations", [])
+        replay = iter(
+            (
+                sse_event(
+                    "start",
+                    {
+                        "protocol": STREAM_PROTOCOL_VERSION,
+                        "message_id": response_message_id,
+                        "session_id": session_id,
+                    },
+                ),
+                sse_event("progress", {"stage": "complete"}),
+                sse_event(
+                    "done",
+                    {
+                        "done": True,
+                        "message_id": response_message_id,
+                        "full_response": full_response,
+                        "citations": _safe_json_value(citations),
+                        "generated_from": str(
+                            completed_response.get("generated_from", "")
+                        ),
+                    },
+                ),
+            )
+        )
+        return StreamingResponse(
+            replay,
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                "X-Stream-Protocol": STREAM_PROTOCOL_VERSION,
+            },
+        )
 
     # Extract user API key from header
     user_api_key: str | None = request.headers.get("X-API-Key")
@@ -594,30 +699,30 @@ async def send_message(
         raise HTTPException(status_code=500, detail="Graph not initialized")
 
     try:
-        await _stream_lifecycle.acquire(session_id)
-    except StreamSessionConflictError as exc:
-        raise HTTPException(status_code=409, detail=_STREAM_CONFLICT_MESSAGE) from exc
-    except StreamCapacityError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=_STREAM_CAPACITY_MESSAGE,
-            headers={"Retry-After": str(STREAM_RETRY_AFTER_SECONDS)},
-        ) from exc
 
-    try:
-        return StreamingResponse(
-            _sse_stream(
+        async def produce(publish: PublishEvent) -> None:
+            _store_user_message(session_id, body.content, client_message_id)
+            async for event in _sse_stream(
                 session_id,
                 body.content,
-                request,
                 user_api_key=user_api_key,
+                user_message_id=client_message_id,
                 compiled_graph=compiled_graph,
                 provider=provider,
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens_val,
                 system_prompt=system_prompt_val,
-            ),
+            ):
+                await publish(event)
+
+        subscription = await _chat_jobs.start(
+            session_id,
+            produce,
+            buffer_max_bytes=max(65536, min(2097152, max_tokens_val * 256)),
+        )
+        return StreamingResponse(
+            subscription,
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -626,9 +731,14 @@ async def send_message(
                 "X-Stream-Protocol": STREAM_PROTOCOL_VERSION,
             },
         )
-    except BaseException:
-        await _stream_lifecycle.release(session_id)
-        raise
+    except StreamSessionConflictError as exc:
+        raise HTTPException(status_code=409, detail=_STREAM_CONFLICT_MESSAGE) from exc
+    except StreamCapacityError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=_STREAM_CAPACITY_MESSAGE,
+            headers={"Retry-After": str(STREAM_RETRY_AFTER_SECONDS)},
+        ) from exc
 
 
 def _append_feedback_record(path: Path, record: dict[str, object]) -> None:
@@ -793,6 +903,45 @@ async def create_session(
     return dict(_session_meta[session_id])
 
 
+@router.post("/sessions/{session_id}/messages", status_code=201)
+async def commit_session_message(
+    session_id: str,
+    body: MessageCommit,
+) -> dict[str, object]:
+    if session_id not in _session_meta:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return _store_user_message(session_id, body.content, body.message_id)
+
+
+@router.get("/sessions/{session_id}/stream")
+async def reattach_session_stream(session_id: str) -> StreamingResponse:
+    """Attach to and replay the live generation stream for a session."""
+    try:
+        subscription = await _chat_jobs.subscribe(session_id)
+    except ChatJobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="No active response") from exc
+    return StreamingResponse(
+        subscription,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "X-Stream-Protocol": STREAM_PROTOCOL_VERSION,
+        },
+    )
+
+
+@router.post("/sessions/{session_id}/cancel")
+async def cancel_session_stream(session_id: str) -> dict[str, str]:
+    """Explicitly stop the live generation job for a session."""
+    cancelled = await _chat_jobs.cancel_and_wait(session_id)
+    return {
+        "status": "stopped" if cancelled else "idle",
+        "session_id": session_id,
+    }
+
+
 @router.delete("/sessions/{session_id}")
 async def delete_session(session_id: str) -> dict[str, str]:
     """Delete a chat session and all its messages.
@@ -806,6 +955,7 @@ async def delete_session(session_id: str) -> dict[str, str]:
     Raises:
         HTTPException: 404 if session not found.
     """
+    await _chat_jobs.cancel_and_wait(session_id)
     if session_id == "default":
         # Reset default session instead of deleting
         _session_messages["default"] = []
@@ -963,5 +1113,6 @@ async def clear_session_messages(session_id: str) -> dict[str, str]:
     if session_id not in _session_meta:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    await _chat_jobs.cancel_and_wait(session_id)
     _session_messages[session_id] = []
     return {"status": "cleared", "session_id": session_id}

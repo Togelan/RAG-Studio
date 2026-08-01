@@ -13,7 +13,6 @@ import hashlib
 import json
 import logging
 import os
-import platform
 import uuid
 from datetime import UTC, datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -45,22 +44,43 @@ _SENSITIVE_KEYS = frozenset(
     }
 )
 
-# Machine-specific identifier for key derivation
-_MACHINE_ID = str(uuid.getnode())  # MAC-based machine identifier
+# Stable per-data-root identifier for key derivation. Container MAC addresses
+# can be randomized for every process, so they cannot protect persisted secrets.
+_INSTALLATION_ID_FILENAME = ".rag-studio-installation-id"
 
 
 def _get_machine_id() -> str:
-    """Return a machine-specific identifier for Fernet key derivation.
+    """Return the stable identifier stored with the configured data root.
 
-    Uses a combination of:
-    - Platform node (MAC address hash)
-    - Machine hostname
+    The identifier is created once with exclusive creation and then reused by
+    every process using that data root. It remains stable across container
+    restarts while the volume is retained.
 
     Returns:
-        A stable string unique to this machine.
-    """
-    return f"{_MACHINE_ID}:{platform.node()}"
+        A stable installation identifier.
 
+    Raises:
+        RuntimeError: If a concurrently-created identifier cannot be read.
+    """
+    path = data_path(_INSTALLATION_ID_FILENAME)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        identifier = path.read_text(encoding="utf-8").strip()
+        if identifier:
+            return identifier
+        raise RuntimeError("Persistent installation identifier is not ready.")
+
+    identifier = uuid.uuid4().hex
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+            file.write(identifier)
+    except OSError:
+        path.unlink(missing_ok=True)
+        raise
+    return identifier
 
 def _derive_fernet_key(passphrase: str | None = None) -> bytes:
     """Derive a Fernet-compatible 32-byte key from machine_id + optional passphrase.
@@ -117,12 +137,9 @@ def decrypt_api_key(ciphertext: str) -> str:
 def get_secrets_path() -> Path:
     """Return the path to the encrypted secrets file.
 
-    Default: ~/.rag-studio/secrets.enc
+    Default: <configured-data-root>/secrets.enc
     """
-    custom = os.getenv("RAG_STUDIO_SECRETS_PATH")
-    if custom:
-        return Path(custom)
-    return Path.home() / ".rag-studio" / "secrets.enc"
+    return data_path("secrets.enc")
 
 
 def load_secrets() -> dict[str, str]:

@@ -746,10 +746,9 @@ async def stream_rag_graph(
 ) -> AsyncIterator[dict[str, Any]]:
     """Yield genuine generation chunks followed by one validated graph result.
 
-    LangGraph's ``messages`` stream relays provider chunks even when a node uses
-    ``ainvoke``. Tokens from analyzer/validator LLMs are excluded by node name,
-    so only the grounded answer reaches the browser. The ``values`` stream is
-    retained until validation and cache persistence complete.
+    LangGraph's ``custom`` stream relays provider chunks emitted by the grounded
+    generation node as it receives them. The ``values`` stream is retained until
+    validation and cache persistence complete.
     """
     config, initial_state = _graph_inputs(
         query,
@@ -767,20 +766,17 @@ async def stream_rag_graph(
     async for mode, payload in compiled_graph.astream(
         initial_state,
         config,
-        stream_mode=["messages", "values"],
+        stream_mode=["custom", "values"],
     ):
         if mode == "values":
             final_state = payload
             continue
-        if mode != "messages" or not isinstance(payload, tuple) or len(payload) != 2:
+        if mode != "custom" or not isinstance(payload, Mapping):
             continue
-        message, raw_metadata = payload
-        if not isinstance(raw_metadata, Mapping):
+        if payload.get("type") != "token":
             continue
-        if raw_metadata.get("langgraph_node") != "generate_from_retrieval":
-            continue
-        token = _stream_chunk_text(message)
-        if token:
+        token = payload.get("token")
+        if isinstance(token, str) and token:
             emitted_provider_token = True
             yield {"type": "token", "token": token}
 

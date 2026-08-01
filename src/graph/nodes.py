@@ -21,6 +21,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
+from langgraph.config import get_stream_writer
 from pydantic import SecretStr
 
 from src.graph.state import RAGState
@@ -392,7 +393,7 @@ async def generate_from_retrieval_node(state: RAGState) -> dict[str, Any]:
     provider = state.get("provider", "openai")
     model_name = state.get("model_name", "gpt-4o-mini")
     llm_temperature = state.get("temperature", 0.3)
-    system_prompt_text = state.get("system_prompt", "") or GROUNDING_INSTRUCTION
+    configured_system_prompt = state.get("system_prompt", "").strip()
 
     # Determine base_url based on provider
     base_url: str | None = None
@@ -424,29 +425,37 @@ async def generate_from_retrieval_node(state: RAGState) -> dict[str, Any]:
         )
     context = "\n\n---\n\n".join(context_parts)
 
-    system_prompt = f"""{system_prompt_text}
-
-When quoting or referencing document content, cite sources inline using [N]
+    context_prompt = f"""When quoting or referencing document content, cite sources inline using [N]
 where N is the document number from the context below.
 
 CONTEXT:
 {context}"""
 
-    messages: list[Any] = [SystemMessage(content=system_prompt)]
+    messages: list[Any] = [SystemMessage(content=GROUNDING_INSTRUCTION)]
+    if configured_system_prompt:
+        messages.append(SystemMessage(content=configured_system_prompt))
+    messages.append(SystemMessage(content=context_prompt))
     messages.extend(state["messages"])
 
-    response = await llm.ainvoke(messages)
+    writer = get_stream_writer()
+    response_parts: list[str] = []
+    async for chunk in llm.astream(messages):
+        content = chunk.content
+        if isinstance(content, str) and content:
+            writer({"type": "token", "token": content})
+            response_parts.append(content)
 
+    final_answer = "".join(response_parts)
     logger.info(
         "Generate (retrieval): answer length=%d, docs=%d",
-        len(str(response.content)) if response.content else 0,
+        len(final_answer),
         len(retrieved_docs),
     )
 
     return {
-        "final_answer": response.content,
+        "final_answer": final_answer,
         "generated_from": "retrieval",
-        "messages": [AIMessage(content=str(response.content))],
+        "messages": [AIMessage(content=final_answer)],
     }
 
 

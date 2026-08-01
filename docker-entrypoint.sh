@@ -10,11 +10,8 @@ if [ "$(id -u)" -eq 0 ]; then
     /app/data/qdrant_storage \
     /app/data/checkpoints \
     /app/data/logs \
-    /app/data/secrets \
-    /data/qdrant \
-    /home/ragstudio/.rag-studio/logs \
-    /home/ragstudio/.rag-studio/secrets
-  chown -R ragstudio:ragstudio /app/data /data/qdrant /home/ragstudio/.rag-studio
+    /app/data/secrets
+  chown -R ragstudio:ragstudio /app/data
   exec su -s /bin/sh ragstudio -c /docker-entrypoint.sh
 fi
 

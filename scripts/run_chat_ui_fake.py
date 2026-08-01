@@ -13,7 +13,8 @@ from unittest.mock import AsyncMock, patch
 
 import uvicorn
 
-from src.api.chat_stream import StreamLifecycleManager
+from src.api.chat_jobs import ChatJobManager
+from src.api.chat_stream import MAX_CONCURRENT_STREAMS
 
 
 @asynccontextmanager
@@ -60,7 +61,9 @@ def main() -> None:
     from src.api.routes import chat
 
     dependencies._audit_logger = None  # pyright: ignore[reportPrivateUsage]
-    chat._stream_lifecycle = StreamLifecycleManager()  # pyright: ignore[reportPrivateUsage]
+    chat._chat_jobs = ChatJobManager(  # pyright: ignore[reportPrivateUsage]
+        MAX_CONCURRENT_STREAMS
+    )
     with (
         patch("src.api.main.wait_for_qdrant_ready", new=AsyncMock(return_value=True)),
         patch("src.api.main.close_qdrant_client", new=AsyncMock(return_value=None)),

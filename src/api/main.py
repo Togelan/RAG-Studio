@@ -11,9 +11,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncGenerator, cast
+from typing import Any, cast
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI
@@ -23,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from src.api.dependencies import log_audit
 from src.api.rate_limiter import RateLimitMiddleware
 from src.api.routes.chat import router as chat_router
-from src.api.routes.chat import set_graph
+from src.api.routes.chat import set_graph, shutdown_chat_jobs
 from src.api.routes.health import router as health_router
 from src.api.routes.settings import router as settings_router
 from src.api.routes.ui import router as ui_router
@@ -83,7 +84,7 @@ def _cors_origins_from_environment() -> tuple[str, ...]:
         except ValueError as exc:
             raise ValueError(f"Invalid CORS origin {origin!r}.") from exc
         try:
-            parsed.port  # Validates malformed port values.
+            _ = parsed.port  # Validates malformed port values.
         except ValueError as exc:
             raise ValueError(
                 f"Invalid CORS origin {origin!r}: port must be a valid number."
@@ -117,7 +118,7 @@ def _create_task(coro: Any) -> asyncio.Task[Any]:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """FastAPI lifespan context manager.
 
     Startup:
@@ -158,7 +159,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.graph = graph
         set_graph(graph)
         logger.info("LangGraph compiled graph stored in app.state")
-        yield
+        try:
+            yield
+        finally:
+            await shutdown_chat_jobs()
         logger.info("LangGraph checkpointer connection closed")
 
     # ============================================================
@@ -176,7 +180,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 asyncio.gather(*_pending_tasks, return_exceptions=True),
                 timeout=_SHUTDOWN_TIMEOUT,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "Shutdown timeout (%ds) reached. %d task(s) will be cancelled.",
                 _SHUTDOWN_TIMEOUT,

@@ -290,4 +290,17 @@ class TestMachineIDDerivation:
 
         machine_id = _get_machine_id()
         assert len(machine_id) > 0
-        assert ":" in machine_id  # Format: node:hostname
+
+    def test_machine_id_is_persisted_in_the_data_root(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """The encryption identity survives a new process with the same data root."""
+        from src.api import dependencies
+
+        monkeypatch.setattr(dependencies, "data_path", lambda name: tmp_path / name)
+
+        machine_id = dependencies._get_machine_id()
+
+        assert machine_id == dependencies._get_machine_id()
+        identifier_path = tmp_path / ".rag-studio-installation-id"
+        assert identifier_path.read_text().strip() == machine_id

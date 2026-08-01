@@ -21,16 +21,12 @@ services:
 
     # Port mapping: host:container
     ports:
-      - "8000:8000"
+      - "8001:8000"
 
     # Volume mounts for data persistence (AC-008.1, AC-008.2)
     volumes:
-      # Unified app data volume (Qdrant, models, logs, secrets)
-      - ./rag-data:/app/data
-      # Legacy mounts (backward compatibility)
-      - ./rag-data/qdrant:/data/qdrant
-      - ./rag-data/secrets:/home/ragstudio/.rag-studio/secrets
-      - ./rag-data/logs:/home/ragstudio/.rag-studio/logs
+      # The single persistent application volume: Qdrant, models, logs, settings, and secrets.
+      - rag-studio-data:/app/data
 
     # Environment variables
     env_file:
@@ -38,9 +34,8 @@ services:
 
     environment:
       - RAG_STUDIO_DATA_ROOT=/app/data
-      - QDRANT_PATH=/data/qdrant
-      - RAG_STUDIO_SECRETS_PATH=/home/ragstudio/.rag-studio/secrets/secrets.enc
-      - RAG_STUDIO_LOGS_PATH=/home/ragstudio/.rag-studio/logs
+      - QDRANT_PATH=/app/data/qdrant_storage
+      - RAG_STUDIO_LOGS_PATH=/app/data/logs
 
     # Resource constraints (AC-008.7)
     # Minimum: 4 GB RAM, 2 CPUs
@@ -60,3 +55,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  rag-studio-data:
+    name: rag-studio-data
+    external: true

@@ -20,14 +20,20 @@
   let isStreaming = false;
   /** @type {AbortController|null} */
   let streamAbort = null;
+  let streamSessionId = null;
   /** @type {number} */
   let streamRequestId = 0;
   /** @type {number} */
   let sessionLoadRequestId = 0;
+  /** @type {Object.<string, Array<Object>>} */
+  const knownMessagesBySession = Object.create(null);
   /** @type {number|null} */
   let streamRenderFrame = null;
   /** @type {string} */
   let pendingStreamingContent = '';
+  /** @type {number} */
+  let displayedStreamingLength = 0;
+  const STREAM_RENDER_CODEPOINTS_PER_FRAME = 1;
   /** @type {HTMLElement|null} */
   let streamingNode = null;
   /** @type {boolean} */
@@ -45,6 +51,9 @@
   let sessions = [];
   /** @type {string|null} */
   let contextMenuTargetId = null;
+  const ACTIVE_SESSION_STORAGE_KEY = "rag-studio-active-session-id";
+  const PENDING_USER_MESSAGE_STORAGE_KEY = "rag-studio-pending-user-message";
+
 
   // ============================================================
   // HTML Escape (AC-006.8)
@@ -88,6 +97,173 @@
   // ============================================================
 
   function el(id) { return document.getElementById(id); }
+  function rememberActiveSession(sessionId) {
+    try {
+      sessionStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, sessionId);
+    } catch (error) {
+      console.warn('Unable to remember active chat session.', error.name);
+    }
+  }
+
+  function rememberedSessionId() {
+    try {
+      return sessionStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+    } catch (error) {
+      console.warn('Unable to restore active chat session.', error.name);
+      return null;
+    }
+  }
+
+  function rememberSessionSnapshot() {
+    if (activeSessionId) rememberActiveSession(activeSessionId);
+  }
+
+  function restoredSessionSnapshot() {
+    return rememberedSessionId();
+  }
+
+  function hydrateSessionSnapshot() {
+    var sessionId = restoredSessionSnapshot();
+    if (!sessionId) return false;
+    activeSessionId = sessionId;
+    if (el('sessionTitle')) {
+      el('sessionTitle').textContent = 'Loading session...';
+    }
+    return true;
+  }
+
+  function clearSessionSnapshot() {
+    try {
+      sessionStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+    } catch (error) {
+      console.warn('Unable to clear cached chat session.', error.name);
+    }
+  }
+
+  function rememberPendingUserMessage(sessionId, message) {
+    try {
+      sessionStorage.setItem(
+        PENDING_USER_MESSAGE_STORAGE_KEY,
+        JSON.stringify({
+          session_id: sessionId,
+          message_id: message.id,
+          content: message.content,
+          created_at: message.created_at
+        })
+      );
+    } catch (error) {
+      console.warn('Unable to remember pending user message.', error.name);
+    }
+  }
+
+  function clearPendingUserMessage() {
+    try {
+      sessionStorage.removeItem(PENDING_USER_MESSAGE_STORAGE_KEY);
+    } catch (error) {
+      console.warn('Unable to clear pending user message.', error.name);
+    }
+  }
+
+  function pendingUserMessage() {
+    try {
+      var serializedMessage = sessionStorage.getItem(PENDING_USER_MESSAGE_STORAGE_KEY);
+      if (!serializedMessage) return null;
+      var message = JSON.parse(serializedMessage);
+      if (
+        !message ||
+        typeof message !== 'object' ||
+        Array.isArray(message) ||
+        typeof message.session_id !== 'string' ||
+        !message.session_id ||
+        typeof message.message_id !== 'string' ||
+        !message.message_id ||
+        typeof message.content !== 'string' ||
+        !message.content ||
+        typeof message.created_at !== 'string' ||
+        !message.created_at
+      ) {
+        clearPendingUserMessage();
+        return null;
+      }
+      return {
+        session_id: message.session_id,
+        message_id: message.message_id,
+        content: message.content,
+        created_at: message.created_at
+      };
+    } catch (error) {
+      clearPendingUserMessage();
+      return null;
+    }
+  }
+
+  async function replayPendingUserMessage() {
+    var message = pendingUserMessage();
+    if (!message) return;
+    try {
+      await commitUserMessage(message.session_id, {
+        id: message.message_id,
+        content: message.content
+      });
+      clearPendingUserMessage();
+    } catch (error) {
+      console.warn('Unable to replay pending user message.', error.name);
+    }
+  }
+
+  function sendPendingUserMessageBeacon() {
+    var message = pendingUserMessage();
+    if (!message || !navigator.sendBeacon) return;
+    try {
+      navigator.sendBeacon(
+        '/api/chat/sessions/' + encodeURIComponent(message.session_id) + '/messages',
+        new Blob(
+          [JSON.stringify({ content: message.content, message_id: message.message_id })],
+          { type: 'application/json' }
+        )
+      );
+    } catch (error) {
+      console.warn('Unable to send pending user message beacon.', error.name);
+    }
+  }
+
+  function rememberMessagesForSession(sessionId, sessionMessages) {
+    knownMessagesBySession[sessionId] = sessionMessages.slice();
+  }
+
+  function mergeMessagesForSession(sessionId, serverMessages) {
+    var knownMessages = knownMessagesBySession[sessionId] || [];
+    var mergedMessages = serverMessages.slice();
+    var serverMessageIds = Object.create(null);
+    mergedMessages.forEach(function (message) {
+      serverMessageIds[message.id] = true;
+    });
+    knownMessages.forEach(function (message) {
+      if (!serverMessageIds[message.id]) mergedMessages.push(message);
+    });
+    rememberMessagesForSession(sessionId, mergedMessages);
+    return mergedMessages;
+  }
+
+  function createClientMessageId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'local-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+  }
+
+  async function commitUserMessage(sessionId, message) {
+    var response = await fetch(
+      '/api/chat/sessions/' + encodeURIComponent(sessionId) + '/messages',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: message.content, message_id: message.id }),
+        keepalive: true
+      }
+    );
+    if (!response.ok) throw new Error(await responseErrorMessage(response));
+  }
 
   // ============================================================
   // Message Sending (SSE Streaming)
@@ -112,28 +288,54 @@
       streamRenderFrame = null;
     }
     pendingStreamingContent = '';
+    displayedStreamingLength = 0;
     if (streamingNode) streamingNode.remove();
     streamingNode = null;
   }
 
-  function cancelActiveStream(showNotice) {
+  function detachActiveStream() {
     if (!streamAbort) return;
     var controller = streamAbort;
     streamAbort = null;
+    streamSessionId = null;
     streamRequestId += 1;
     controller.abort();
     isStreaming = false;
     hideLoadingIndicator();
     removeStreamingMessage();
     setStreamingControls(false);
-    if (showNotice) showToast(t('chat_stream_cancelled') || 'Response stopped.');
   }
 
-  function updateStreamingMessage(content, requestId, sessionId) {
-    if (!isCurrentStream(requestId, sessionId)) return;
-    pendingStreamingContent = content;
+  async function stopActiveStream() {
+    var sessionId = streamSessionId || activeSessionId;
+    detachActiveStream();
+    if (!sessionId) return;
+    try {
+      var response = await fetch(
+        '/api/chat/sessions/' + encodeURIComponent(sessionId) + '/cancel',
+        { method: 'POST' }
+      );
+      if (!response.ok) throw new Error(await responseErrorMessage(response));
+      showToast(t('chat_stream_cancelled') || 'Response stopped.');
+    } catch (error) {
+      console.error('stopActiveStream failed:', error.name || 'Error');
+      showToast(t('chat_stream_failed') || 'The response could not be stopped.');
+    }
+  }
+
+  function nextStreamingCodePointEnd(content, start) {
+    var firstCodeUnit = content.charCodeAt(start);
+    if (firstCodeUnit >= 0xD800 && firstCodeUnit <= 0xDBFF) {
+      if (start + 1 >= content.length) return start;
+      var secondCodeUnit = content.charCodeAt(start + 1);
+      if (secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF) return start + 2;
+    }
+    return start + 1;
+  }
+
+  function scheduleStreamingRender(requestId, sessionId) {
     if (streamRenderFrame !== null) return;
-    streamRenderFrame = requestAnimationFrame(function () {
+    streamRenderFrame = requestAnimationFrame(function renderStreamingFrame() {
       streamRenderFrame = null;
       if (!isCurrentStream(requestId, sessionId)) return;
       if (!streamingNode) {
@@ -145,11 +347,82 @@
         streamingNode.appendChild(bubble);
         el('chatMessages').appendChild(streamingNode);
       }
-      streamingNode.querySelector('.message-bubble').textContent = pendingStreamingContent;
-      scrollToBottom();
+      var madeProgress = false;
+      for (var index = 0; index < STREAM_RENDER_CODEPOINTS_PER_FRAME; index += 1) {
+        var nextLength = nextStreamingCodePointEnd(
+          pendingStreamingContent,
+          displayedStreamingLength
+        );
+        if (nextLength === displayedStreamingLength) break;
+        displayedStreamingLength = nextLength;
+        madeProgress = true;
+      }
+      if (madeProgress) {
+        streamingNode.querySelector('.message-bubble').textContent =
+          pendingStreamingContent.substring(0, displayedStreamingLength);
+        scrollToBottom();
+      }
+      if (displayedStreamingLength < pendingStreamingContent.length && madeProgress) {
+        scheduleStreamingRender(requestId, sessionId);
+      }
     });
   }
 
+  function updateStreamingMessage(content, requestId, sessionId) {
+    if (!isCurrentStream(requestId, sessionId)) return;
+    pendingStreamingContent = content;
+    scheduleStreamingRender(requestId, sessionId);
+  }
+
+  function flushStreamingMessage(requestId, sessionId) {
+    return new Promise(function (resolve) {
+      var resolved = false;
+
+      function finish() {
+        if (resolved) return;
+        resolved = true;
+        document.removeEventListener('visibilitychange', finishWhenHidden);
+        resolve();
+      }
+
+      function finishWhenHidden() {
+        if (document.visibilityState === 'hidden') {
+          displayedStreamingLength = pendingStreamingContent.length;
+          finish();
+        }
+      }
+
+      function checkRenderProgress() {
+        if (resolved) return;
+        if (!isCurrentStream(requestId, sessionId) || displayedStreamingLength >= pendingStreamingContent.length) {
+          finish();
+          return;
+        }
+        if (
+          nextStreamingCodePointEnd(pendingStreamingContent, displayedStreamingLength) ===
+          displayedStreamingLength
+        ) {
+          displayedStreamingLength = pendingStreamingContent.length;
+          if (streamingNode) {
+            streamingNode.querySelector('.message-bubble').textContent =
+              pendingStreamingContent;
+            scrollToBottom();
+          }
+          finish();
+          return;
+        }
+        if (document.visibilityState === 'hidden') {
+          finishWhenHidden();
+          return;
+        }
+        scheduleStreamingRender(requestId, sessionId);
+        requestAnimationFrame(checkRenderProgress);
+      }
+
+      document.addEventListener('visibilitychange', finishWhenHidden);
+      checkRenderProgress();
+    });
+  }
   async function responseErrorMessage(response) {
     if (response.status === 409) {
       return t('chat_stream_conflict') || 'This chat already has a response in progress.';
@@ -165,17 +438,28 @@
   async function sendMessage(text) {
     if (!text.trim() || isStreaming) return;
 
-    var requestSessionId = activeSessionId || 'default';
+    if (!activeSessionId) {
+      await createSession();
+      if (!activeSessionId) {
+        showToast(t('chat_stream_failed') || 'Unable to create a chat session.');
+        return;
+      }
+    }
+
+    var requestSessionId = activeSessionId;
     var requestId = ++streamRequestId;
     var controller = new AbortController();
     streamAbort = controller;
+    streamSessionId = requestSessionId;
     var userMsg = {
-      id: 'local-' + Date.now(),
+      id: createClientMessageId(),
       role: 'user',
       content: text,
       created_at: new Date().toISOString()
     };
     messages.push(userMsg);
+    rememberMessagesForSession(requestSessionId, messages);
+    rememberSessionSnapshot();
     renderMessages();
     updateEmptyState();
     el('chatInput').value = '';
@@ -193,10 +477,18 @@
     var streamFailure = null;
 
     try {
+      rememberPendingUserMessage(requestSessionId, userMsg);
+      await commitUserMessage(requestSessionId, userMsg);
+      clearPendingUserMessage();
+      if (!isCurrentStream(requestId, requestSessionId)) return;
       var resp = await fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text, session_id: requestSessionId }),
+        body: JSON.stringify({
+          content: text,
+          session_id: requestSessionId,
+          message_id: userMsg.id
+        }),
         signal: controller.signal
       });
       if (!resp.ok) {
@@ -242,6 +534,9 @@
       parser.finish();
       if (streamFailure) throw streamFailure;
       if (!completed || !assistantMsgId) throw new Error('Incomplete stream');
+      await flushStreamingMessage(requestId, requestSessionId);
+      if (!isCurrentStream(requestId, requestSessionId)) return;
+
       if (!isCurrentStream(requestId, requestSessionId)) return;
 
       removeStreamingMessage();
@@ -252,6 +547,7 @@
         created_at: new Date().toISOString(),
         citations: citations
       });
+      rememberMessagesForSession(requestSessionId, messages);
       hideLoadingIndicator();
       renderMessages();
       scrollToBottom();
@@ -265,9 +561,99 @@
     } finally {
       if (requestId === streamRequestId) {
         streamAbort = null;
+        streamSessionId = null;
         isStreaming = false;
         setStreamingControls(false);
         if (el('chatInput')) el('chatInput').focus();
+        rememberSessionSnapshot();
+      }
+    }
+  }
+
+  async function reloadSessionMessages(sessionId, requestId) {
+    var response = await fetch(
+      '/api/chat/sessions/' + encodeURIComponent(sessionId) + '/messages'
+    );
+    if (!response.ok || !isCurrentStream(requestId, sessionId)) return;
+    messages = mergeMessagesForSession(sessionId, await response.json());
+    renderMessages();
+    updateEmptyState();
+    scrollToBottom();
+  }
+
+  async function reattachSessionStream(sessionId) {
+    if (isStreaming && streamSessionId === sessionId) return;
+    detachActiveStream();
+    var requestId = ++streamRequestId;
+    var controller = new AbortController();
+    streamAbort = controller;
+    streamSessionId = sessionId;
+    isStreaming = true;
+    setStreamingControls(true);
+    showLoadingIndicator();
+    var assistantContent = '';
+    var completed = false;
+    var streamFailure = null;
+
+    try {
+      var response = await fetch(
+        '/api/chat/sessions/' + encodeURIComponent(sessionId) + '/stream',
+        { signal: controller.signal }
+      );
+      if (response.status === 404) {
+        await reloadSessionMessages(sessionId, requestId);
+        return;
+      }
+      if (!response.ok) throw new Error(await responseErrorMessage(response));
+      if (!response.body || !window.RAGSse) throw new Error('Streaming unavailable');
+
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var parser = new window.RAGSse.SseParser(function (frame) {
+        if (!isCurrentStream(requestId, sessionId)) return;
+        var data = frame.data || {};
+        if (frame.event === 'token' && typeof data.token === 'string') {
+          hideLoadingIndicator();
+          assistantContent += data.token;
+          updateStreamingMessage(assistantContent, requestId, sessionId);
+        } else if (frame.event === 'done') {
+          completed = true;
+          assistantContent = data.full_response || assistantContent;
+        } else if (frame.event === 'error') {
+          streamFailure = new Error(
+            data.message || t('chat_stream_failed') || 'The response could not be completed.'
+          );
+        }
+      }, function () {
+        streamFailure = new Error(t('chat_stream_failed') || 'Malformed stream response.');
+      });
+
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        parser.push(decoder.decode(chunk.value, { stream: true }));
+        if (streamFailure) throw streamFailure;
+      }
+      parser.push(decoder.decode());
+      parser.finish();
+      if (streamFailure) throw streamFailure;
+      if (!completed) throw new Error('Incomplete stream');
+      await flushStreamingMessage(requestId, sessionId);
+      if (!isCurrentStream(requestId, sessionId)) return;
+      removeStreamingMessage();
+      await reloadSessionMessages(sessionId, requestId);
+    } catch (error) {
+      if (error.name !== 'AbortError' && isCurrentStream(requestId, sessionId)) {
+        console.error('reattachSessionStream failed:', error.name || 'Error');
+        showToast(error.message || t('chat_stream_failed') || 'Response failed.');
+      }
+    } finally {
+      if (requestId === streamRequestId) {
+        streamAbort = null;
+        streamSessionId = null;
+        isStreaming = false;
+        hideLoadingIndicator();
+        setStreamingControls(false);
       }
     }
   }
@@ -591,17 +977,20 @@
     showConfirm(
       t('chat_clear_confirm') || 'Clear all messages?',
       async function () {
-        cancelActiveStream(false);
+        detachActiveStream();
         if (activeSessionId) {
           try {
-            await fetch('/api/chat/sessions/' + encodeURIComponent(activeSessionId) + '/messages', {
+            var response = await fetch('/api/chat/sessions/' + encodeURIComponent(activeSessionId) + '/messages', {
               method: 'DELETE'
             });
+            if (!response.ok) return;
           } catch (e) {
             console.error('clearChat error:', e);
+            return;
           }
         }
         messages = [];
+        if (activeSessionId) delete knownMessagesBySession[activeSessionId];
         renderMessages();
         updateEmptyState();
         scrollToBottom();
@@ -717,7 +1106,7 @@
 
     var btnStop = el('btnStop');
     if (btnStop) {
-      btnStop.addEventListener('click', function () { cancelActiveStream(true); });
+      btnStop.addEventListener('click', stopActiveStream);
     }
 
     // Scroll tracking
@@ -785,7 +1174,6 @@
 
     // Close context menu on scroll
     window.addEventListener('scroll', closeContextMenu, { passive: true });
-    window.addEventListener('pagehide', function () { cancelActiveStream(false); });
 
     // Confirm dialog cancel
     var confirmCancel = el('confirmCancel');
@@ -827,16 +1215,18 @@
   async function loadSessions() {
     try {
       var resp = await fetch('/api/chat/sessions');
-      if (!resp.ok) return;
+      if (!resp.ok) return false;
       sessions = await resp.json();
       renderSessionList();
+      rememberSessionSnapshot();
+      return true;
     } catch (e) {
       console.error('loadSessions error:', e);
+      return false;
     }
   }
-
   async function createSession() {
-    cancelActiveStream(false);
+    detachActiveStream();
     try {
       var resp = await fetch('/api/chat/sessions', {
         method: 'POST',
@@ -847,23 +1237,25 @@
       var session = await resp.json();
       sessions.unshift(session);
       renderSessionList();
-      switchToSession(session.id);
+      await switchToSession(session.id);
     } catch (e) {
       console.error('createSession error:', e);
     }
   }
 
   async function deleteSession(id) {
-    if (activeSessionId === id) cancelActiveStream(false);
+    if (activeSessionId === id) detachActiveStream();
     try {
       var resp = await fetch('/api/chat/sessions/' + encodeURIComponent(id), {
         method: 'DELETE'
       });
       if (!resp.ok) return;
       sessions = sessions.filter(function (s) { return s.id !== id; });
+      delete knownMessagesBySession[id];
       if (activeSessionId === id) {
         activeSessionId = null;
         messages = [];
+        clearSessionSnapshot();
         renderMessages();
         updateEmptyState();
         if (el('sessionTitle')) {
@@ -871,6 +1263,7 @@
         }
       }
       renderSessionList();
+      rememberSessionSnapshot();
     } catch (e) {
       console.error('deleteSession error:', e);
     }
@@ -895,6 +1288,7 @@
           return s.id === id ? updated : s;
         });
         renderSessionList();
+        rememberSessionSnapshot();
         if (activeSessionId === id && el('sessionTitle')) {
           el('sessionTitle').textContent = updated.title;
         }
@@ -958,8 +1352,10 @@
   }
 
   async function switchToSession(id) {
-    if (id !== activeSessionId) cancelActiveStream(false);
+    if (activeSessionId) rememberMessagesForSession(activeSessionId, messages);
+    if (id !== activeSessionId) detachActiveStream();
     activeSessionId = id;
+    rememberActiveSession(id);
     var loadRequestId = ++sessionLoadRequestId;
     // Update session title in header
     var session = sessions.find(function (s) { return s.id === id; });
@@ -973,18 +1369,20 @@
       if (activeSessionId !== id || loadRequestId !== sessionLoadRequestId) return;
       if (resp.ok) {
         var msgs = await resp.json();
-        messages = msgs;
+        messages = mergeMessagesForSession(id, msgs);
       } else {
-        messages = [];
+        messages = mergeMessagesForSession(id, []);
       }
     } catch (e) {
       if (activeSessionId !== id || loadRequestId !== sessionLoadRequestId) return;
-      messages = [];
+      messages = mergeMessagesForSession(id, []);
     }
     renderMessages();
     updateEmptyState();
     renderSessionList();
     scrollToBottom();
+    rememberSessionSnapshot();
+    await reattachSessionStream(id);
   }
 
   function showContextMenu(e, sessionId) {
@@ -1088,11 +1486,30 @@
   // ============================================================
 
   async function init() {
+    var hydratedSession = hydrateSessionSnapshot();
     bindEvents();
     updateEmptyState();
-    await loadSessions();
+    window.addEventListener('pagehide', function () {
+      rememberSessionSnapshot();
+      detachActiveStream();
+      sendPendingUserMessageBeacon();
+    });
+    var sessionsLoaded = await loadSessions();
+    if (!sessionsLoaded) return;
+    await replayPendingUserMessage();
+    var restoredSessionId = rememberedSessionId();
+    if (restoredSessionId && sessions.some(function (session) { return session.id === restoredSessionId; })) {
+      await switchToSession(restoredSessionId);
+    } else if (hydratedSession) {
+      activeSessionId = null;
+      messages = [];
+      clearSessionSnapshot();
+      if (el('sessionTitle')) el('sessionTitle').textContent = t('chat_new_session') || 'New Session';
+      renderMessages();
+      updateEmptyState();
+      renderSessionList();
+    }
   }
-
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
@@ -1113,7 +1530,9 @@
     createSession: createSession,
     deleteSession: deleteSession,
     renameSession: renameSession,
-    cancelActiveStream: cancelActiveStream,
+    detachActiveStream: detachActiveStream,
+    stopActiveStream: stopActiveStream,
+    reattachSessionStream: reattachSessionStream,
     getActiveSessionId: function () { return activeSessionId; },
     getSessions: function () { return sessions; }
   };

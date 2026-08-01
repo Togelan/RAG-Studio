@@ -55,11 +55,8 @@ RUN mkdir -p \
         /app/data/qdrant_storage \
         /app/data/checkpoints \
         /app/data/logs \
-        /app/data/secrets \
-        /data/qdrant \
-        /home/ragstudio/.rag-studio/logs \
-        /home/ragstudio/.rag-studio/secrets && \
-    chown -R ragstudio:ragstudio /app /data /home/ragstudio
+        /app/data/secrets && \
+    chown -R ragstudio:ragstudio /app
 # Copy entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
