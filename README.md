@@ -27,8 +27,8 @@ _(Support for PDF, DOCX, and CSV is planned for future releases.)_
 git clone https://github.com/Togelan/RAG-Studio.git
 cd rag-studio
 
-# 2. Set your DeepSeek API key
-echo "DEEPSEEK_API_KEY=your-api-key-here" > .env
+# 2. Create an empty-secret local configuration template
+cp .env.example .env
 
 # 3. Build the Docker image (includes model downloads — one-time, ~3–5 minutes)
 docker compose build
@@ -48,13 +48,15 @@ docker compose up -d
 
 ### Required: API Key
 
-RAG-Studio needs a DeepSeek API key to call the LLM. Pass it via environment variable:
+RAG-Studio needs a provider API key to call a hosted LLM. Keep the tracked
+template empty and provide a key only in your untracked local environment or
+through the Settings page.
 
 **Option A — `.env` file (recommended):**
 
 ```bash
-# Create .env in the project root:
-echo "DEEPSEEK_API_KEY=your-api-key-here" > .env
+# Create an untracked local configuration file:
+cp .env.example .env
 ```
 
 The `docker-compose.yml` reads this file automatically via `env_file: - .env`.
@@ -62,11 +64,7 @@ The `docker-compose.yml` reads this file automatically via `env_file: - .env`.
 **Option B — `docker run` with `-e`:**
 
 ```bash
-docker run -d \
-  -p 8000:8000 \
-  -e DEEPSEEK_API_KEY=your-api-key-here \
-  -v ./rag-data:/app/data \
-  rag-studio:latest
+docker run -d -p 8000:8000 -v ./rag-data:/app/data rag-studio:latest
 ```
 
 You can also set the key from the **Settings** page in the UI (`/settings`) — it will be validated, encrypted, and persisted.
@@ -253,8 +251,8 @@ docker compose up -d
 **Symptom:** Status indicator shows 🟡 "No API key". Chat returns an error.
 
 **Fix:**
-1. Ensure `.env` contains `DEEPSEEK_API_KEY=your-api-key-here`
-2. Or set it via the Settings UI (`/settings` → Provider → API Key → Save)
+1. Configure a provider key in the Settings UI (`/settings` → Provider → API Key → Save)
+2. Or set the provider-specific environment variable in your untracked `.env`
 3. Verify with: `docker compose exec rag-studio env | grep DEEPSEEK`
 
 ### "No text found in PDF"

@@ -18,7 +18,6 @@ from unittest.mock import patch
 
 import pytest
 
-
 # ============================================================
 # AC-008.3: API Key Encryption at Rest
 # ============================================================
@@ -244,14 +243,32 @@ class TestSanitization:
         assert sanitized["items"][1]["api_key"] == "[REDACTED]"
         assert sanitized["items"][0]["name"] == "item1"
 
+    def test_audit_text_never_contains_controls_or_bidi(self) -> None:
+        from src.api.dependencies import sanitize_audit_text
+
+        assert sanitize_audit_text("safe\r\nforged\u202e.txt") == "[INVALID]"
+        assert sanitize_audit_text("\uff21 report.txt") == "A report.txt"
+
     def test_env_example_has_no_real_keys(self) -> None:
         """.env.example contains only placeholder values."""
         env_file = Path(__file__).parent.parent / ".env.example"
         content = env_file.read_text()
 
-        # Check for placeholder patterns
-        assert "sk-your-key-here" in content
-        assert "your-key-here" in content
+        secret_names = {
+            "OPENAI_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "QDRANT_API_KEY",
+            "LANGCHAIN_API_KEY",
+            "RAG_STUDIO_AUTH_TOKEN",
+        }
+        values = {
+            key: value
+            for line in content.splitlines()
+            if line and not line.startswith("#") and "=" in line
+            for key, value in [line.split("=", 1)]
+        }
+        assert all(values[name] == "" for name in secret_names)
 
         # Verify no real-looking API keys
         import re
@@ -259,13 +276,7 @@ class TestSanitization:
         # Match patterns like sk-... with 20+ alphanumeric chars
         real_key_pattern = re.compile(r"(?:sk|ls__)[a-zA-Z0-9_-]{20,}")
         matches = real_key_pattern.findall(content)
-        # Allow the placeholder "sk-your-key-here" but nothing else
-        real_keys = [
-            m for m in matches if m not in ("sk-your-key-here", "sk-ant-your-key-here")
-        ]
-        assert len(real_keys) == 0, (
-            f"Found potential real API keys in .env.example: {real_keys}"
-        )
+        assert matches == []
 
 
 # ============================================================

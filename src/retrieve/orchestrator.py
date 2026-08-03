@@ -15,6 +15,9 @@ from threading import Lock
 from typing import Any
 
 from src.paths import configured_path
+from src.vector_store.adapter import get_vector_store
+from src.vector_store.contracts import VectorSearcher
+from src.vector_store.models import DenseVector, SparseVector, VectorSearchQuery
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,8 @@ _FLASHRANK_MODEL_NAME = "ms-marco-MultiBERT-L-12"
 def _flashrank_cache_dir() -> str:
     """Return the reranker cache, honoring the existing environment override."""
     return str(configured_path("FLASHRANK_CACHE_PATH", "models", "flashrank"))
+
+
 # Score threshold: FlashRank scores are sigmoid probabilities in [0,1].
 # 0.0 effectively disables filtering — any score above pure noise passes.
 # Keep at 0.0 to avoid dropping low-confidence but valid multilingual passages.
@@ -78,7 +83,7 @@ def _get_reranker() -> Any | None:
                 "Error: %s",
                 e,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             _reranker_available = False
             _reranker_load_error = str(e)
             logger.warning(
@@ -123,6 +128,7 @@ async def hybrid_search(
     collection_name: str = "rag_studio_docs",
     top_k: int = 20,
     use_reranker: bool = True,
+    vector_searcher: VectorSearcher | None = None,
 ) -> list[dict[str, Any]]:
     """Execute hybrid search with RRF fusion and FlashRank reranking (FR-002).
 
@@ -145,71 +151,55 @@ async def hybrid_search(
         List of up to 5 result dicts with keys: text, score, metadata.
         Returns empty list if no results found or all scores below threshold.
     """
-    from qdrant_client.http import models as qmodels
-
-    from src.vector_store.client import get_qdrant_client
-
-    client = await get_qdrant_client()
-
     # Step 1 & 2: Hybrid search with RRF fusion (AC-002.1)
     # Oversample: prefetch top_k * 3 candidates from each vector type
     # (more candidates for RRF fusion to improve recall)
     # RRF k=60 is Qdrant's default — matches AC-002.1 requirement
     try:
-        search_results = await client.query_points(
-            collection_name=collection_name,
-            prefetch=[
-                qmodels.Prefetch(
-                    query=dense_vector,
-                    using="dense",
-                    limit=top_k * 3,
+        searcher = vector_searcher or await get_vector_store()
+        search_results = await searcher.search(
+            VectorSearchQuery(
+                collection_name=collection_name,
+                dense=DenseVector(tuple(dense_vector)),
+                sparse=SparseVector(
+                    indices=tuple(sparse_indices),
+                    values=tuple(sparse_values),
                 ),
-                qmodels.Prefetch(
-                    query=qmodels.SparseVector(
-                        indices=sparse_indices,
-                        values=sparse_values,
-                    ),
-                    using="sparse",
-                    limit=top_k * 3,
-                ),
-            ],
-            query=qmodels.FusionQuery(fusion=qmodels.Fusion.RRF),
-            limit=top_k,
-            with_payload=True,
-            with_vectors=False,
+                limit=top_k,
+            )
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error("Hybrid search failed: %s", e)
         return []  # AC-002.3: graceful empty on error
 
     # AC-002.3: Empty result handling
-    if not search_results.points:
+    if not search_results:
         logger.info("No search results for query: %s", query[:100])
         return []
 
     # Debug: log raw prefetch-style results before reranking
     logger.info(
         "DEBUG prefetch total points before RRF: count=%d",
-        len(search_results.points),
+        len(search_results),
     )
-    for i, point in enumerate(search_results.points):
-        payload = point.payload or {}
+    for i, point in enumerate(search_results):
+        payload = point.payload
         text_preview = str(payload.get("text", ""))[:200]
         logger.info(
             "DEBUG prefetch result[%d]: id=%s, score=%.6f, text_preview=%.200s",
             i,
-            point.id,
+            point.point_id,
             float(point.score) if point.score else 0.0,
             text_preview,
         )
 
     # Convert Qdrant points to candidate dicts
     candidates: list[dict[str, Any]] = []
-    for point in search_results.points:
-        payload = point.payload or {}
+    for point in search_results:
+        payload = point.payload
         candidates.append(
             {
-                "id": point.id,
+                "id": point.point_id,
                 "score": float(point.score),
                 "text": str(payload.get("text", "")),
                 "metadata": {k: v for k, v in payload.items() if k not in ("text",)},
@@ -268,7 +258,7 @@ async def hybrid_search(
                     e,
                 )
                 _reranker_available = False
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning(
                     "Reranking failed: %s. Falling back to RRF-only results.", e
                 )

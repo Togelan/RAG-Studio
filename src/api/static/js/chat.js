@@ -1307,7 +1307,7 @@
       var emptyDiv = document.createElement('div');
       emptyDiv.className = 'session-empty-state';
       emptyDiv.setAttribute('data-i18n', 'chat_no_sessions');
-      emptyDiv.textContent = 'No sessions yet. Create your first chat.';
+      emptyDiv.textContent = t('chat_no_sessions') || 'No sessions yet. Create your first chat.';
       list.appendChild(emptyDiv);
       return;
     }
@@ -1515,6 +1515,7 @@
   } else {
     init();
   }
+  window.addEventListener('ragstudio:locale-changed', renderSessionList);
 
   // ============================================================
   // Public API

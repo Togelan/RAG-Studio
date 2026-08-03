@@ -653,11 +653,12 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 
 #### AC-008.1: Single Docker Container
 **Given** I have Docker installed
-**When** I run `docker compose up -d` (or `docker run -p 8000:8000 -v ./rag-data:/data rag-studio`)
+**When** I run `docker compose up -d` (or `docker run -p 8000:8000 -v ./rag-data:/app/data rag-studio`)
 **Then** the application starts and is accessible at `http://localhost:8000`
 **And** all components (FastAPI, Qdrant, UI) run inside the same container
-**And** the Qdrant data directory is mapped to `./rag-data/qdrant` on the host
-**And** encrypted secrets are stored at `./rag-data/secrets`
+**And** Compose maps `./rag-data` to `/app/data` without requiring a pre-created external volume
+**And** the Qdrant data directory is mapped to `./rag-data/qdrant_storage` on the host
+**And** encrypted settings are stored at `./rag-data/settings.enc.json`
 **And** audit logs are stored at `./rag-data/logs`
 
 #### AC-008.2: Data Persistence
@@ -674,7 +675,7 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 **Then** it is encrypted using AES-256 (Fernet symmetric encryption) before writing to disk
 **And** the encryption key is derived from the host machine's unique identifier (`uuid.getnode() + platform.node()`)
 **And** the API key is NEVER written to logs, tracebacks, or LangSmith traces
-**And** the `.env.example` file contains no real keys
+**And** the tracked `.env.example` file contains empty secret, token, and passphrase assignments
 **And** audit logs (`~/.rag-studio/logs/`) exclude API keys, passwords, and document content
 
 #### AC-008.4: Dockerfile & Build
@@ -737,9 +738,9 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 
 ### Technical Notes
 - Files: `Dockerfile` (single-stage), `docker-compose.yml`, `.env.example`, `.dockerignore`.
-- Qdrant: runs as embedded/local process within the container. Data directory: `/data/qdrant` (volume-mounted).
-- **Qdrant storage path** is controlled by the `QDRANT_PATH` environment variable. Default: `data/qdrant_storage/`.
-- Encrypted storage: `data/settings.enc.json` (JSON with encrypted API keys).
+- Qdrant: runs as embedded/local process within the container. Data directory: `/app/data/qdrant_storage` (bind-mounted from `./rag-data`).
+- **Qdrant storage path** is controlled by the `QDRANT_PATH` environment variable. Default: `rag-data/qdrant_storage/`.
+- Encrypted storage: `rag-data/settings.enc.json` (JSON with encrypted API keys).
 - Fernet key derivation: `hashlib.sha256(machine_id + optional_passphrase).digest()` → base64.
 - Health check endpoints: `GET /api/health` (Docker HEALTHCHECK) and `GET /api/health/status` (UI status polling, every 30s).
 - Audit log: `TimedRotatingFileHandler` for daily rotation, structured JSON format.

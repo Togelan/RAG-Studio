@@ -29,6 +29,7 @@ from src.api.routes.health import router as health_router
 from src.api.routes.settings import router as settings_router
 from src.api.routes.ui import router as ui_router
 from src.graph import create_graph
+from src.graph.llm_provider import OpenAIProviderFactory
 from src.ingestion.router import router as ingestion_router
 from src.paths import data_path
 from src.vector_store.client import close_qdrant_client, wait_for_qdrant_ready
@@ -155,7 +156,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # This is absolute and independent of the process working directory.
     _checkpoints_db = str(data_path("checkpoints", "checkpoints.db"))
 
-    async with create_graph(db_path=_checkpoints_db) as graph:
+    provider_factory = OpenAIProviderFactory()
+    async with create_graph(
+        db_path=_checkpoints_db,
+        provider_factory=provider_factory,
+    ) as graph:
         app.state.graph = graph
         set_graph(graph)
         logger.info("LangGraph compiled graph stored in app.state")

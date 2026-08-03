@@ -10,12 +10,22 @@ All embeddings are 100% local — no external API calls.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+from datetime import UTC
 from threading import Lock
-from typing import Any, cast
+from typing import cast
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
 
+from src.ingestion.embedding import (
+    DENSE_EMBEDDING_SIZE,
+    DenseEmbeddingModel,
+    Embedder,
+    FastEmbedder,
+    SparseEmbeddingModel,
+)
 from src.paths import configured_path
 
 logger = logging.getLogger(__name__)
@@ -24,19 +34,35 @@ logger = logging.getLogger(__name__)
 COLLECTION_NAME = "rag_studio_docs"
 
 # Dense vector dimensions
-DENSE_VECTOR_SIZE = 384
+DENSE_VECTOR_SIZE = DENSE_EMBEDDING_SIZE
 
 # Qdrant namespace UUID for UUID5 deterministic IDs
 RAG_STUDIO_NAMESPACE_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
 # Module-level lazy-loaded embedding models
-_dense_model: Any = None
-_sparse_model: Any = None
+_dense_model: DenseEmbeddingModel | None = None
+_sparse_model: SparseEmbeddingModel | None = None
 # Model construction downloads/loads sizable ONNX assets.  Keep separate locks so
 # that a first dense and first sparse request may initialize independently, while
 # concurrent requests for the same model always share one instance.
 _dense_model_lock = Lock()
 _sparse_model_lock = Lock()
+_default_embedder: Embedder | None = None
+_default_embedder_lock = Lock()
+
+
+@dataclass(frozen=True, slots=True)
+class _DenseOutput:
+    values: tuple[float, ...]
+
+    def tolist(self) -> list[float]:
+        return list(self.values)
+
+
+@dataclass(frozen=True, slots=True)
+class _SparseOutput:
+    indices: tuple[int, ...]
+    values: tuple[float, ...]
 
 
 def _get_cache_dir() -> str:
@@ -48,15 +74,16 @@ def _get_cache_dir() -> str:
     return str(configured_path("FASTEMBED_CACHE_PATH", "models", "fastembed_cache"))
 
 
-def _get_dense_model() -> Any:
+def _get_dense_model() -> DenseEmbeddingModel:
     """Lazy-load the dense embedding model (ONNX, 384-dim).
 
     Returns:
-        TextEmbedding instance for paraphrase-multilingual-MiniLM-L12-v2.
+        Dense model adapter for paraphrase-multilingual-MiniLM-L12-v2.
     """
     global _dense_model
     with _dense_model_lock:
-        if _dense_model is None:
+        model = _dense_model
+        if model is None:
             from fastembed import TextEmbedding
 
             cache_dir = _get_cache_dir()
@@ -65,23 +92,34 @@ def _get_dense_model() -> Any:
                 "(cache: %s)",
                 cache_dir,
             )
-            _dense_model = TextEmbedding(
+            backend = TextEmbedding(
                 model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
                 cache_dir=cache_dir,
             )
+
+            class DenseModel:
+                def embed(self, texts: Sequence[str]) -> Iterable[_DenseOutput]:
+                    return (
+                        _DenseOutput(tuple(float(value) for value in output))
+                        for output in backend.embed(texts)
+                    )
+
+            model = DenseModel()
+            _dense_model = model
             logger.info("Dense embedding model loaded.")
-    return _dense_model
+    return model
 
 
-def _get_sparse_model() -> Any:
+def _get_sparse_model() -> SparseEmbeddingModel:
     """Lazy-load the sparse embedding model (BM25).
 
     Returns:
-        SparseTextEmbedding instance for Qdrant/bm25.
+        Sparse model adapter for Qdrant/bm25.
     """
     global _sparse_model
     with _sparse_model_lock:
-        if _sparse_model is None:
+        model = _sparse_model
+        if model is None:
             from fastembed import SparseTextEmbedding
 
             cache_dir = _get_cache_dir()
@@ -89,12 +127,39 @@ def _get_sparse_model() -> Any:
                 "Loading sparse embedding model: Qdrant/bm25 (cache: %s)",
                 cache_dir,
             )
-            _sparse_model = SparseTextEmbedding(
+            backend = SparseTextEmbedding(
                 model_name="Qdrant/bm25",
                 cache_dir=cache_dir,
             )
+
+            class SparseModel:
+                def embed(self, texts: Sequence[str]) -> Iterable[_SparseOutput]:
+                    return (
+                        _SparseOutput(
+                            indices=tuple(int(index) for index in output.indices),
+                            values=tuple(float(value) for value in output.values),
+                        )
+                        for output in backend.embed(texts)
+                    )
+
+            model = SparseModel()
+            _sparse_model = model
             logger.info("Sparse embedding model loaded.")
-    return _sparse_model
+    return model
+
+
+def get_embedder() -> Embedder:
+    """Return the process-wide injected embedding capability."""
+    global _default_embedder
+    with _default_embedder_lock:
+        embedder = _default_embedder
+        if embedder is None:
+            embedder = FastEmbedder(
+                dense_factory=_get_dense_model,
+                sparse_factory=_get_sparse_model,
+            )
+            _default_embedder = embedder
+    return embedder
 
 
 async def ensure_collection_exists(client: AsyncQdrantClient) -> None:
@@ -167,7 +232,11 @@ def make_document_doc_id(filename: str) -> str:
     return str(uuid.uuid5(namespace, f"{filename}:doc"))
 
 
-def generate_dense_embeddings(chunks: list[str]) -> list[list[float]]:
+def generate_dense_embeddings(
+    chunks: list[str],
+    *,
+    embedder: Embedder | None = None,
+) -> list[list[float]]:
     """Generate dense embeddings for a list of text chunks.
 
     Args:
@@ -176,13 +245,14 @@ def generate_dense_embeddings(chunks: list[str]) -> list[list[float]]:
     Returns:
         List of dense embedding vectors (each 384-dim).
     """
-    model = _get_dense_model()
-    embeddings = list(model.embed(chunks))
-    return [emb.tolist() for emb in embeddings]
+    selected = embedder if embedder is not None else get_embedder()
+    return [list(vector.values) for vector in selected.embed_dense(chunks)]
 
 
 def generate_sparse_embeddings(
     chunks: list[str],
+    *,
+    embedder: Embedder | None = None,
 ) -> list[qmodels.SparseVector]:
     """Generate sparse (BM25) embeddings for a list of text chunks.
 
@@ -192,32 +262,14 @@ def generate_sparse_embeddings(
     Returns:
         List of Qdrant SparseVector objects with indices and values.
     """
-    model = _get_sparse_model()
-    sparse_embeddings = list(model.embed(chunks))
-
-    result: list[qmodels.SparseVector] = []
-    for se in sparse_embeddings:
-        # fastembed returns SparseEmbedding with .indices and .values
-        indices: list[int] = []
-        values: list[float] = []
-
-        if hasattr(se, "indices") and hasattr(se, "values"):
-            indices = [int(i) for i in se.indices]
-            values = [float(v) for v in se.values]
-        elif isinstance(se, dict):
-            # Dict format: {token_id: weight}
-            for k, v in se.items():
-                indices.append(int(k))
-                values.append(float(v))
-        elif hasattr(se, "as_dict"):
-            d: dict[str, float] = se.as_dict()
-            for k, v in d.items():
-                indices.append(int(k))
-                values.append(float(v))
-
-        result.append(qmodels.SparseVector(indices=indices, values=values))
-
-    return result
+    selected = embedder if embedder is not None else get_embedder()
+    return [
+        qmodels.SparseVector(
+            indices=list(vector.indices),
+            values=list(vector.values),
+        )
+        for vector in selected.embed_sparse(chunks)
+    ]
 
 
 async def delete_document_points(
@@ -305,7 +357,7 @@ async def upsert_chunks(
     Raises:
         ValueError: If lengths of chunks and vectors don't match.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     n = len(chunks)
     if len(dense_vectors) != n or len(sparse_vectors) != n:
@@ -318,7 +370,7 @@ async def upsert_chunks(
     await delete_document_points(client, doc_id)
 
     points: list[qmodels.PointStruct] = []
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     for i in range(n):
         point_id = make_doc_id(filename, i)

@@ -1553,23 +1553,31 @@ input[type="range"]:focus::-moz-range-track {
 
 .retrieval-settings-row {
   width: 100%;
-  display: flex;
-  flex-direction: row;
-  gap: var(--space-lg);
-  align-items: center;
+  height: auto;
+  min-height: 132px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+  align-items: stretch;
 }
 
 .retrieval-setting-item {
-  flex: 1;
   min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(4.5em, auto) auto;
+  align-items: end;
 }
 
 .retrieval-setting-item label {
-  display: block;
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-text-primary);
   margin-bottom: var(--space-sm);
+  align-self: end;
+  overflow-wrap: anywhere;
+  min-height: 4.5em;
+  display: flex;
+  align-items: flex-end;
 }
 
 /* ---- System Prompt Full Width ---- */

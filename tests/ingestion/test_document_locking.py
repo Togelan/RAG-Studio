@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from importlib import import_module
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -100,3 +101,88 @@ async def test_qdrant_delete_waits_before_replacement_upsert() -> None:
     assert operations == ["delete", "upsert"]
     assert client.delete.await_args.kwargs["wait"] is True
     assert client.upsert.await_args.kwargs["wait"] is True
+
+
+@pytest.mark.asyncio
+async def test_failed_replacement_preserves_legacy_metadata() -> None:
+    router = import_module("src.ingestion.router")
+    await router._reset_upload_admissions_for_tests()
+    router.stored_files["legacy.txt"] = {
+        "original_filename": "Legacy.txt",
+        "doc_id": "legacy-id",
+        "file_hash": "old-hash",
+        "chunk_count": 2,
+    }
+    await router.reserve_upload_name("Legacy.txt", rename=False, allow_stored=True)
+
+    await router._ingest_file(
+        "job-id",
+        "missing-stage.txt",
+        "Legacy.txt",
+        None,
+        AsyncMock(),
+        doc_id="legacy-id",
+        reservation_key=router.filename_comparison_key("Legacy.txt"),
+    )
+
+    assert router.stored_files["legacy.txt"]["doc_id"] == "legacy-id"
+    assert router.stored_files["legacy.txt"]["file_hash"] == "old-hash"
+    assert (
+        router.filename_comparison_key("Legacy.txt") not in router._pending_upload_names
+    )
+
+
+@pytest.mark.asyncio
+async def test_embedding_failure_preserves_old_raw_and_vectors(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    router = import_module("src.ingestion.router")
+    await router._reset_upload_admissions_for_tests()
+    source = tmp_path / "source.txt"
+    source.write_text("replacement", encoding="utf-8")
+    staged = tmp_path / ".job.pending"
+    staged.write_text("replacement", encoding="utf-8")
+    old_raw = tmp_path / "legacy-id.txt"
+    old_raw.write_text("original", encoding="utf-8")
+    store = AsyncMock()
+    embedder = MagicMock()
+    audit = MagicMock()
+    monkeypatch.setattr(router, "log_audit", audit)
+    embedder.embed_dense.side_effect = RuntimeError(
+        "token=sk-adversarial\u202e\nINJECT"
+    )
+    monkeypatch.setattr(router, "_raw_uploads_dir", lambda: tmp_path)
+    monkeypatch.setattr(router, "detect_and_parse", lambda *_: ("replacement", ".txt"))
+    monkeypatch.setattr(router, "chunk_text", lambda *_args, **_kwargs: ["replacement"])
+    router.stored_files["legacy.txt"] = {
+        "original_filename": "Legacy.txt",
+        "doc_id": "legacy-id",
+        "file_hash": "old-hash",
+        "chunk_count": 2,
+    }
+    await router.reserve_upload_name("Legacy.txt", rename=False, allow_stored=True)
+
+    await router._ingest_file(
+        "job-id",
+        str(source),
+        "Legacy.txt",
+        "text/plain",
+        store,
+        doc_id="legacy-id",
+        reservation_key=router.filename_comparison_key("Legacy.txt"),
+        staged_raw_path=str(staged),
+        embedder=embedder,
+    )
+
+    assert old_raw.read_text(encoding="utf-8") == "original"
+    assert router.stored_files["legacy.txt"]["file_hash"] == "old-hash"
+    store.replace_document.assert_not_awaited()
+    assert not staged.exists()
+    marker = "token=sk-adversarial\u202e\nINJECT"
+    progress = await router._get_progress("job-id")
+    assert progress is not None and progress["message"] == "ingestion_failed"
+    assert marker not in repr(progress)
+    assert marker not in caplog.text
+    assert marker not in repr(audit.call_args_list)

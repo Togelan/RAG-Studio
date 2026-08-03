@@ -21,12 +21,11 @@ services:
 
     # Port mapping: host:container
     ports:
-      - "8001:8000"
+      - "8000:8000"
 
-    # Volume mounts for data persistence (AC-008.1, AC-008.2)
     volumes:
       # The single persistent application volume: Qdrant, models, logs, settings, and secrets.
-      - rag-studio-data:/app/data
+      - ./rag-data:/app/data
 
     # Environment variables
     env_file:
@@ -55,8 +54,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-volumes:
-  rag-studio-data:
-    name: rag-studio-data
-    external: true

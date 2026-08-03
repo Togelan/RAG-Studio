@@ -11,10 +11,12 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import asynccontextmanager
+from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 from langgraph.graph import END, StateGraph
 
+from src.graph.llm_provider import LLMProviderFactory, OpenAIProviderFactory
 from src.graph.nodes import (
     analyzer_node,
     cache_check_node,
@@ -34,7 +36,12 @@ if TYPE_CHECKING:
         CheckpointMetadata,
     )
 
+    from src.ingestion.embedding import Embedder
+    from src.vector_store.contracts import VectorStore
+
 logger = logging.getLogger(__name__)
+
+_DEFAULT_PROVIDER_FACTORY = OpenAIProviderFactory()
 
 
 # ============================================================
@@ -146,7 +153,12 @@ def route_after_validate(state: RAGState) -> str:
 # ============================================================
 
 
-def build_rag_graph() -> StateGraph:
+def build_rag_graph(
+    provider_factory: LLMProviderFactory = _DEFAULT_PROVIDER_FACTORY,
+    *,
+    embedder: Embedder | None = None,
+    vector_store: VectorStore | None = None,
+) -> StateGraph:
     """Build the complete RAG-Studio chat graph with 7 nodes.
 
     Graph topology:
@@ -167,13 +179,31 @@ def build_rag_graph() -> StateGraph:
     # Add all 7 nodes
     # LangGraph StateGraph.add_node overloads have Unknown generic params
     # in type stubs — known library limitation, safe to ignore.
-    builder.add_node("analyzer", analyzer_node)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("cache_check", cache_check_node)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("retrieve", retrieve_node)  # pyright: ignore[reportUnknownMemberType]
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "analyzer",
+        partial(analyzer_node, provider_factory=provider_factory),
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "cache_check",
+        partial(cache_check_node, embedder=embedder, vector_store=vector_store),
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "retrieve",
+        partial(retrieve_node, embedder=embedder, vector_searcher=vector_store),
+    )
     builder.add_node("generate_from_cache", generate_from_cache_node)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("generate_from_retrieval", generate_from_retrieval_node)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("validate", validate_node)  # pyright: ignore[reportUnknownMemberType]
-    builder.add_node("save_to_cache", save_to_cache_node)  # pyright: ignore[reportUnknownMemberType]
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "generate_from_retrieval",
+        partial(generate_from_retrieval_node, provider_factory=provider_factory),
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "validate",
+        partial(validate_node, provider_factory=provider_factory),
+    )
+    builder.add_node(  # pyright: ignore[reportUnknownMemberType]
+        "save_to_cache",
+        partial(save_to_cache_node, embedder=embedder, vector_store=vector_store),
+    )
 
     # Set entry point
     builder.set_entry_point("analyzer")
@@ -219,6 +249,10 @@ def build_rag_graph() -> StateGraph:
 @asynccontextmanager
 async def create_graph(
     db_path: str | None = None,
+    provider_factory: LLMProviderFactory = _DEFAULT_PROVIDER_FACTORY,
+    *,
+    embedder: Embedder | None = None,
+    vector_store: VectorStore | None = None,
 ) -> AsyncIterator[Any]:
     """Create a compiled graph with AsyncSqliteSaver checkpointer.
 
@@ -563,7 +597,11 @@ async def create_graph(
                 db_path_resolved,
             )
 
-            compiled_graph = build_rag_graph().compile(  # pyright: ignore[reportUnknownMemberType]
+            compiled_graph = build_rag_graph(  # pyright: ignore[reportUnknownMemberType]
+                provider_factory,
+                embedder=embedder,
+                vector_store=vector_store,
+            ).compile(
                 checkpointer=saver,
             )
             logger.info("Graph compiled with AsyncSqliteSaver checkpointer")
@@ -575,7 +613,11 @@ async def create_graph(
             "MemorySaver initialized (in-memory, no persistence across restarts)",
         )
 
-        compiled_graph = build_rag_graph().compile(  # pyright: ignore[reportUnknownMemberType]
+        compiled_graph = build_rag_graph(  # pyright: ignore[reportUnknownMemberType]
+            provider_factory,
+            embedder=embedder,
+            vector_store=vector_store,
+        ).compile(
             checkpointer=memory_saver,
         )
         logger.info("Graph compiled with MemorySaver checkpointer")
@@ -687,7 +729,9 @@ def _normalize_graph_result(result: object, *, session_id: str) -> dict[str, Any
             {
                 "index": index + 1,
                 "chunk_text": str(doc.get("text", "")),
-                "filename": str(metadata.get("filename", "unknown")),
+                "filename": str(
+                    metadata.get("filename", metadata.get("source", "unknown"))
+                ),
                 "chunk_index": str(metadata.get("chunk_index", "?")),
                 "score": score,
             }

@@ -26,6 +26,12 @@ from src.ingestion.embedder import (
     make_document_doc_id,
     upsert_chunks,
 )
+from src.ingestion.embedding import (
+    Embedder,
+    EmbeddingError,
+    EmbeddingErrorCode,
+    FastEmbedder,
+)
 from src.ingestion.parser import (
     MAX_FILE_SIZE,
     detect_and_parse,
@@ -40,22 +46,26 @@ from src.ingestion.parser import (
 from src.ingestion.router import router
 
 __all__ = [
-    "router",
-    "chunk_text",
+    "MAX_FILE_SIZE",
+    "Embedder",
+    "EmbeddingError",
+    "EmbeddingErrorCode",
+    "FastEmbedder",
     "chunk_csv_rows",
+    "chunk_text",
+    "detect_and_parse",
+    "detect_file_type",
+    "ensure_collection_exists",
     "generate_dense_embeddings",
     "generate_sparse_embeddings",
-    "ensure_collection_exists",
     "make_doc_id",
     "make_document_doc_id",
-    "upsert_chunks",
-    "validate_file",
-    "detect_file_type",
-    "detect_and_parse",
-    "parse_txt",
-    "parse_pdf",
-    "parse_docx",
     "parse_csv",
     "parse_csv_as_rows",
-    "MAX_FILE_SIZE",
+    "parse_docx",
+    "parse_pdf",
+    "parse_txt",
+    "router",
+    "upsert_chunks",
+    "validate_file",
 ]

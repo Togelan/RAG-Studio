@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -281,7 +282,7 @@ class TestAC0088AuditLogging:
 
         from src.api.dependencies import _AUDIT_LOGGER_NAME, log_audit
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:  # noqa: SIM117
             with (
                 patch("src.api.dependencies._audit_logger", None),
                 patch.dict(os.environ, {"RAG_STUDIO_LOGS_PATH": str(tmpdir)}),
@@ -323,7 +324,7 @@ class TestAC0088AuditLogging:
 
         from src.api.dependencies import _AUDIT_LOGGER_NAME, log_audit
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir:  # noqa: SIM117
             with (
                 patch("src.api.dependencies._audit_logger", None),
                 patch.dict(os.environ, {"RAG_STUDIO_LOGS_PATH": str(tmpdir)}),
@@ -419,7 +420,7 @@ class TestAC0089GracefulShutdown:
                 asyncio.gather(task, return_exceptions=True),
                 timeout=0.05,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             task.cancel()
             try:
                 await task
@@ -462,7 +463,7 @@ class TestNFR023StartupIntegrity:
         manager = QdrantClientManager()
 
         # Simulate persistent failure
-        with patch.object(manager, "health_check", AsyncMock(return_value=False)):
+        with patch.object(manager, "health_check", AsyncMock(return_value=False)):  # noqa: SIM117
             with pytest.raises(RuntimeError, match="Qdrant did not become ready"):
                 await manager.wait_for_ready(timeout=0.5, retry_interval=0.1)
 
@@ -473,26 +474,63 @@ class TestNFR023StartupIntegrity:
 
 
 class TestEnvExample:
-    """Verify .env.example contains no real keys."""
-
     def test_env_example_exists(self) -> None:
         """.env.example file exists."""
         env_file = Path(__file__).parent.parent / ".env.example"
         assert env_file.exists(), ".env.example not found"
 
-    def test_env_example_no_real_keys(self) -> None:
-        """.env.example contains placeholder values, not real keys."""
+    def test_env_example_tracks_empty_secret_assignments(self) -> None:
         env_file = Path(__file__).parent.parent / ".env.example"
-        content = env_file.read_text()
-        # Check that placeholder patterns exist
-        assert "sk-your-key-here" in content
-        assert "your-key-here" in content
-        # No real-looking API keys (sk- followed by > 20 chars that aren't "your-key-here")
-        import re
+        assignments = {
+            line.partition("=")[0]: line.partition("=")[2]
+            for line in env_file.read_text().splitlines()
+            if line and not line.startswith("#") and "=" in line
+        }
+        secret_names = {
+            "OPENAI_API_KEY",
+            "DEEPSEEK_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "LANGCHAIN_API_KEY",
+            "QDRANT_API_KEY",
+            "RAG_STUDIO_AUTH_TOKEN",
+            "RAG_STUDIO_PASSPHRASE",
+        }
+        assert secret_names <= assignments.keys()
+        assert all(assignments[name] == "" for name in secret_names)
 
-        real_key_pattern = re.compile(r"sk-[a-zA-Z0-9]{20,}")
-        real_keys = real_key_pattern.findall(content)
-        assert len(real_keys) == 0, f"Found potential real API keys: {real_keys}"
+        result = subprocess.run(
+            ["git", "check-ignore", ".env.example"],
+            cwd=env_file.parent,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout
+
+
+class TestDeploymentConfigurationContract:
+    def test_compose_uses_localhost_port_and_managed_bind_mount(self) -> None:
+        project_root = Path(__file__).parent.parent
+        compose = (project_root / "docker-compose.yml").read_text()
+
+        assert '- "8000:8000"' in compose
+        assert "- ./rag-data:/app/data" in compose
+        assert "external: true" not in compose
+        assert "rag-studio-data:" not in compose
+
+    def test_dependency_audit_workflow_is_least_privilege_and_isolated(self) -> None:
+        workflow = (
+            Path(__file__).parent.parent / ".github/workflows/dependency-audit.yml"
+        ).read_text()
+
+        assert "pull_request:" in workflow
+        assert "workflow_dispatch:" in workflow
+        assert "develop" in workflow
+        assert "contents: read" in workflow
+        assert 'python-version: "3.14"' in workflow
+        assert "python -m pip install --isolated pip-audit" in workflow
+        assert "python -m pip_audit -r requirements.txt" in workflow
+        assert "continue-on-error" not in workflow
 
 
 # ============================================================

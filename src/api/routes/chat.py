@@ -28,6 +28,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from src.api.chat_jobs import ChatJobManager, ChatJobNotFoundError, PublishEvent
+from src.api.chat_state import (
+    ChatStateCache,
+    IdempotencyConflictError,
+    SessionCapacityError,
+)
 from src.api.chat_stream import (
     MAX_CONCURRENT_STREAMS,
     STREAM_HEARTBEAT_SECONDS,
@@ -42,6 +47,7 @@ from src.api.chat_stream import (
 from src.api.dependencies import decrypt_api_key, load_secrets
 from src.api.routes.settings import load_settings
 from src.graph import GraphResultError, stream_rag_graph
+from src.graph.retry import ProviderFailureError
 from src.graph.session import SessionPersistenceError, list_all_sessions
 from src.graph.session import delete_session as delete_graph_session
 from src.paths import data_path
@@ -56,6 +62,7 @@ _PERSISTENCE_ERROR_MESSAGE = (
 _DELETE_ERROR_MESSAGE = "Session could not be deleted safely. Please retry."
 _STREAM_CONFLICT_MESSAGE = "A response is already streaming for this session."
 _STREAM_CAPACITY_MESSAGE = "Chat streaming is at capacity. Please retry shortly."
+_CACHE_CAPACITY_MESSAGE = "Chat session cache is at capacity. Please retry shortly."
 _chat_jobs = ChatJobManager(MAX_CONCURRENT_STREAMS)
 
 # ============================================================
@@ -112,8 +119,27 @@ GROUNDING_INSTRUCTION = (
 # (SqliteSaver/MemorySaver) via the graph's state persistence.
 # FR-003: session metadata comes from checkpointer + this lightweight store.
 
-_session_meta: dict[str, dict[str, object]] = {}
-_session_messages: dict[str, list[dict[str, object]]] = {}
+_chat_state = ChatStateCache()
+_session_meta = _chat_state.meta
+_session_messages = _chat_state.messages
+
+
+def _begin_cache_request() -> None:
+    _chat_state.cleanup()
+
+
+def _upsert_session_or_503(
+    session_id: str, metadata: Mapping[str, object]
+) -> dict[str, object]:
+    try:
+        return _chat_state.upsert_session(session_id, metadata)
+    except SessionCapacityError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=_CACHE_CAPACITY_MESSAGE,
+            headers={"Retry-After": str(STREAM_RETRY_AFTER_SECONDS)},
+        ) from exc
+
 
 # ============================================================
 # Session Title Persistence (JSON file — survives restarts)
@@ -440,17 +466,19 @@ async def _sse_stream(
         if not isinstance(final_answer, str):
             raise GraphResultError("Graph stream returned an invalid answer")
 
-        if session_id in _session_meta:
-            current_title = str(_session_meta[session_id].get("title", ""))
+        session_meta = _chat_state.get_meta(session_id)
+        if session_meta is not None:
+            current_title = str(session_meta.get("title", ""))
             saved_titles = _load_session_titles()
             if current_title == "New Session" and session_id not in saved_titles:
                 title = user_content.strip()[:60]
                 if len(user_content.strip()) > 60:
                     title += "..."
-                _session_meta[session_id]["title"] = title
+                session_meta["title"] = title
                 _save_session_title(session_id, title)
 
-        _session_messages.setdefault(session_id, []).append(
+        _chat_state.store_assistant(
+            session_id,
             {
                 "id": message_id,
                 "role": "assistant",
@@ -459,7 +487,7 @@ async def _sse_stream(
                 "citations": citations,
                 "in_reply_to": user_message_id,
                 "generated_from": str(result.get("generated_from", "")),
-            }
+            },
         )
         yield sse_event("progress", {"stage": "complete"})
         yield sse_event(
@@ -475,6 +503,21 @@ async def _sse_stream(
     except asyncio.CancelledError:
         logger.info("Chat stream cancelled: session=%s stage=%s", session_id, stage)
         raise
+    except ProviderFailureError as exc:
+        logger.error(
+            "Provider stream failed: stage=%s type=%s attempt=%d",
+            exc.stage,
+            type(exc).__name__,
+            exc.attempt,
+        )
+        yield sse_event(
+            "error",
+            {
+                "code": exc.code,
+                "message": _PERSISTENCE_ERROR_MESSAGE,
+                "retryable": exc.retryable,
+            },
+        )
     except Exception as exc:  # noqa: BLE001 - sanitize the streaming boundary
         logger.error(
             "Chat stream failed: session=%s stage=%s type=%s",
@@ -542,32 +585,18 @@ def _store_user_message(
     content: str,
     message_id: str,
 ) -> dict[str, object]:
-    stored_messages = _session_messages.setdefault(session_id, [])
-    for message in stored_messages:
-        if message.get("id") == message_id:
-            return message
-    message = {
-        "id": message_id,
-        "role": "user",
-        "content": content,
-        "created_at": datetime.now(UTC).isoformat(),
-    }
-    stored_messages.append(message)
+    message = _chat_state.store_user(session_id, content, message_id)
+    message.setdefault("created_at", datetime.now(UTC).isoformat())
     return message
 
 
 def _find_completed_response(
     session_id: str,
     user_message_id: str,
+    content: str,
 ) -> dict[str, object] | None:
     """Return the stored assistant response for one idempotent user turn."""
-    for message in _session_messages.get(session_id, []):
-        if (
-            message.get("role") == "assistant"
-            and message.get("in_reply_to") == user_message_id
-        ):
-            return message
-    return None
+    return _chat_state.completed_response(session_id, user_message_id, content)
 
 
 # ============================================================
@@ -596,17 +625,21 @@ async def send_message(
     Returns:
         Server-Sent Events stream with token data events.
     """
+    _begin_cache_request()
     # Use session_id from body or default
     session_id = body.session_id or "default"
     client_message_id = body.message_id or str(uuid.uuid4())
 
     # Initialize default session metadata if not present
-    if session_id not in _session_meta:
-        _session_meta[session_id] = {
-            "id": session_id,
-            "title": "Chat",
-            "created_at": datetime.now(UTC).isoformat(),
-        }
+    if _chat_state.get_meta(session_id) is None:
+        _upsert_session_or_503(
+            session_id,
+            {
+                "id": session_id,
+                "title": "Chat",
+                "created_at": datetime.now(UTC).isoformat(),
+            },
+        )
     existing_user = next(
         (
             message
@@ -624,7 +657,15 @@ async def send_message(
             detail="Message id is already associated with different content.",
         )
 
-    completed_response = _find_completed_response(session_id, client_message_id)
+    try:
+        completed_response = _find_completed_response(
+            session_id, client_message_id, body.content
+        )
+    except IdempotencyConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Message id is already associated with different content.",
+        ) from exc
     if completed_response is not None:
         response_message_id = str(completed_response.get("id", ""))
         full_response = str(completed_response.get("content", ""))
@@ -701,20 +742,24 @@ async def send_message(
     try:
 
         async def produce(publish: PublishEvent) -> None:
-            _store_user_message(session_id, body.content, client_message_id)
-            async for event in _sse_stream(
-                session_id,
-                body.content,
-                user_api_key=user_api_key,
-                user_message_id=client_message_id,
-                compiled_graph=compiled_graph,
-                provider=provider,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens_val,
-                system_prompt=system_prompt_val,
-            ):
-                await publish(event)
+            _chat_state.mark_active(session_id, active=True)
+            try:
+                _store_user_message(session_id, body.content, client_message_id)
+                async for event in _sse_stream(
+                    session_id,
+                    body.content,
+                    user_api_key=user_api_key,
+                    user_message_id=client_message_id,
+                    compiled_graph=compiled_graph,
+                    provider=provider,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens_val,
+                    system_prompt=system_prompt_val,
+                ):
+                    await publish(event)
+            finally:
+                _chat_state.mark_active(session_id, active=False)
 
         subscription = await _chat_jobs.start(
             session_id,
@@ -761,6 +806,7 @@ async def submit_feedback(
     Returns:
         Confirmation message.
     """
+    _begin_cache_request()
     feedback_path = data_path("feedback.jsonl")
     feedback_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -825,6 +871,7 @@ async def list_sessions() -> list[dict[str, object]]:
     Returns:
         List of session objects with id, title, created_at, message_count.
     """
+    _begin_cache_request()
     # Collect session IDs seen from the checkpointer
     seen_ids: set[str] = set()
     result: list[dict[str, object]] = []
@@ -848,12 +895,20 @@ async def list_sessions() -> list[dict[str, object]]:
                 result.append(dict(s))
                 # Populate in-memory _session_meta so subsequent requests
                 # (get_session_messages, rename, delete) can find the session
-                if sid not in _session_meta:
-                    _session_meta[sid] = {
-                        "id": sid,
-                        "title": s.get("title", "New Session"),
-                        "created_at": s.get("created_at", ""),
-                    }
+                if _chat_state.get_meta(sid) is None:
+                    try:
+                        _chat_state.upsert_session(
+                            sid,
+                            {
+                                "id": sid,
+                                "title": s.get("title", "New Session"),
+                                "created_at": s.get("created_at", ""),
+                            },
+                        )
+                    except SessionCapacityError:
+                        logger.debug(
+                            "Skipped persistent session cache hydration at capacity"
+                        )
     except Exception as exc:  # noqa: BLE001 - checkpointer adapters vary by backend
         logger.warning(
             "Failed to list sessions from checkpointer (%s)", type(exc).__name__
@@ -861,10 +916,10 @@ async def list_sessions() -> list[dict[str, object]]:
 
     # 2. Merge in-memory sessions not already in the checkpointer list.
     #    This covers newly created sessions that haven't sent a message yet.
-    for sid, meta in _session_meta.items():
+    for sid, meta in list(_session_meta.items()):
         if sid not in seen_ids:
             entry: dict[str, object] = dict(meta)
-            entry["message_count"] = len(_session_messages.get(sid, []))
+            entry["message_count"] = len(_chat_state.get_messages(sid) or [])
             result.append(entry)
 
     # Sort by created_at descending
@@ -884,23 +939,26 @@ async def create_session(
     Returns:
         The created session metadata.
     """
+    _begin_cache_request()
     session_id = str(uuid.uuid4())
     title = (body.title if body and body.title else "New Session").strip()[
         :200
     ] or "New Session"
 
-    _session_meta[session_id] = {
-        "id": session_id,
-        "title": title,
-        "created_at": datetime.now(UTC).isoformat(),
-    }
-    _session_messages[session_id] = []
+    metadata = _upsert_session_or_503(
+        session_id,
+        {
+            "id": session_id,
+            "title": title,
+            "created_at": datetime.now(UTC).isoformat(),
+        },
+    )
 
     # Persist title to disk so it survives restarts
     if title != "New Session":
         _save_session_title(session_id, title)
 
-    return dict(_session_meta[session_id])
+    return dict(metadata)
 
 
 @router.post("/sessions/{session_id}/messages", status_code=201)
@@ -908,14 +966,23 @@ async def commit_session_message(
     session_id: str,
     body: MessageCommit,
 ) -> dict[str, object]:
-    if session_id not in _session_meta:
+    _begin_cache_request()
+    if _chat_state.get_meta(session_id) is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return _store_user_message(session_id, body.content, body.message_id)
+    try:
+        return _store_user_message(session_id, body.content, body.message_id)
+    except IdempotencyConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Message id is already associated with different content.",
+        ) from exc
 
 
 @router.get("/sessions/{session_id}/stream")
 async def reattach_session_stream(session_id: str) -> StreamingResponse:
     """Attach to and replay the live generation stream for a session."""
+    _begin_cache_request()
+    _chat_state.get_meta(session_id)
     try:
         subscription = await _chat_jobs.subscribe(session_id)
     except ChatJobNotFoundError as exc:
@@ -935,7 +1002,9 @@ async def reattach_session_stream(session_id: str) -> StreamingResponse:
 @router.post("/sessions/{session_id}/cancel")
 async def cancel_session_stream(session_id: str) -> dict[str, str]:
     """Explicitly stop the live generation job for a session."""
+    _begin_cache_request()
     cancelled = await _chat_jobs.cancel_and_wait(session_id)
+    _chat_state.mark_active(session_id, active=False)
     return {
         "status": "stopped" if cancelled else "idle",
         "session_id": session_id,
@@ -955,14 +1024,23 @@ async def delete_session(session_id: str) -> dict[str, str]:
     Raises:
         HTTPException: 404 if session not found.
     """
+    _begin_cache_request()
     await _chat_jobs.cancel_and_wait(session_id)
+    _chat_state.mark_active(session_id, active=False)
     if session_id == "default":
         # Reset default session instead of deleting
-        _session_messages["default"] = []
-        _session_meta["default"]["title"] = "Chat"
+        metadata = _chat_state.get_meta("default")
+        if metadata is None:
+            metadata = _upsert_session_or_503(
+                "default",
+                {"id": "default", "title": "Chat", "created_at": ""},
+            )
+        metadata["title"] = "Chat"
+        _chat_state.remove("default")
+        _upsert_session_or_503("default", metadata)
         return {"status": "cleared", "session_id": session_id}
 
-    if session_id not in _session_meta:
+    if _chat_state.get_meta(session_id) is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
     # Delete persisted state before removing local metadata. This prevents the
@@ -981,8 +1059,7 @@ async def delete_session(session_id: str) -> dict[str, str]:
         )
         raise HTTPException(status_code=503, detail=_DELETE_ERROR_MESSAGE) from exc
 
-    _session_meta.pop(session_id, None)
-    _session_messages.pop(session_id, None)
+    _chat_state.remove(session_id)
     _delete_session_title(session_id)
 
     return {"status": "deleted", "session_id": session_id}
@@ -1005,15 +1082,17 @@ async def rename_session(
     Raises:
         HTTPException: 404 if session not found.
     """
-    if session_id not in _session_meta:
+    _begin_cache_request()
+    metadata = _chat_state.get_meta(session_id)
+    if metadata is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    _session_meta[session_id]["title"] = body.title.strip()[:200]
+    metadata["title"] = body.title.strip()[:200]
 
     # Persist title to disk so renames survive restarts
-    _save_session_title(session_id, str(_session_meta[session_id]["title"]))
+    _save_session_title(session_id, str(metadata["title"]))
 
-    return dict(_session_meta[session_id])
+    return dict(metadata)
 
 
 @router.get("/sessions/{session_id}/messages")
@@ -1036,24 +1115,21 @@ async def get_session_messages(
     Raises:
         HTTPException: 404 if session not found.
     """
+    _begin_cache_request()
     # Try in-memory cache first (fast path)
-    cached = _session_messages.get(session_id)
-    if cached:
+    cached = _chat_state.get_messages(session_id)
+    if cached is not None:
         return cached
-
-    # Check if session exists in meta (could be from checkpointer via list_sessions)
-    if session_id not in _session_meta:
-        raise HTTPException(status_code=404, detail="Session not found")
 
     # Fallback: load messages from the checkpointer
     try:
         compiled_graph = getattr(request.app.state, "graph", None)
         if compiled_graph is None:
-            return []
+            raise HTTPException(status_code=404, detail="Session not found")
 
         checkpointer = getattr(compiled_graph, "checkpointer", None)
         if checkpointer is None:
-            return []
+            raise HTTPException(status_code=404, detail="Session not found")
 
         config = {"configurable": {"thread_id": session_id}}
 
@@ -1075,18 +1151,32 @@ async def get_session_messages(
 
                 # Convert LangChain messages to plain dicts for JSON serialization
                 result: list[dict[str, object]] = []
+                pending_user_id: str | None = None
                 for msg in raw_messages:
+                    message_id = str(getattr(msg, "id", "") or uuid.uuid4())
+                    role = _get_message_role(msg)
                     msg_dict: dict[str, object] = {
-                        "id": str(uuid.uuid4()),
-                        "role": _get_message_role(msg),
+                        "id": message_id,
+                        "role": role,
                         "content": _get_message_content(msg),
                         "created_at": "",
                     }
+                    if role == "user":
+                        pending_user_id = message_id
+                    elif role == "assistant" and pending_user_id is not None:
+                        msg_dict["in_reply_to"] = pending_user_id
+                        pending_user_id = None
                     result.append(msg_dict)
 
                 # Cache for next request
-                _session_messages[session_id] = result
-                return result
+                saved_title = _load_session_titles().get(session_id, "New Session")
+                _upsert_session_or_503(
+                    session_id,
+                    {"id": session_id, "title": saved_title, "created_at": ""},
+                )
+                return _chat_state.replace_messages(session_id, result)
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001 - checkpointer adapters vary by backend
         logger.warning(
             "Failed to load messages from checkpointer for session %s (%s)",
@@ -1094,7 +1184,7 @@ async def get_session_messages(
             type(exc).__name__,
         )
 
-    return []
+    raise HTTPException(status_code=404, detail="Session not found")
 
 
 @router.delete("/sessions/{session_id}/messages")
@@ -1110,9 +1200,12 @@ async def clear_session_messages(session_id: str) -> dict[str, str]:
     Raises:
         HTTPException: 404 if session not found.
     """
-    if session_id not in _session_meta:
+    _begin_cache_request()
+    metadata = _chat_state.get_meta(session_id)
+    if metadata is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
     await _chat_jobs.cancel_and_wait(session_id)
-    _session_messages[session_id] = []
+    _chat_state.remove(session_id)
+    _upsert_session_or_503(session_id, metadata)
     return {"status": "cleared", "session_id": session_id}

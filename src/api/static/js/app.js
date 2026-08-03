@@ -161,8 +161,8 @@
    *
    * @param {string} locale - 'en' or 'ru'
    */
-  function switchLanguage(locale) {
-    if (locale === currentLocale) return;
+  function switchLanguage(locale, force) {
+    if (locale === currentLocale && !force) return;
 
     fetch('/api/ui/locale', {
       method: 'POST',
@@ -179,6 +179,7 @@
         // data.translations contains the translation map
         currentLocale = locale;
         translations = data.translations || {};
+        window.RAGStudio.translations = translations;
 
         // Update all [data-i18n] elements (textContent)
         document.querySelectorAll('[data-i18n]').forEach(function (el) {
@@ -239,6 +240,8 @@
           var defaultPrompt = DEFAULT_SYSTEM_PROMPTS[locale] || DEFAULT_SYSTEM_PROMPTS['en'];
           promptTextarea.value = defaultPrompt;
         }
+
+        window.dispatchEvent(new CustomEvent('ragstudio:locale-changed'));
       })
       .catch(function (err) {
         console.error('Language switch error:', err);
@@ -447,11 +450,7 @@
       }
     });
 
-    // 10. If saved locale differs from current, apply it
-    var docLocale = document.documentElement.getAttribute('data-locale') || 'en';
-    if (currentLocale !== docLocale) {
-      switchLanguage(currentLocale);
-    }
+    switchLanguage(currentLocale, true);
 
     // 11. Initialize welcome page features (counters, CTA button)
     initWelcomeCounters();
@@ -1596,20 +1595,28 @@
    * Load the list of ingested documents from GET /api/ingest/documents
    * and populate the document table.
    */
-  function loadDocumentList() {
+  function loadDocumentList(cursor, append) {
     var tbody = document.getElementById('doc-table-body');
     if (!tbody) return;
 
-    fetch('/api/ingest/documents')
+    var url = '/api/ingest/documents';
+    if (cursor) url += '?cursor=' + encodeURIComponent(cursor);
+    fetch(url)
       .then(function (resp) {
         if (!resp.ok) throw new Error('Failed to load documents');
         return resp.json();
       })
       .then(function (data) {
         var docs = data.documents || [];
-        tbody.innerHTML = '';
+        var oldContinuation = tbody.querySelector('.document-load-more');
+        if (oldContinuation) oldContinuation.remove();
+        if (!append) tbody.innerHTML = '';
+        if (append && docs.length > 0) {
+          var oldEmptyRow = tbody.querySelector('.doc-table-empty');
+          if (oldEmptyRow) oldEmptyRow.remove();
+        }
 
-        if (docs.length === 0) {
+        if (docs.length === 0 && !append) {
           var emptyRow = document.createElement('tr');
           emptyRow.className = 'doc-table-empty';
           emptyRow.innerHTML = '<td colspan="6" data-i18n="settings_no_documents">' +
@@ -1691,6 +1698,23 @@
           row.appendChild(actionsCell);
           tbody.appendChild(row);
         });
+
+        if (data.next_cursor) {
+          var continuationRow = document.createElement('tr');
+          continuationRow.className = 'document-load-more';
+          var continuationCell = document.createElement('td');
+          continuationCell.colSpan = 6;
+          var continuationButton = document.createElement('button');
+          continuationButton.className = 'btn-load-more-documents';
+          continuationButton.textContent = translations['settings_load_more'] || 'Load more';
+          continuationButton.addEventListener('click', function () {
+            continuationButton.disabled = true;
+            loadDocumentList(data.next_cursor, true);
+          });
+          continuationCell.appendChild(continuationButton);
+          continuationRow.appendChild(continuationCell);
+          tbody.appendChild(continuationRow);
+        }
       })
       .catch(function (err) {
         console.error('Failed to load document list:', err);
@@ -1905,10 +1929,10 @@
         }
         return resp.json();
       })
-      .then(function(chunks) {
+      .then(function(data) {
         btn.textContent = '\u25BC Chunks';
         btn.title = translations['settings_hide_chunks'] || 'Hide chunks';
-        renderChunkRow(row, chunks);
+        renderChunkRow(row, data, docId);
       })
       .catch(function(err) {
         console.error('Failed to fetch chunks:', err);
@@ -1920,9 +1944,10 @@
   /**
    * Render chunk preview cards below a document row (AC-005.8).
    * @param {Element} docRow - The document table row
-   * @param {Array} chunks - Array of chunk objects {chunk_index, text, token_count, page}
+   * @param {Object} data - Paginated chunk response
+   * @param {string} docId - The document ID
    */
-  function renderChunkRow(docRow, chunks) {
+  function renderChunkRow(docRow, data, docId) {
     var chunkRow = document.createElement('tr');
     chunkRow.className = 'chunk-row';
 
@@ -1932,6 +1957,20 @@
     var container = document.createElement('div');
     container.className = 'chunk-container';
 
+    appendChunkCards(container, data.chunks || []);
+
+    if (data.next_cursor) {
+      addChunkContinuation(container, docId, data.next_cursor);
+    }
+
+    chunkCell.appendChild(container);
+    chunkRow.appendChild(chunkCell);
+
+    // Insert after the document row
+    docRow.parentNode.insertBefore(chunkRow, docRow.nextSibling);
+  }
+
+  function appendChunkCards(container, chunks) {
     chunks.forEach(function(chunk) {
       var card = document.createElement('div');
       card.className = 'chunk-card';
@@ -1966,12 +2005,33 @@
       card.appendChild(preview);
       container.appendChild(card);
     });
+  }
 
-    chunkCell.appendChild(container);
-    chunkRow.appendChild(chunkCell);
-
-    // Insert after the document row
-    docRow.parentNode.insertBefore(chunkRow, docRow.nextSibling);
+  function addChunkContinuation(container, docId, cursor) {
+    var button = document.createElement('button');
+    button.className = 'btn-load-more-chunks';
+    button.textContent = translations['settings_load_more'] || 'Load more';
+    button.addEventListener('click', function () {
+      button.disabled = true;
+      fetch('/api/ingest/documents/' + encodeURIComponent(docId) +
+        '/chunks?cursor=' + encodeURIComponent(cursor))
+        .then(function(resp) {
+          if (!resp.ok) throw new Error('Failed to fetch chunks: ' + resp.status);
+          return resp.json();
+        })
+        .then(function(data) {
+          button.remove();
+          appendChunkCards(container, data.chunks || []);
+          if (data.next_cursor) {
+            addChunkContinuation(container, docId, data.next_cursor);
+          }
+        })
+        .catch(function(err) {
+          console.error('Failed to fetch chunks:', err);
+          button.disabled = false;
+        });
+    });
+    container.appendChild(button);
   }
 
   // ============================================================

@@ -13,6 +13,7 @@ import hashlib
 import json
 import logging
 import os
+import unicodedata
 import uuid
 from datetime import UTC, datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -20,10 +21,13 @@ from pathlib import Path
 from typing import Any
 
 from cryptography.fernet import Fernet
+from fastapi import Depends
 from qdrant_client import AsyncQdrantClient
 
 from src.paths import data_path
+from src.vector_store.adapter import QdrantVectorStore
 from src.vector_store.client import get_qdrant_client as _get_qdrant_client
+from src.vector_store.contracts import VectorStore
 
 # ============================================================
 # Fernet Encryption for API Keys (AC-008.3)
@@ -81,6 +85,7 @@ def _get_machine_id() -> str:
         path.unlink(missing_ok=True)
         raise
     return identifier
+
 
 def _derive_fernet_key(passphrase: str | None = None) -> bytes:
     """Derive a Fernet-compatible 32-byte key from machine_id + optional passphrase.
@@ -200,6 +205,14 @@ def sanitize_for_log(data: dict[str, Any]) -> dict[str, Any]:
     return sanitized
 
 
+def sanitize_audit_text(value: str) -> str:
+    """Return NFKC audit text or a fixed marker for unsafe control text."""
+    canonical = unicodedata.normalize("NFKC", value)
+    if any(unicodedata.category(character) in {"Cc", "Cf"} for character in canonical):
+        return "[INVALID]"
+    return canonical
+
+
 # ============================================================
 # Audit Logging (AC-008.8)
 # ============================================================
@@ -277,9 +290,9 @@ def log_audit(
     }
 
     if session_id:
-        entry["session_id"] = session_id
+        entry["session_id"] = sanitize_audit_text(session_id)
     if filename:
-        entry["filename"] = filename
+        entry["filename"] = sanitize_audit_text(filename)
     if extra:
         sanitized = sanitize_for_log(extra)
         entry["extra"] = sanitized
@@ -296,3 +309,10 @@ def log_audit(
 async def get_qdrant_client() -> AsyncQdrantClient:
     """FastAPI dependency for Qdrant client (re-export)."""
     return await _get_qdrant_client()
+
+
+async def get_vector_store(
+    client: AsyncQdrantClient = Depends(get_qdrant_client),  # noqa: B008
+) -> VectorStore:
+    """FastAPI dependency exposing application vector capabilities."""
+    return QdrantVectorStore(client)

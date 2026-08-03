@@ -12,13 +12,13 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.dependencies import get_qdrant_client
+from src.api.dependencies import get_vector_store
 
 # ============================================================
 # Fixtures
@@ -194,25 +194,16 @@ class TestSettingsReingest:
         app = cast(FastAPI, client.app)
 
         try:
-            # Mock the Qdrant client dependency and background ingestion
-            mock_client = AsyncMock()
-            mock_client.collection_exists = AsyncMock(return_value=True)
+            mock_store = AsyncMock()
 
-            async def override_get_qdrant() -> AsyncMock:
-                return mock_client
+            async def override_get_vector_store() -> AsyncMock:
+                return mock_store
 
-            app.dependency_overrides[get_qdrant_client] = override_get_qdrant
-
-            # Mock ensure_collection_exists
-            with patch(
-                "src.ingestion.router.ensure_collection_exists",
-                new_callable=AsyncMock,
-                return_value=None,
-            ):
-                resp = client.post(
-                    "/api/ingest/reingest",
-                    json={"doc_id": test_doc_id, "filename": "test.txt"},
-                )
+            app.dependency_overrides[get_vector_store] = override_get_vector_store
+            resp = client.post(
+                "/api/ingest/reingest",
+                json={"doc_id": test_doc_id, "filename": "test.txt"},
+            )
 
             assert resp.status_code == 202
             data = resp.json()
@@ -223,7 +214,7 @@ class TestSettingsReingest:
             # Clean up mock file
             raw_path.unlink(missing_ok=True)
             # Clean up dependency override
-            app.dependency_overrides.pop(get_qdrant_client, None)
+            app.dependency_overrides.pop(get_vector_store, None)
 
     def test_reingest_endpoint_no_stored_file(self, client: TestClient) -> None:
         """AC-010.4: POST /api/ingest/reingest returns 200 with skipped status when no stored file found."""
@@ -240,10 +231,10 @@ class TestSettingsReingest:
         # as a dependency before the handler runs.
         mock_client = AsyncMock()
 
-        async def override_get_qdrant() -> AsyncMock:
+        async def override_get_vector_store() -> AsyncMock:
             return mock_client
 
-        app.dependency_overrides[get_qdrant_client] = override_get_qdrant
+        app.dependency_overrides[get_vector_store] = override_get_vector_store
 
         try:
             resp = client.post(
@@ -257,7 +248,7 @@ class TestSettingsReingest:
             assert "no longer available" in data["message"]
             assert data["detail"] is not None
         finally:
-            app.dependency_overrides.pop(get_qdrant_client, None)
+            app.dependency_overrides.pop(get_vector_store, None)
 
     # ----------------------------------------------------------
     # AC-010.4: Clear Then Re-Ingest Flow
@@ -265,31 +256,24 @@ class TestSettingsReingest:
 
     def test_clear_endpoint_exists(self, client: TestClient) -> None:
         """AC-010.4: DELETE /api/ingest/clear endpoint exists and returns 200."""
-        mock_client = AsyncMock()
-        mock_client.collection_exists = AsyncMock(return_value=True)
-        mock_client.count = AsyncMock(return_value=MagicMock(count=5))
-        mock_client.delete_collection = AsyncMock(return_value=None)
+        mock_store = AsyncMock()
+        mock_store.clear_documents = AsyncMock(return_value=5)
 
-        async def override_get_qdrant() -> AsyncMock:
-            return mock_client
+        async def override_get_vector_store() -> AsyncMock:
+            return mock_store
 
         app = cast(FastAPI, client.app)
-        app.dependency_overrides[get_qdrant_client] = override_get_qdrant
+        app.dependency_overrides[get_vector_store] = override_get_vector_store
 
         try:
-            with patch(
-                "src.ingestion.router.ensure_collection_exists",
-                new_callable=AsyncMock,
-                return_value=None,
-            ):
-                resp = client.delete("/api/ingest/clear")
+            resp = client.delete("/api/ingest/clear")
 
             assert resp.status_code == 200
             data = resp.json()
             assert data["status"] == "ok"
             assert "deleted_count" in data
         finally:
-            app.dependency_overrides.pop(get_qdrant_client, None)
+            app.dependency_overrides.pop(get_vector_store, None)
 
     # ----------------------------------------------------------
     # AC-010.1: Silent Save When No Documents

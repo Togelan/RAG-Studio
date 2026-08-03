@@ -973,33 +973,31 @@ class TestAC0018DuplicateDetection:
         """After Qdrant fallback, file_hash, chunk_size, chunk_overlap are correctly populated."""
         import asyncio
 
-        from src.ingestion.embedder import make_document_doc_id
         from src.ingestion.router import (
-            get_document_info_from_qdrant,
+            get_document_info_from_store,
             get_stored_file,
             stored_files,
         )
+        from src.vector_store.models import DocumentMetadata
 
         stored_files.clear()
 
         async def _run() -> None:
-            from unittest.mock import AsyncMock, MagicMock
+            from unittest.mock import AsyncMock
 
-            mock_client = AsyncMock()
-            mock_client.collection_exists = AsyncMock(return_value=True)
-            mock_client.count = AsyncMock(return_value=MagicMock(count=5))
-            point = MagicMock()
-            point.payload = {
-                "doc_id": make_document_doc_id("test_meta.txt"),
-                "total_chunks": 5,
-                "source": "test_meta.txt",
-                "file_hash": "abcdef1234567890",
-                "chunk_size": 512,
-                "chunk_overlap": 64,
-            }
-            mock_client.scroll = AsyncMock(return_value=([point], None))
+            mock_store = AsyncMock()
+            mock_store.find_document = AsyncMock(
+                return_value=DocumentMetadata(
+                    doc_id="document-test-meta",
+                    filename="test_meta.txt",
+                    file_hash="abcdef1234567890",
+                    chunk_count=5,
+                    chunk_size=512,
+                    chunk_overlap=64,
+                )
+            )
 
-            info = await get_document_info_from_qdrant(mock_client, "test_meta.txt")
+            info = await get_document_info_from_store(mock_store, "test_meta.txt")
             assert info is not None
             assert info["file_hash"] == "abcdef1234567890", (
                 f"Expected file_hash='abcdef1234567890', got {info['file_hash']}"

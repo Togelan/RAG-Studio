@@ -10,38 +10,99 @@ Tests cover:
 from __future__ import annotations
 
 import logging
-import os
-import shutil
-import tempfile
+from collections.abc import AsyncIterator, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, HumanMessage
 
+from src.graph.llm_provider import LLMProviderConfig
 from src.graph.nodes import retrieve_node
 from src.graph.state import RAGState
-from src.ingestion.chunker import chunk_text
-from src.ingestion.embedder import (
-    generate_dense_embeddings,
-    generate_sparse_embeddings,
-    make_doc_id,
+from src.ingestion.embedding import Embedder
+from src.vector_store.models import (
+    DenseVector,
+    SparseVector,
+    VectorCollection,
+    VectorRecord,
+    VectorSearchHit,
+    VectorSearchQuery,
 )
-from src.ingestion.parser import parse_md
 
 logger = logging.getLogger(__name__)
 
 # Test collection name
 TEST_COLLECTION = "test_collection"
 
-# Test data file path
-TEST_DATA_FILE = (
-    Path(__file__).resolve().parent.parent.parent
-    / "data"
-    / "raw_data"
-    / "raw_test_data.md"
-)
+_DETERMINISTIC_ANSWER = "Deterministic answer from the injected test provider."
+
+_RAW_TEST_FIXTURE = """# RAG E2E fixture
+
+Masha is 19 years old. Mark is Masha's neighbor and walks at a speed of 4.7
+kilometres per hour. The distance from Masha's window to the gate is 8.4
+metres. Their first verbal interaction took place on May 31. Masha and Mark
+met on the bench 14 times. This text is non-production test data for retrieval.
+"""
+
+
+class _DeterministicProvider:
+    """Provide deterministic graph-node responses without a vendor SDK."""
+
+    async def ainvoke(self, messages: Sequence[BaseMessage]) -> BaseMessage:
+        return AIMessage(content="standalone")
+
+    async def astream(
+        self,
+        messages: Sequence[BaseMessage],
+    ) -> AsyncIterator[AIMessageChunk]:
+        yield AIMessageChunk(content=_DETERMINISTIC_ANSWER)
+
+
+class _DeterministicProviderFactory:
+    """Construct a protocol-conforming deterministic provider for graph E2E tests."""
+
+    def __call__(self, config: LLMProviderConfig) -> _DeterministicProvider:
+        return _DeterministicProvider()
+
+
+@dataclass(frozen=True, slots=True)
+class _DeterministicEmbedder:
+    def embed_dense(self, texts: Sequence[str]) -> tuple[DenseVector, ...]:
+        return tuple(DenseVector((1.0,) * 384) for _ in texts)
+
+    def embed_sparse(self, texts: Sequence[str]) -> tuple[SparseVector, ...]:
+        return tuple(SparseVector((1,), (1.0,)) for _ in texts)
+
+
+class _DeterministicVectorStore:
+    def __init__(self) -> None:
+        self.saved_records: list[VectorRecord] = []
+        self._retrieval_hits = (
+            VectorSearchHit(
+                point_id="e2e-document-1",
+                score=0.95,
+                payload={
+                    "text": _RAW_TEST_FIXTURE,
+                    "source": "rag_fixture.md",
+                    "chunk_index": 0,
+                },
+            ),
+        )
+
+    async def ensure_collection(self, collection: VectorCollection) -> None:
+        return None
+
+    async def search(self, query: VectorSearchQuery) -> tuple[VectorSearchHit, ...]:
+        if query.collection_name == "rag_studio_cache":
+            return ()
+        return self._retrieval_hits
+
+    async def upsert(
+        self, collection_name: str, records: Sequence[VectorRecord]
+    ) -> None:
+        self.saved_records.extend(records)
 
 
 def _make_state(
@@ -84,164 +145,26 @@ class TestRagPipelineE2E:
     """E2E tests for the RAG pipeline: ingestion → retrieval → persistence."""
 
     @pytest.fixture(autouse=True)
-    async def setup_teardown(self, monkeypatch: pytest.MonkeyPatch) -> Any:
+    async def setup_teardown(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> AsyncIterator[None]:
         """Set up test Qdrant instance with test data, tear down after.
 
         Creates a temporary Qdrant storage path, ingests test data,
         and cleans up everything after all tests.
         """
-        # Create temp directories for test isolation
-        self.temp_qdrant_path = tempfile.mkdtemp(prefix="test_qdrant_e2e_")
-        self.temp_checkpoints_dir = tempfile.mkdtemp(prefix="test_checkpoints_e2e_")
-        self.temp_db_path = os.path.join(
-            self.temp_checkpoints_dir, "test_checkpoints.db"
-        )
+        self.embedder: Embedder = _DeterministicEmbedder()
+        self.vector_store = _DeterministicVectorStore()
+        self.temp_db_path = str(tmp_path / "test_checkpoints.db")
 
-        # Override env for Qdrant path (in-process mode)
-        monkeypatch.setenv("QDRANT_PATH", self.temp_qdrant_path)
-        # Unset QDRANT_URL to force in-process mode
-        monkeypatch.delenv("QDRANT_URL", raising=False)
-
-        # Reset Qdrant singleton so it picks up the new path
-        from src.vector_store.client import QdrantClientManager
-
-        QdrantClientManager._instance = None  # pyright: ignore[reportPrivateUsage]
-        QdrantClientManager._client = None  # pyright: ignore[reportPrivateUsage]
-
-        # Patch COLLECTION_NAME in embedder to use test collection
-        monkeypatch.setattr(
-            "src.ingestion.embedder.COLLECTION_NAME",
-            TEST_COLLECTION,
-        )
-        # Also patch in retrieve orchestrator for hybrid_search default
-        # (hybrid_search has collection_name parameter, so we pass it explicitly)
-
-        # Parse test data
-        assert TEST_DATA_FILE.exists(), f"Test data file not found: {TEST_DATA_FILE}"
-        raw_text = parse_md(str(TEST_DATA_FILE))
-        assert len(raw_text) > 100, "Test data is too short"
-
-        # Chunk the text
-        chunks = chunk_text(raw_text)
-        assert len(chunks) > 0, "No chunks generated from test data"
-        logger.info(
-            "E2E setup: %d chunks generated from %s", len(chunks), TEST_DATA_FILE.name
-        )
-
-        # Generate embeddings
-        dense_vectors = generate_dense_embeddings(chunks)
-        sparse_vectors = generate_sparse_embeddings(chunks)
-        assert len(dense_vectors) == len(chunks)
-        assert len(sparse_vectors) == len(chunks)
-
-        # Get Qdrant client and ensure test collection exists
-        from src.vector_store.client import get_qdrant_client
-
-        client = await get_qdrant_client()
-
-        # Create test collection manually (similar to ensure_collection_exists but for test_collection)
-        from qdrant_client.http import models as qmodels
-
-        if not await client.collection_exists(TEST_COLLECTION):
-            await client.create_collection(
-                collection_name=TEST_COLLECTION,
-                vectors_config={
-                    "dense": qmodels.VectorParams(
-                        size=384,
-                        distance=qmodels.Distance.COSINE,
-                    ),
-                },
-                sparse_vectors_config={
-                    "sparse": qmodels.SparseVectorParams(
-                        index=qmodels.SparseIndexParams(on_disk=False),
-                    ),
-                },
-            )
-            logger.info("Created test collection '%s'", TEST_COLLECTION)
-
-        # Upsert chunks into test collection
-        # We need to use the patched COLLECTION_NAME, but upsert_chunks uses the
-        # module-level COLLECTION_NAME which is now monkeypatched to TEST_COLLECTION.
-        # However, upsert_chunks also references it at definition time...
-        # Let's upsert directly to be safe.
-        from datetime import datetime, timezone
-
-        from qdrant_client.http import models as qmodels
-
-        # Delete existing points for test data first
-        await client.delete_collection(TEST_COLLECTION)
-        await client.create_collection(
-            collection_name=TEST_COLLECTION,
-            vectors_config={
-                "dense": qmodels.VectorParams(
-                    size=384,
-                    distance=qmodels.Distance.COSINE,
-                ),
-            },
-            sparse_vectors_config={
-                "sparse": qmodels.SparseVectorParams(
-                    index=qmodels.SparseIndexParams(on_disk=False),
-                ),
-            },
-        )
-
-        points: list[qmodels.PointStruct] = []
-        now = datetime.now(timezone.utc).isoformat()
-        filename = "raw_test_data.md"
-
-        for i, chunk_text_val in enumerate(chunks):
-            point_id = make_doc_id(filename, i)
-            payload: dict[str, object] = {
-                "text": chunk_text_val,
-                "source": filename,
-                "chunk_index": i,
-                "total_chunks": len(chunks),
-                "doc_id": make_doc_id(filename, 0),  # simplified
-                "created_at": now,
-                "file_hash": "",
-                "chunk_size": 512,
-                "chunk_overlap": 64,
-            }
-            points.append(
-                qmodels.PointStruct(
-                    id=point_id,
-                    vector={
-                        "dense": dense_vectors[i],
-                        "sparse": sparse_vectors[i],
-                    },
-                    payload=payload,
-                )
-            )
-
-        await client.upsert(
-            collection_name=TEST_COLLECTION,
-            points=points,
-            wait=True,
-        )
-        logger.info(
-            "E2E setup: upserted %d points into '%s'", len(points), TEST_COLLECTION
-        )
-
-        # Verify points exist
-        count_result = await client.count(collection_name=TEST_COLLECTION, exact=True)
-        assert count_result.count > 0, (
-            f"No points in test collection '{TEST_COLLECTION}'"
-        )
-        logger.info("E2E setup: verified %d points in collection", count_result.count)
-
-        self.collection_name = TEST_COLLECTION
-        self.chunks = chunks
-
-        # Monkeypatch hybrid_search in src.graph.nodes so retrieve_node
-        # searches the test collection instead of the default rag_studio_docs.
         from src.graph import nodes as graph_nodes
         from src.retrieve import orchestrator as _retrieve_orch
 
-        _original_hybrid_search = _retrieve_orch.hybrid_search
-
         async def _patched_hybrid_search(*args: Any, **kwargs: Any) -> Any:
-            kwargs.setdefault("collection_name", TEST_COLLECTION)
-            return await _original_hybrid_search(*args, **kwargs)
+            kwargs["use_reranker"] = False
+            return await _retrieve_orch.hybrid_search(*args, **kwargs)
 
         monkeypatch.setattr(
             graph_nodes,
@@ -251,21 +174,13 @@ class TestRagPipelineE2E:
 
         yield
 
-        # Teardown: clean up test collection and temp dirs
-        try:
-            await client.delete_collection(TEST_COLLECTION)
-            logger.info("E2E teardown: deleted test collection '%s'", TEST_COLLECTION)
-        except Exception as exc:
-            logger.warning("E2E teardown: failed to delete collection: %s", exc)
-
-        # Close Qdrant client
-        from src.vector_store.client import close_qdrant_client
-
-        await close_qdrant_client()
-
-        # Clean up temp dirs
-        shutil.rmtree(self.temp_qdrant_path, ignore_errors=True)
-        shutil.rmtree(self.temp_checkpoints_dir, ignore_errors=True)
+    async def _retrieve(self, state: RAGState) -> dict[str, Any]:
+        """Retrieve through the E2E test's deterministic capabilities."""
+        return await retrieve_node(
+            state,
+            embedder=self.embedder,
+            vector_searcher=self.vector_store,
+        )
 
     # ============================================================
     # Query 1: "Who is Masha?" (EN)
@@ -276,10 +191,7 @@ class TestRagPipelineE2E:
         query = "Who is Masha?"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -299,10 +211,7 @@ class TestRagPipelineE2E:
         query = "Who is Mark?"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -321,10 +230,7 @@ class TestRagPipelineE2E:
         query = "How old is Masha?"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -341,10 +247,7 @@ class TestRagPipelineE2E:
         query = "What is Mark's walking speed?"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -363,10 +266,7 @@ class TestRagPipelineE2E:
         query = "кто такая маша"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -385,10 +285,7 @@ class TestRagPipelineE2E:
         query = "сколько лет маше"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -407,10 +304,7 @@ class TestRagPipelineE2E:
         query = "какая скорость ходьбы у марка"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -429,10 +323,7 @@ class TestRagPipelineE2E:
         query = "What is the distance from Masha's window to the gate?"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -449,10 +340,7 @@ class TestRagPipelineE2E:
         query = "When was the first verbal interaction?"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -471,10 +359,7 @@ class TestRagPipelineE2E:
         query = "Сколько раз они встречались на скамейке?"
         state = _make_state(query)
 
-        try:
-            result_state = await retrieve_node(state)
-        except Exception as exc:
-            pytest.fail(f"retrieve_node raised exception: {type(exc).__name__}: {exc}")
+        result_state = await self._retrieve(state)
 
         docs: list[dict[str, Any]] = result_state.get("retrieved_docs", [])
         all_text = _get_all_text(docs)
@@ -497,11 +382,7 @@ class TestRagPipelineE2E:
         """
         session_id = "e2e-persistence-test-session"
 
-        # Mock ChatOpenAI to avoid real LLM calls during the graph run
-        mock_llm = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = "Mocked answer for testing."
-        mock_llm.ainvoke = AsyncMock(return_value=mock_response)
+        provider_factory = _DeterministicProviderFactory()
 
         all_queries = [
             "Who is Masha?",
@@ -516,106 +397,37 @@ class TestRagPipelineE2E:
             "Сколько раз они встречались на скамейке?",
         ]
 
-        # Patch ChatOpenAI and run the full graph
-        with patch("src.graph.nodes.ChatOpenAI", return_value=mock_llm):
-            from src.graph.builder import create_graph, run_rag_graph
+        from src.graph.builder import create_graph, run_rag_graph
 
-            # Run all 10 queries through the same compiled graph
-            async with create_graph(db_path=self.temp_db_path) as graph:
-                for query in all_queries:
-                    try:
-                        result = await run_rag_graph(
-                            query=query,
-                            session_id=session_id,
-                            user_api_key="test-key",
-                            compiled_graph=graph,
-                        )
-                        assert "final_answer" in result, (
-                            f"No final_answer in result for query: {query}"
-                        )
-                    except Exception as exc:
-                        # Check that it's not a UnicodeDecodeError
-                        if isinstance(exc, UnicodeDecodeError):
-                            pytest.fail(
-                                f"UnicodeDecodeError during graph run for '{query}': {exc}"
-                            )
-                        # Other errors are acceptable if they're not UTF-8 related
-                        logger.warning(
-                            "Graph run for '%s' failed (non-UTF8): %s: %s",
-                            query,
-                            type(exc).__name__,
-                            exc,
-                        )
-
-            # Step 2: Simulate refresh — create a NEW graph instance with same db_path
-            async with create_graph(db_path=self.temp_db_path) as graph2:
-                from src.graph.session import get_session_metadata
-
-                try:
-                    metadata = await get_session_metadata(
-                        thread_id=session_id,
-                        compiled_graph=graph2,
-                    )
-                except UnicodeDecodeError as exc:
-                    pytest.fail(f"UnicodeDecodeError during session reload: {exc}")
-                except Exception as exc:
-                    logger.warning(
-                        "get_session_metadata failed (non-UTF8): %s: %s",
-                        type(exc).__name__,
-                        exc,
-                    )
-                    metadata = None
-
-                # If metadata is available, verify message count
-                if metadata is not None:
-                    msg_count = metadata.get("message_count", 0)
-                    logger.info(
-                        "Session persistence: metadata=%s, message_count=%d",
-                        metadata,
-                        msg_count,
-                    )
-                    # We expect at least some messages (each query adds at least 1 user + 1 AI)
-                    assert msg_count > 0, (
-                        f"Session has no messages after reload. Metadata: {metadata}"
-                    )
-                else:
-                    # Fallback: try to get checkpoint directly via aconfig
-                    try:
-                        if hasattr(graph2, "checkpointer"):
-                            config = {"configurable": {"thread_id": session_id}}
-                            checkpoint_tuple = await graph2.checkpointer.aget_tuple(
-                                config
-                            )
-                            assert checkpoint_tuple is not None, (
-                                "No checkpoint found after reload"
-                            )
-                            logger.info(
-                                "Session persistence: checkpoint found via aget_tuple"
-                            )
-                    except UnicodeDecodeError as exc:
-                        pytest.fail(
-                            f"UnicodeDecodeError during checkpoint reload: {exc}"
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "Checkpoint reload failed (non-UTF8): %s: %s",
-                            type(exc).__name__,
-                            exc,
-                        )
-
-        # Clean up checkpoint data
-        try:
-            import aiosqlite
-
-            async with aiosqlite.connect(self.temp_db_path) as conn:
-                await conn.execute(
-                    "DELETE FROM checkpoints WHERE thread_id = ?",
-                    (session_id,),
+        async with create_graph(
+            db_path=self.temp_db_path,
+            provider_factory=provider_factory,
+            embedder=self.embedder,
+            vector_store=self.vector_store,
+        ) as graph:
+            for query in all_queries:
+                result = await run_rag_graph(
+                    query=query,
+                    session_id=session_id,
+                    user_api_key="test-key",
+                    compiled_graph=graph,
                 )
-                await conn.execute(
-                    "DELETE FROM writes WHERE thread_id = ?",
-                    (session_id,),
-                )
-                await conn.commit()
-        except Exception:
-            pass
+                assert result["generated_from"] == "retrieval"
+                assert result["final_answer"] == _DETERMINISTIC_ANSWER
+                assert result["faithfulness_score"] == 0.5
+
+        # Step 2: Simulate refresh — create a NEW graph instance with same db_path
+        async with create_graph(
+            db_path=self.temp_db_path,
+            provider_factory=provider_factory,
+            embedder=self.embedder,
+            vector_store=self.vector_store,
+        ) as graph2:
+            from src.graph.session import get_session_metadata
+
+            metadata = await get_session_metadata(
+                thread_id=session_id,
+                compiled_graph=graph2,
+            )
+            assert metadata is not None
+            assert metadata["message_count"] > 0

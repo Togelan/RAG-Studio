@@ -10,8 +10,12 @@ Supports:
 from __future__ import annotations
 
 import csv
+import io
 import logging
+import unicodedata
+from codecs import BOM_UTF8
 from pathlib import Path
+from typing import Final
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +25,13 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 # Supported file extensions
 SUPPORTED_EXTENSIONS = frozenset({".txt", ".md", ".pdf", ".docx", ".csv"})
 
+_CSV_ENCODINGS: Final[tuple[str, ...]] = (
+    "utf-8-sig",
+    "utf-8",
+    "cp1251",
+    "cp1252",
+)
+
 # MIME type to extension mapping (for fallback detection)
 _MIME_MAP: dict[str, str] = {
     "text/plain": ".txt",
@@ -29,6 +40,59 @@ _MIME_MAP: dict[str, str] = {
     "application/pdf": ".pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
+
+_BIDI_CONTROL_CODEPOINTS = frozenset(
+    {
+        "\u061c",
+        "\u200e",
+        "\u200f",
+        "\u202a",
+        "\u202b",
+        "\u202c",
+        "\u202d",
+        "\u202e",
+        "\u2066",
+        "\u2067",
+        "\u2068",
+        "\u2069",
+    }
+)
+
+
+class UnsupportedCsvEncodingError(ValueError):
+    """Raised when CSV bytes match none of the finite supported encodings."""
+
+    def __str__(self) -> str:
+        return "unsupported_csv_encoding"
+
+
+def _decode_csv(path: Path) -> str:
+    raw = path.read_bytes()
+    for encoding in _CSV_ENCODINGS:
+        if encoding == "utf-8-sig" and not raw.startswith(BOM_UTF8):
+            continue
+        try:
+            return raw.decode(encoding, errors="strict")
+        except UnicodeDecodeError:
+            continue
+    raise UnsupportedCsvEncodingError from None
+
+
+def canonicalize_filename(filename: str) -> str:
+    """Return the safe NFKC display form of an untrusted upload filename."""
+    canonical = unicodedata.normalize("NFKC", filename)
+    if not canonical or any(
+        unicodedata.category(character) in {"Cc", "Cf"}
+        or character in _BIDI_CONTROL_CODEPOINTS
+        for character in canonical
+    ):
+        raise ValueError("Invalid filename")
+    return canonical
+
+
+def filename_comparison_key(filename: str) -> str:
+    """Return the canonical case-insensitive reservation key for a filename."""
+    return canonicalize_filename(filename).casefold()
 
 
 def detect_file_type(filename: str, content_type: str | None = None) -> str:
@@ -157,7 +221,7 @@ def parse_csv(file_path: str | Path) -> list[dict[str, str]]:
     path = Path(file_path)
     rows: list[dict[str, str]] = []
 
-    with path.open("r", encoding="utf-8", newline="") as f:
+    with io.StringIO(_decode_csv(path), newline="") as f:
         reader = csv.DictReader(f)
 
         if reader.fieldnames is None:
@@ -232,7 +296,7 @@ def parse_csv_as_rows(
     row_texts: list[str] = []
     metadata_list: list[dict[str, object]] = []
 
-    with path.open("r", encoding="utf-8", newline="") as f:
+    with io.StringIO(_decode_csv(path), newline="") as f:
         reader = csv.DictReader(f)
 
         if reader.fieldnames is None:
@@ -281,6 +345,8 @@ def validate_file(
     Raises:
         ValueError: If validation fails.
     """
+    canonical = canonicalize_filename(filename)
+
     # Size check
     if file_size > MAX_FILE_SIZE:
         raise ValueError("File too large. Maximum size is 50 MB.")
@@ -290,18 +356,18 @@ def validate_file(
         raise ValueError("Empty file")
 
     # Filename length check
-    if len(filename) > 200:
+    if len(canonical) > 200:
         raise ValueError("Filename too long. Maximum length is 200 characters.")
 
     # Path traversal check
-    filename_normalized = filename.replace("\\", "/")
+    filename_normalized = canonical.replace("\\", "/")
     if ".." in filename_normalized.split("/"):
         raise ValueError("Invalid filename")
 
     # Absolute path check
-    if filename.startswith("/") or filename.startswith("\\"):
+    if canonical.startswith(("/", "\\")):
         raise ValueError("Invalid filename")
 
     # Drive letter check (Windows absolute path)
-    if len(filename) >= 2 and filename[1] == ":":
+    if len(canonical) >= 2 and canonical[1] == ":":
         raise ValueError("Invalid filename")

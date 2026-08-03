@@ -23,7 +23,7 @@ from src.api.dependencies import get_qdrant_client
 
 
 @pytest.fixture(name="client")
-def fixture_client() -> Generator[TestClient, Any, None]:
+def fixture_client() -> Generator[TestClient, Any]:
     """Pytest fixture providing a TestClient with mocked Qdrant and no settings file."""
     with (
         patch(
@@ -127,9 +127,12 @@ class TestSettingsAPI:
         mock_client.__aexit__ = AsyncMock(return_value=None)
         mock_client.get = AsyncMock(return_value=mock_response)
 
-        with patch("httpx.AsyncClient", return_value=mock_client), patch(
-            "src.api.routes.settings.save_secrets",
-            side_effect=OSError("read-only data directory"),
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch(
+                "src.api.routes.settings.save_secrets",
+                side_effect=OSError("read-only data directory"),
+            ),
         ):
             response = client.post(
                 "/api/settings/validate-key",
@@ -223,6 +226,7 @@ class TestSettingsAPI:
         """GET /api/ingest/documents/{doc_id}/chunks returns chunks sorted by chunk_index."""
         # Create mock scroll result
         mock_point1 = MagicMock()
+        mock_point1.id = "point-2"
         mock_point1.payload = {
             "doc_id": "test-doc-123",
             "chunk_index": 2,
@@ -232,6 +236,7 @@ class TestSettingsAPI:
         }
 
         mock_point2 = MagicMock()
+        mock_point2.id = "point-0"
         mock_point2.payload = {
             "doc_id": "test-doc-123",
             "chunk_index": 0,
@@ -256,17 +261,20 @@ class TestSettingsAPI:
             resp = c.get("/api/ingest/documents/test-doc-123/chunks")
 
         assert resp.status_code == 200
-        data: list[dict[str, object]] = resp.json()  # type: ignore[assignment]
-        assert len(data) == 2
+        data = resp.json()
+        chunks = data["chunks"]
+        assert len(chunks) == 2
+        assert data["next_cursor"] is None
+        assert data["truncated"] is False
         # Verify sorted by chunk_index
-        assert data[0]["chunk_index"] == 0
-        assert data[0]["text"] == "First chunk text."
-        assert data[0]["token_count"] == 4
-        assert data[0]["page"] == 1
-        assert data[1]["chunk_index"] == 2
-        assert data[1]["text"] == "Third chunk text here for testing purposes."
-        assert data[1]["token_count"] == 8
-        assert data[1]["page"] == 2
+        assert chunks[0]["chunk_index"] == 0
+        assert chunks[0]["text"] == "First chunk text."
+        assert chunks[0]["token_count"] == 4
+        assert chunks[0]["page"] == 1
+        assert chunks[1]["chunk_index"] == 2
+        assert chunks[1]["text"] == "Third chunk text here for testing purposes."
+        assert chunks[1]["token_count"] == 8
+        assert chunks[1]["page"] == 2
 
     def test_get_document_chunks_not_found(self, client: TestClient) -> None:
         """GET /api/ingest/documents/{doc_id}/chunks returns 404 for unknown doc."""

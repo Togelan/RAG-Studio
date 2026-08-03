@@ -17,10 +17,11 @@ import shutil
 import tempfile
 import time
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, AsyncIterator, cast
 
 from fastapi import (
     APIRouter,
@@ -32,27 +33,32 @@ from fastapi import (
     UploadFile,
 )
 from pydantic import BaseModel
-from qdrant_client import AsyncQdrantClient
-from qdrant_client.http import models as qmodels
 
-from src.api.dependencies import get_qdrant_client, log_audit
+from src.api.dependencies import get_vector_store, log_audit
 from src.ingestion.chunker import chunk_csv_rows, chunk_text
 from src.ingestion.embedder import (
-    COLLECTION_NAME,
-    delete_document_points,
-    ensure_collection_exists,
-    generate_dense_embeddings,
-    generate_sparse_embeddings,
+    get_embedder,
+    make_doc_id,
     make_document_doc_id,
-    upsert_chunks,
 )
+from src.ingestion.embedding import Embedder
 from src.ingestion.parser import (
+    UnsupportedCsvEncodingError,
+    canonicalize_filename,
     detect_and_parse,
     detect_file_type,
+    filename_comparison_key,
     parse_csv_as_rows,
     validate_file,
 )
 from src.paths import configured_path, data_path
+from src.vector_store.contracts import VectorStore
+from src.vector_store.models import (
+    DocumentReplacement,
+    JsonValue,
+    VectorRecord,
+)
+from src.vector_store.pagination import CursorError
 
 
 def _raw_uploads_dir() -> Path:
@@ -64,15 +70,69 @@ def _settings_path() -> Path:
     """Return the same settings location used by the settings API."""
     return configured_path("RAG_STUDIO_SETTINGS_PATH", "settings.enc.json")
 
+
 # A single document can otherwise fan out into an unbounded embedding batch.
 # This limit applies to both uploads and re-ingestion before any embeddings or
 # Qdrant writes are attempted.
 MAX_CHUNKS_PER_DOCUMENT = 10_000
+MAX_PENDING_UPLOADS = 10
 
 # In-memory store of ingested file metadata for duplicate detection (AC-001.8–001.10)
 # Key: normalized filename (lowercase), Value: dict with hash, chunk_settings, chunk_count
 stored_files: dict[str, dict[str, object]] = {}
 stored_files_lock = asyncio.Lock()
+_pending_upload_names: set[str] = set()
+
+
+class FilenameReservedError(Exception):
+    """Raised when a canonical filename already has an active admission."""
+
+
+class UploadCapacityError(Exception):
+    """Raised when all bounded upload slots are occupied."""
+
+
+async def reserve_upload_name(
+    filename: str,
+    *,
+    rename: bool,
+    allow_stored: bool = False,
+) -> str:
+    """Atomically choose and reserve a canonical upload display name."""
+    canonical = canonicalize_filename(filename)
+    stem = Path(canonical).stem
+    suffix = Path(canonical).suffix
+    async with stored_files_lock:
+        stored_keys = {
+            filename_comparison_key(str(meta.get("original_filename", key)))
+            for key, meta in stored_files.items()
+        }
+        candidate = canonical
+        counter = 1
+        while rename and filename_comparison_key(candidate) in (
+            stored_keys | _pending_upload_names
+        ):
+            candidate = f"{stem} ({counter}){suffix}"
+            counter += 1
+        key = filename_comparison_key(candidate)
+        if key in _pending_upload_names or (not allow_stored and key in stored_keys):
+            raise FilenameReservedError
+        if len(_pending_upload_names) >= MAX_PENDING_UPLOADS:
+            raise UploadCapacityError
+        _pending_upload_names.add(key)
+        return candidate
+
+
+async def release_upload_name(filename_or_key: str) -> None:
+    """Release an upload reservation without waiting for capacity."""
+    key = filename_comparison_key(filename_or_key)
+    async with stored_files_lock:
+        _pending_upload_names.discard(key)
+
+
+async def _reset_upload_admissions_for_tests() -> None:
+    async with stored_files_lock:
+        _pending_upload_names.clear()
 
 
 @dataclass
@@ -118,6 +178,7 @@ async def document_operation_lock(doc_id: str) -> AsyncIterator[None]:
             state.users -= 1
             if state.users == 0 and _document_locks.get(doc_id) is state:
                 del _document_locks[doc_id]
+
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +246,27 @@ class DocumentsListResponse(BaseModel):
     """Response from GET /api/ingest/documents."""
 
     documents: list[DocumentInfo]
-    total: int
+    total: int | None
+    next_cursor: str | None
+    truncated: bool
+
+
+class ChunkInfo(BaseModel):
+    """One chunk returned by the bounded listing API."""
+
+    point_id: str
+    chunk_index: int
+    text: str
+    token_count: int
+    page: int | None
+
+
+class ChunksListResponse(BaseModel):
+    """Response from GET /api/ingest/documents/{doc_id}/chunks."""
+
+    chunks: list[ChunkInfo]
+    next_cursor: str | None
+    truncated: bool
 
 
 class DeleteResponse(BaseModel):
@@ -278,7 +359,11 @@ def generate_unique_filename(original_filename: str) -> str:
     suffix = Path(original_filename).suffix
     candidate = original_filename
     counter = 1
-    while candidate.lower() in stored_files:
+    occupied = {
+        filename_comparison_key(str(meta.get("original_filename", key)))
+        for key, meta in stored_files.items()
+    } | _pending_upload_names
+    while filename_comparison_key(candidate) in occupied:
         candidate = f"{stem} ({counter}){suffix}"
         counter += 1
     return candidate
@@ -303,7 +388,13 @@ def _get_current_chunk_settings() -> tuple[int, int]:
                 int(data.get("chunk_size", 512)),
                 int(data.get("chunk_overlap", 64)),
             )
-    except Exception:
+    except AttributeError:
+        logger.debug("Could not read current chunk settings, using defaults.")
+    except OSError:
+        logger.debug("Could not read current chunk settings, using defaults.")
+    except UnicodeError:
+        logger.debug("Could not read current chunk settings, using defaults.")
+    except ValueError:
         logger.debug("Could not read current chunk settings, using defaults.")
     return (512, 64)
 
@@ -322,7 +413,7 @@ def _safe_int(value: object) -> int | None:
     try:
         v = int(str(value))
         return v if v > 0 else None
-    except (ValueError, TypeError):
+    except (ValueError, TypeError):  # fmt: skip
         return None
 
 
@@ -336,7 +427,15 @@ async def get_stored_file(filename: str) -> dict[str, object] | None:
         The stored metadata dict, or None if not found.
     """
     async with stored_files_lock:
-        return stored_files.get(filename.lower())
+        key = filename_comparison_key(filename)
+        direct = stored_files.get(key)
+        if direct is not None:
+            return direct
+        for legacy_key, metadata in stored_files.items():
+            legacy_name = str(metadata.get("original_filename", legacy_key))
+            if filename_comparison_key(legacy_name) == key:
+                return metadata
+        return None
 
 
 async def store_file_metadata(
@@ -345,6 +444,7 @@ async def store_file_metadata(
     chunk_count: int,
     chunk_size: int,
     chunk_overlap: int,
+    doc_id: str | None = None,
 ) -> None:
     """Store metadata for an ingested file in the tracking dict.
 
@@ -356,8 +456,16 @@ async def store_file_metadata(
         chunk_overlap: Chunk overlap setting used during ingestion.
     """
     async with stored_files_lock:
-        stored_files[filename.lower()] = {
+        key = filename_comparison_key(filename)
+        existing = stored_files.get(key)
+        preserved_doc_id = doc_id or (
+            str(existing["doc_id"])
+            if existing is not None and "doc_id" in existing
+            else str(make_document_doc_id(filename))
+        )
+        stored_files[key] = {
             "original_filename": filename,
+            "doc_id": preserved_doc_id,
             "file_hash": file_hash,
             "chunk_count": chunk_count,
             "chunk_size": chunk_size,
@@ -375,98 +483,64 @@ async def remove_stored_file(filename: str) -> bool:
         True if the file was found and removed, False otherwise.
     """
     async with stored_files_lock:
-        key = filename.lower()
+        key = filename_comparison_key(filename)
         if key in stored_files:
             del stored_files[key]
             return True
+        for legacy_key, metadata in tuple(stored_files.items()):
+            legacy_name = str(metadata.get("original_filename", legacy_key))
+            if filename_comparison_key(legacy_name) == key:
+                del stored_files[legacy_key]
+                return True
         return False
 
 
-async def get_document_info_from_qdrant(
-    client: AsyncQdrantClient,
+async def get_document_info_from_store(
+    vector_store: VectorStore,
     filename: str,
 ) -> dict[str, object] | None:
-    """Query Qdrant for existing document metadata (fallback when stored_files is cold).
-
-    Used after server restart when the in-memory stored_files dict is empty
-    but documents exist in Qdrant.
-
-    Args:
-        client: AsyncQdrantClient instance.
-        filename: Original filename to look up.
-
-    Returns:
-        Dict with file_hash, chunk_count, chunk_size, chunk_overlap,
-        or None if no points found for this doc_id.
-    """
-    await ensure_collection_exists(client)
-    doc_id = make_document_doc_id(filename)
-
-    try:
-        count_result = await client.count(
-            collection_name=COLLECTION_NAME,
-            count_filter=qmodels.Filter(
-                must=[
-                    qmodels.FieldCondition(
-                        key="doc_id",
-                        match=qmodels.MatchValue(value=doc_id),
-                    ),
-                ],
-            ),
-            exact=True,
-        )
-    except Exception:
-        logger.debug("Qdrant count failed for doc_id=%s", doc_id)
+    """Read persisted duplicate metadata through the vector capability."""
+    metadata = await vector_store.find_document(filename)
+    if metadata is None:
         return None
-
-    if count_result.count == 0:
-        return None
-
-    # Fetch one point to get chunk metadata
-    scroll_result, _ = await client.scroll(
-        collection_name=COLLECTION_NAME,
-        scroll_filter=qmodels.Filter(
-            must=[
-                qmodels.FieldCondition(
-                    key="doc_id",
-                    match=qmodels.MatchValue(value=doc_id),
-                ),
-            ],
-        ),
-        limit=1,
-        with_payload=True,
-        with_vectors=False,
-    )
-
-    if not scroll_result:
-        return None
-
-    payload = scroll_result[0].payload or {}
-
-    # Use _safe_int to treat missing/zero chunk settings as unknown (None).
-    # Old documents in Qdrant may lack chunk_size/chunk_overlap fields.
-    cs_val = _safe_int(payload.get("chunk_size"))
-    co_val = _safe_int(payload.get("chunk_overlap"))
-
     info: dict[str, object] = {
-        "original_filename": filename,
-        "file_hash": str(payload.get("file_hash", "")),
-        "chunk_count": payload.get("total_chunks", count_result.count),
-        "chunk_size": cs_val if cs_val is not None else 0,
-        "chunk_overlap": co_val if co_val is not None else 0,
+        "original_filename": metadata.filename,
+        "doc_id": metadata.doc_id,
+        "file_hash": metadata.file_hash,
+        "chunk_count": metadata.chunk_count,
+        "chunk_size": metadata.chunk_size,
+        "chunk_overlap": metadata.chunk_overlap,
     }
-
-    # Cache in stored_files with normalized defaults for unknown values.
-    # This prevents stale 0-values from triggering false chunk-settings-changed warnings.
     await store_file_metadata(
-        filename=filename,
-        file_hash=str(info["file_hash"]),
-        chunk_count=int(str(info["chunk_count"])),
-        chunk_size=cs_val if cs_val is not None else 512,
-        chunk_overlap=co_val if co_val is not None else 64,
+        filename=metadata.filename,
+        file_hash=metadata.file_hash,
+        chunk_count=metadata.chunk_count,
+        chunk_size=metadata.chunk_size or 512,
+        chunk_overlap=metadata.chunk_overlap or 64,
+        doc_id=metadata.doc_id,
     )
-
     return info
+
+
+async def _record_ingestion_failure(
+    file_id: str,
+    code: str,
+    stage: str,
+    *,
+    error_type: str | None = None,
+) -> None:
+    """Record a stable ingestion failure without user or exception text."""
+    await _set_progress(file_id, "error", code)
+    metadata: dict[str, object] = {"error": code, "stage": stage}
+    if error_type is not None:
+        metadata["error_type"] = error_type
+    log_audit("upload", success=False, extra=metadata)
+    logger.warning(
+        "ingestion_failed stage=%s code=%s error_type=%s",
+        stage,
+        code,
+        error_type or "none",
+    )
 
 
 # ============================================================
@@ -479,11 +553,15 @@ async def _ingest_file(
     file_path: str,
     original_filename: str,
     content_type: str | None,
-    client: AsyncQdrantClient,
+    client: VectorStore,
     *,
     chunk_size: int | None = None,
     chunk_overlap: int | None = None,
     file_hash: str = "",
+    doc_id: str | None = None,
+    reservation_key: str | None = None,
+    staged_raw_path: str | None = None,
+    embedder: Embedder | None = None,
 ) -> None:
     """Background task entry point serialized by parent document ID.
 
@@ -491,18 +569,25 @@ async def _ingest_file(
     request.  This keeps the final vectors and ``stored_files`` metadata from
     the same completed ingestion when upload and re-ingest overlap.
     """
-    doc_id = make_document_doc_id(original_filename)
-    async with document_operation_lock(doc_id):
-        await _ingest_file_locked(
-            file_id=file_id,
-            file_path=file_path,
-            original_filename=original_filename,
-            content_type=content_type,
-            client=client,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            file_hash=file_hash,
-        )
+    preserved_doc_id = doc_id or str(make_document_doc_id(original_filename))
+    try:
+        async with document_operation_lock(preserved_doc_id):
+            await _ingest_file_locked(
+                file_id=file_id,
+                file_path=file_path,
+                original_filename=original_filename,
+                content_type=content_type,
+                client=client,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                file_hash=file_hash,
+                doc_id=preserved_doc_id,
+                staged_raw_path=staged_raw_path,
+                embedder=embedder,
+            )
+    finally:
+        if reservation_key is not None:
+            await release_upload_name(reservation_key)
 
 
 async def _ingest_file_locked(
@@ -510,11 +595,14 @@ async def _ingest_file_locked(
     file_path: str,
     original_filename: str,
     content_type: str | None,
-    client: AsyncQdrantClient,
+    client: VectorStore,
     *,
     chunk_size: int | None = None,
     chunk_overlap: int | None = None,
     file_hash: str = "",
+    doc_id: str | None = None,
+    staged_raw_path: str | None = None,
+    embedder: Embedder | None = None,
 ) -> None:
     """Parse, chunk, embed, and replace a document while its lock is held.
 
@@ -541,11 +629,7 @@ async def _ingest_file_locked(
     try:
         await _set_progress(file_id, "processing", "Parsing document...")
 
-        # Ensure collection exists
-        await ensure_collection_exists(client)
-
-        # Generate document UUID5
-        doc_id = make_document_doc_id(original_filename)
+        preserved_doc_id = doc_id or str(make_document_doc_id(original_filename))
 
         # Detect file type
         ext = detect_file_type(original_filename, content_type)
@@ -569,8 +653,6 @@ async def _ingest_file_locked(
             await _set_progress(
                 file_id, "error", "No text chunks generated from document."
             )
-            # Remove stale stored_files entry so re-upload is not blocked
-            await remove_stored_file(original_filename)
             log_audit(
                 "upload",
                 filename=original_filename,
@@ -586,25 +668,50 @@ async def _ingest_file_locked(
             file_id, "processing", f"Generating embeddings for {len(chunks)} chunks..."
         )
 
-        # Generate embeddings
-        dense_vectors = generate_dense_embeddings(chunks)
-        sparse_vectors = generate_sparse_embeddings(chunks)
-
-        await _set_progress(file_id, "processing", "Storing vectors in Qdrant...")
-
-        # Upsert to Qdrant
-        await upsert_chunks(
-            client=client,
-            filename=original_filename,
-            doc_id=doc_id,
-            chunks=chunks,
-            dense_vectors=dense_vectors,
-            sparse_vectors=sparse_vectors,
-            extra_payloads=extra_payload,
-            file_hash=file_hash,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
+        selected_embedder = embedder or get_embedder()
+        dense_vectors = selected_embedder.embed_dense(chunks)
+        sparse_vectors = selected_embedder.embed_sparse(chunks)
+        created_at = datetime.now(UTC).isoformat()
+        records: list[VectorRecord] = []
+        for index, chunk in enumerate(chunks):
+            payload: dict[str, JsonValue] = {
+                "text": chunk,
+                "source": original_filename,
+                "chunk_index": index,
+                "total_chunks": len(chunks),
+                "doc_id": preserved_doc_id,
+                "created_at": created_at,
+                "file_hash": file_hash,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+            }
+            if extra_payload is not None and index < len(extra_payload):
+                payload.update(
+                    {key: str(value) for key, value in extra_payload[index].items()}
+                )
+            records.append(
+                VectorRecord(
+                    point_id=make_doc_id(original_filename, index),
+                    dense=dense_vectors[index],
+                    sparse=sparse_vectors[index],
+                    payload=payload,
+                )
+            )
+        await client.replace_document(
+            DocumentReplacement(
+                doc_id=preserved_doc_id,
+                filename=original_filename,
+                records=tuple(records),
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                created_at=created_at,
+            )
         )
+        if staged_raw_path is not None:
+            raw_path = _raw_uploads_dir() / (
+                f"{preserved_doc_id}{Path(original_filename).suffix}"
+            )
+            Path(staged_raw_path).replace(raw_path)
 
         await _set_progress(
             file_id,
@@ -632,45 +739,34 @@ async def _ingest_file_locked(
                 chunk_count=len(chunks),
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
+                doc_id=preserved_doc_id,
             )
 
-        logger.info(
-            "Successfully ingested '%s': %d chunks, doc_id=%s",
-            original_filename,
-            len(chunks),
-            doc_id,
-        )
+        logger.info("ingestion_completed chunk_count=%d", len(chunks))
 
-    except ValueError as e:
-        error_msg = str(e)
-        await _set_progress(file_id, "error", error_msg)
-        # Remove stale stored_files entry so re-upload is not blocked
-        await remove_stored_file(original_filename)
-        log_audit(
-            "upload",
-            filename=original_filename,
-            success=False,
-            extra={"error": error_msg},
+    except UnsupportedCsvEncodingError:
+        await _record_ingestion_failure(
+            file_id, "unsupported_csv_encoding", "csv_decode"
         )
-        logger.warning("Ingestion failed for '%s': %s", original_filename, error_msg)
-
-    except Exception as e:
-        error_msg = f"Unexpected error: {e}"
-        await _set_progress(file_id, "error", error_msg)
-        # Remove stale stored_files entry so re-upload is not blocked
-        await remove_stored_file(original_filename)
-        log_audit(
-            "upload",
-            filename=original_filename,
-            success=False,
-            extra={"error": str(e)},
+    except ChunkLimitExceededError as error:
+        await _record_ingestion_failure(file_id, str(error), "chunk_limit")
+    except ValueError:
+        await _record_ingestion_failure(file_id, "ingestion_invalid_document", "parse")
+    except asyncio.CancelledError:
+        raise
+    except Exception as error:  # noqa: BLE001 -- background boundary records safe metadata
+        await _record_ingestion_failure(
+            file_id,
+            "ingestion_failed",
+            "background",
+            error_type=type(error).__name__,
         )
-        logger.exception("Ingestion failed for '%s'", original_filename)
-
     finally:
         # Clean up temp file (raw copy persists in data/raw_uploads/)
         try:
             Path(file_path).unlink(missing_ok=True)
+            if staged_raw_path is not None:
+                Path(staged_raw_path).unlink(missing_ok=True)
         except OSError as exc:
             logger.warning(
                 "Could not remove ingestion temp file (%s)", type(exc).__name__
@@ -692,9 +788,10 @@ async def _ingest_file_locked(
 )
 async def upload_document(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+    file: UploadFile = File(...),  # noqa: B008 - FastAPI declaration marker, not an eager application call
     action: str = "default",
-    client: AsyncQdrantClient = Depends(get_qdrant_client),
+    client: VectorStore = Depends(get_vector_store),  # noqa: B008 - FastAPI dependency marker
+    embedder: Embedder = Depends(get_embedder),  # noqa: B008
 ) -> Response:
     """Upload a document for ingestion (AC-001.1, AC-001.5, AC-001.6, AC-001.7, AC-001.8–001.10).
 
@@ -711,7 +808,15 @@ async def upload_document(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided.")
 
-    original_filename = file.filename
+    try:
+        original_filename = canonicalize_filename(file.filename)
+    except ValueError:
+        log_audit(
+            "upload",
+            success=False,
+            extra={"error": "invalid_filename"},
+        )
+        raise HTTPException(status_code=400, detail="Invalid filename") from None
 
     # Read file content
     content = await file.read()
@@ -746,34 +851,21 @@ async def upload_document(
 
     new_hash = compute_sha256(content)
     stored = await get_stored_file(original_filename)
-    logger.info(
-        "Duplicate check: get_stored_file('%s') → %s",
-        original_filename,
-        "found" if stored else "NOT FOUND",
-    )
+    logger.info("duplicate_check memory_hit=%s", stored is not None)
 
     # Fallback: if not in memory (e.g., after server restart), check Qdrant
     in_memory_before_fallback = stored is not None
     if stored is None:
-        stored = await get_document_info_from_qdrant(client, original_filename)
-        logger.info(
-            "Duplicate check: get_document_info_from_qdrant('%s') → %s",
-            original_filename,
-            "found" if stored else "NOT FOUND",
-        )
+        stored = await get_document_info_from_store(client, original_filename)
+        logger.info("duplicate_check persistent_hit=%s", stored is not None)
 
-    logger.info(
-        "DUPLICATE CHECK: filename='%s', in_memory=%s, hash=%s",
-        original_filename,
-        in_memory_before_fallback,
-        new_hash[:12],
-    )
+    logger.info("duplicate_check in_memory=%s", in_memory_before_fallback)
 
     # --- Handle action parameter (AC-001.8) ---
 
     if action == "cancel":
         # User chose "Cancel Upload" from the duplicate modal
-        logger.info("Upload decision: action=cancel for filename=%s", original_filename)
+        logger.info("upload_decision action=cancel")
         log_audit(
             "upload",
             filename=original_filename,
@@ -790,20 +882,11 @@ async def upload_document(
             media_type="application/json",
         )
 
-    if action == "rename":
-        # User chose "Upload as new" — generate a unique name
-        original_filename = generate_unique_filename(original_filename)
-        logger.info("Renamed duplicate file to: %s", original_filename)
-
     if action == "replace" and stored is not None:
         # The background operation deletes and upserts while holding the
         # per-document lock.  Deleting here would race that operation (or a
         # concurrent re-ingest) and can leave the document temporarily empty.
-        doc_id = make_document_doc_id(original_filename)
-        logger.info(
-            "Replace action queued; vector replacement will run under lock for doc_id=%s",
-            doc_id,
-        )
+        logger.info("upload_decision action=replace")
 
     # --- Duplicate detection (AC-001.8) ---
     if action == "default" and stored is not None:
@@ -811,11 +894,7 @@ async def upload_document(
         # from a previous failed upload. Treat as not a duplicate — proceed.
         stored_chunk_count = int(str(stored.get("chunk_count", 0)))
         if stored_chunk_count == 0:
-            logger.info(
-                "DUPLICATE CHECK: stale entry (chunk_count=0) for '%s' — "
-                "removing and proceeding with fresh upload",
-                original_filename,
-            )
+            logger.info("duplicate_check stale_entry=true")
             await remove_stored_file(original_filename)
             stored = None  # Clear the stale reference so no duplicate logic fires
 
@@ -860,11 +939,7 @@ async def upload_document(
         # Same filename exists — check if hash matches for fast path
         if existing_hash == new_hash and not settings_changed:
             # Byte-for-byte identical AND settings unchanged — skip ingestion (AC-001.10)
-            logger.info(
-                "DUPLICATE CHECK: 200 UNCHANGED — filename='%s', hash=%s matches existing",
-                original_filename,
-                new_hash[:12],
-            )
+            logger.info("duplicate_check outcome=unchanged")
             return Response(
                 content=UploadResponse(
                     status="unchanged",
@@ -899,21 +974,17 @@ async def upload_document(
                     estimated_chunks = len(temp_chunks)
             finally:
                 estimate_path.unlink(missing_ok=True)
-        except Exception:
+        except OSError:
+            estimated_chunks = 0
+        except UnicodeError:
+            estimated_chunks = 0
+        except ValueError:
             estimated_chunks = 0
 
         # Approximate existing file size (not stored; use 0 if unknown)
         existing_size = int(str(stored.get("file_size", 0)))
 
-        logger.info(
-            "DUPLICATE CHECK: 409 CONFLICT — filename='%s', existing_chunks=%d, "
-            "stored_chunk_size=%d, stored_chunk_overlap=%d, settings_changed=%s",
-            original_filename,
-            existing_chunks,
-            stored_chunk_size,
-            stored_chunk_overlap,
-            settings_changed,
-        )
+        logger.info("duplicate_check outcome=conflict")
         return Response(
             content=DuplicateResponse(
                 status="duplicate",
@@ -932,45 +1003,64 @@ async def upload_document(
             media_type="application/json",
         )
 
-    logger.info(
-        "DUPLICATE CHECK: 202 PROCESSING — filename='%s', action=%s, "
-        "hash=%s, no duplicate detected",
-        original_filename,
-        action,
-        new_hash[:12],
-    )
+    logger.info("duplicate_check outcome=processing action=%s", action)
 
     # Generate a unique file_id for this ingestion job
     file_id = str(uuid.uuid4())
+    await _set_progress(file_id, "processing", "File received for admission.")
+    try:
+        original_filename = await reserve_upload_name(
+            original_filename,
+            rename=action == "rename",
+            allow_stored=action == "replace",
+        )
+    except FilenameReservedError:
+        raise HTTPException(
+            status_code=409,
+            detail="A document with this filename is already pending or stored.",
+        ) from None
+    except UploadCapacityError:
+        raise HTTPException(
+            status_code=429,
+            detail="Upload capacity reached. Retry after a pending upload completes.",
+        ) from None
+
+    reservation_key = filename_comparison_key(original_filename)
 
     # Store file metadata NOW (synchronously) so duplicate detection works
     # on subsequent uploads (AC-001.8–001.10). The chunk_count is updated
     # in _ingest_file after background processing completes.
     # Read current chunk settings for metadata storage
     _cs, _co = _get_current_chunk_settings()
-    await store_file_metadata(
-        filename=original_filename,
-        file_hash=new_hash,
-        chunk_count=0,  # placeholder — updated after background ingestion
-        chunk_size=_cs,
-        chunk_overlap=_co,
-    )
 
     # Write file to temp location
     suffix = Path(original_filename).suffix
     tmp_path = Path(tempfile.gettempdir()) / f"rag-studio-{file_id}{suffix}"
-    tmp_path.write_bytes(content)
-
-    # Also store a persistent copy in data/raw_uploads/ for re-ingestion (AC-010.4).
-    doc_id = make_document_doc_id(original_filename)
+    preserved_doc_id = (
+        str(
+            stored.get(
+                "doc_id",
+                make_document_doc_id(
+                    str(stored.get("original_filename", original_filename))
+                ),
+            )
+        )
+        if action == "replace" and stored is not None
+        else str(make_document_doc_id(original_filename))
+    )
     raw_uploads_dir = _raw_uploads_dir()
-    raw_uploads_dir.mkdir(parents=True, exist_ok=True)
-    raw_path = raw_uploads_dir / f"{doc_id}{suffix}"
-    raw_path.write_bytes(content)
-    logger.debug("Raw upload saved for re-ingestion: %s (doc_id=%s)", raw_path, doc_id)
-
-    # Initialize progress
-    await _set_progress(file_id, "processing", "File received, queued for ingestion.")
+    staged_raw_path = raw_uploads_dir / f".{file_id}.pending"
+    try:
+        tmp_path.write_bytes(content)
+        raw_uploads_dir.mkdir(parents=True, exist_ok=True)
+        staged_raw_path.write_bytes(content)
+    except OSError as error:
+        tmp_path.unlink(missing_ok=True)
+        staged_raw_path.unlink(missing_ok=True)
+        await release_upload_name(reservation_key)
+        raise HTTPException(
+            status_code=500, detail="Could not stage upload."
+        ) from error
 
     # Schedule background ingestion — pass current chunk settings
     background_tasks.add_task(
@@ -983,15 +1073,13 @@ async def upload_document(
         file_hash=new_hash,
         chunk_size=_cs,
         chunk_overlap=_co,
+        doc_id=preserved_doc_id,
+        reservation_key=reservation_key,
+        staged_raw_path=str(staged_raw_path),
+        embedder=embedder,
     )
 
-    logger.info(
-        "File '%s' accepted for ingestion: file_id=%s, size=%d bytes, action=%s",
-        original_filename,
-        file_id,
-        len(content),
-        action,
-    )
+    logger.info("upload_admitted action=%s size_bytes=%d", action, len(content))
 
     return Response(
         content=UploadResponse(
@@ -1038,238 +1126,113 @@ async def get_ingestion_progress(file_id: str) -> ProgressResponse:
 
 @router.get("/documents", response_model=DocumentsListResponse)
 async def list_documents(
-    client: AsyncQdrantClient = Depends(get_qdrant_client),
+    cursor: str | None = None,
+    client: VectorStore = Depends(get_vector_store),  # noqa: B008
 ) -> DocumentsListResponse:
-    """List all ingested documents with their chunk counts.
-
-    Returns:
-        List of documents with filenames, doc_ids, and chunk counts.
-    """
-    # Ensure collection exists
-    await ensure_collection_exists(client)
-
+    """List one bounded snapshot page of ingested documents."""
     try:
-        # Get all unique doc_ids using scroll with payload
-        seen_docs: dict[str, dict[str, object]] = {}
-
-        offset: Any | None = None
-        while True:
-            points, next_offset = await client.scroll(
-                collection_name=COLLECTION_NAME,
-                limit=100,
-                with_payload=[
-                    "doc_id",
-                    "source",
-                    "created_at",
-                    "chunk_index",
-                    "total_chunks",
-                    "chunk_size",
-                    "chunk_overlap",
-                ],
-                with_vectors=False,
-                offset=offset,
-            )
-
-            for point in points:
-                if point.payload:
-                    doc_id = str(point.payload.get("doc_id", ""))
-                    if doc_id and doc_id not in seen_docs:
-                        seen_docs[doc_id] = {
-                            "doc_id": doc_id,
-                            "filename": point.payload.get("source", "unknown"),
-                            "chunks_count": point.payload.get("total_chunks", 0),
-                            "chunk_size": point.payload.get("chunk_size", 0),
-                            "chunk_overlap": point.payload.get("chunk_overlap", 0),
-                            "created_at": point.payload.get("created_at", ""),
-                        }
-
-            if next_offset is None:
-                break
-            offset = next_offset
-
-        documents = [
-            DocumentInfo(
-                doc_id=str(d["doc_id"]),
-                filename=str(d["filename"]),
-                chunks_count=int(str(d["chunks_count"])),
-                chunk_size=int(str(d.get("chunk_size", 0))),
-                chunk_overlap=int(str(d.get("chunk_overlap", 0))),
-                created_at=str(d["created_at"]),
-            )
-            for d in seen_docs.values()
-        ]
-
-        return DocumentsListResponse(
-            documents=documents,
-            total=len(documents),
+        page = await client.list_documents(cursor)
+    except CursorError:
+        raise HTTPException(
+            status_code=422, detail="Invalid or expired cursor"
+        ) from None
+    documents = [
+        DocumentInfo(
+            doc_id=str(point.payload.get("doc_id", "")),
+            filename=str(point.payload.get("source", "unknown")),
+            chunks_count=int(str(point.payload.get("total_chunks", 0))),
+            chunk_size=int(str(point.payload.get("chunk_size", 0))),
+            chunk_overlap=int(str(point.payload.get("chunk_overlap", 0))),
+            created_at=str(point.payload.get("created_at", "")),
         )
+        for point in page.items
+    ]
+    return DocumentsListResponse(
+        documents=documents,
+        total=None if page.truncated else page.matched_items,
+        next_cursor=page.next_cursor,
+        truncated=page.truncated,
+    )
 
-    except Exception as e:
-        logger.warning("Failed to list documents: %s", e)
-        return DocumentsListResponse(documents=[], total=0)
 
-
-@router.get("/documents/{doc_id}/chunks")
+@router.get("/documents/{doc_id}/chunks", response_model=ChunksListResponse)
 async def get_document_chunks(
     doc_id: str,
-    client: AsyncQdrantClient = Depends(get_qdrant_client),
-) -> list[dict[str, object]]:
-    """Get all chunks for a specific document, sorted by chunk_index.
-
-    Returns a list of chunk objects with: chunk_index, text, token_count, page.
-    """
-    await ensure_collection_exists(client)
-
-    # Scroll all points with matching doc_id
-    chunks: list[dict[str, object]] = []
-    offset: int | str | None = None
-
+    cursor: str | None = None,
+    client: VectorStore = Depends(get_vector_store),  # noqa: B008
+) -> ChunksListResponse:
+    """Get one bounded snapshot page of chunks for a document."""
     try:
-        while True:
-            points, next_offset = await client.scroll(
-                collection_name=COLLECTION_NAME,
-                scroll_filter=qmodels.Filter(
-                    must=[
-                        qmodels.FieldCondition(
-                            key="doc_id",
-                            match=qmodels.MatchValue(value=doc_id),
-                        ),
-                    ],
+        result = await client.list_chunks(doc_id, cursor)
+    except CursorError:
+        raise HTTPException(
+            status_code=422, detail="Invalid or expired cursor"
+        ) from None
+    if not result.items and cursor is None:
+        raise HTTPException(status_code=404, detail="No chunks found for document")
+    chunks: list[ChunkInfo] = []
+    for point in result.items:
+        text_value = str(point.payload.get("text", ""))
+        raw_page = point.payload.get("page")
+        chunks.append(
+            ChunkInfo(
+                point_id=point.point_id,
+                chunk_index=int(str(point.payload.get("chunk_index", 0))),
+                text=text_value,
+                token_count=int(
+                    str(point.payload.get("token_count", len(text_value.split())))
                 ),
-                limit=100,
-                with_payload=True,
-                with_vectors=False,
-                offset=offset,
+                page=int(str(raw_page)) if raw_page is not None else None,
             )
-
-            for point in points:
-                if point.payload:
-                    text = str(point.payload.get("text", ""))
-                    chunks.append(
-                        {
-                            "chunk_index": point.payload.get("chunk_index", 0),
-                            "text": text,
-                            "token_count": point.payload.get(
-                                "token_count", len(text.split())
-                            ),
-                            "page": point.payload.get("page"),
-                        }
-                    )
-
-            if next_offset is None:
-                break
-            # next_offset is grpc.PointId | None (int | str | uuid.UUID).
-            # The scroll() method accepts int | str | None at runtime, and
-            # UUID values work as opaque offset identifiers. The type stubs
-            # for qdrant-client do not include UUID in the offset parameter
-            # union, so we use cast() to acknowledge this boundary.
-            offset = cast("int | str | None", next_offset)
-
-    except Exception as e:
-        logger.warning("Failed to fetch chunks for doc_id=%s: %s", doc_id, e)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch chunks: {e}",
         )
-
-    if not chunks:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No chunks found for document: {doc_id}",
-        )
-
-    # Sort by chunk_index
-    chunks.sort(key=lambda c: int(str(c["chunk_index"])))
-
-    return chunks
+    return ChunksListResponse(
+        chunks=chunks,
+        next_cursor=result.next_cursor,
+        truncated=result.truncated,
+    )
 
 
 @router.delete("/documents/{file_id}", response_model=DeleteResponse)
 async def delete_document(
     file_id: str,
-    client: AsyncQdrantClient = Depends(get_qdrant_client),
+    client: VectorStore = Depends(get_vector_store),  # noqa: B008
 ) -> DeleteResponse:
-    """Delete all chunks for a specific document by doc_id.
-
-    Args:
-        file_id: The document's UUID5 doc_id.
-
-    Returns:
-        Confirmation with count of deleted points.
-    """
+    """Delete all chunks for a specific document by domain ID."""
     async with document_operation_lock(file_id):
-        await ensure_collection_exists(client)
-
-        deleted = await delete_document_points(client, file_id)
-        if deleted == 0:
-            logger.warning("No points found for doc_id=%s", file_id)
-
-        # Also remove matching entries from the in-memory stored_files dict
-        # so re-uploading the same file doesn't trigger a false 409 duplicate.
+        deleted = await client.delete_document(file_id)
         filenames_to_remove: list[str] = []
         async with stored_files_lock:
-            for key, meta in list(stored_files.items()):
-                # Use original_filename for UUID comparison — stored_files keys
-                # are lowercased, but make_document_doc_id is case-sensitive.
+            for key, meta in stored_files.items():
                 original_name = str(meta.get("original_filename", key))
                 if str(make_document_doc_id(original_name)) == file_id:
                     filenames_to_remove.append(key)
         for key in filenames_to_remove:
             await remove_stored_file(key)
-            logger.info("Removed stored_file metadata for '%s' after deletion", key)
-
-    log_audit(
-        "delete_document",
-        filename=file_id,
-        success=True,
-        extra={"deleted_count": deleted},
-    )
-
+    log_audit("delete_document", success=True, extra={"deleted_count": deleted})
     return DeleteResponse(
         status="ok",
-        message=f"Deleted {deleted} chunks for document {file_id}",
+        message=f"Deleted {deleted} chunks for document",
         deleted_count=deleted,
     )
 
 
 @router.delete("/clear", response_model=DeleteResponse)
 async def clear_all_documents(
-    client: AsyncQdrantClient = Depends(get_qdrant_client),
+    client: VectorStore = Depends(get_vector_store),  # noqa: B008
 ) -> DeleteResponse:
-    """Clear all documents from the rag_studio_docs collection.
-
-    Returns:
-        Confirmation with count of deleted points.
-    """
-    await ensure_collection_exists(client)
-
-    # Get count before deletion
-    count: int = 0
+    """Clear all document vectors through the application capability."""
     try:
-        info = await client.count(collection_name=COLLECTION_NAME)
-        count = info.count or 0
-    except Exception:
-        count = 0
-
-    # Delete the collection and recreate it
-    try:
-        await client.delete_collection(collection_name=COLLECTION_NAME)
-        await ensure_collection_exists(client)
-    except Exception as e:
-        logger.warning("Error clearing collection: %s", e)
-        raise HTTPException(status_code=500, detail=f"Failed to clear collection: {e}")
-
-    # Clear the in-memory stored_files dict (AC-001.8 cleanup)
+        count = await client.clear_documents()
+    except asyncio.CancelledError:
+        raise
+    except Exception as error:  # noqa: BLE001 -- HTTP boundary maps safe stable failure
+        logger.warning("clear_documents_failed error_type=%s", type(error).__name__)
+        raise HTTPException(
+            status_code=500, detail="Failed to clear collection"
+        ) from None
     async with stored_files_lock:
         stored_files.clear()
-    logger.info("Cleared stored_files in-memory dict")
-
-    log_audit(
-        "clear_all",
-        success=True,
-        extra={"deleted_count": count},
-    )
-
+    log_audit("clear_all", success=True, extra={"deleted_count": count})
     return DeleteResponse(
         status="ok",
         message=f"Cleared all documents. Deleted {count} chunks.",
@@ -1282,7 +1245,8 @@ async def reingest_document(
     request: ReingestRequest,
     background_tasks: BackgroundTasks,
     response: Response,
-    client: AsyncQdrantClient = Depends(get_qdrant_client),
+    client: VectorStore = Depends(get_vector_store),  # noqa: B008 - FastAPI dependency marker
+    embedder: Embedder = Depends(get_embedder),  # noqa: B008
 ) -> ReingestResponse:
     """Re-ingest a document from the raw uploads store (AC-010.4).
 
@@ -1300,36 +1264,37 @@ async def reingest_document(
     """
     import json
 
+    try:
+        canonical_filename = canonicalize_filename(request.filename)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid filename") from None
+
     # Read current chunk settings from saved settings
     _cur_chunk_size = 512
     _cur_chunk_overlap = 64
     settings_path = _settings_path()
     if settings_path.exists():
         try:
-            with open(settings_path, encoding="utf-8") as f:
-                saved: dict[str, object] = json.load(f)
+            saved: dict[str, object] = json.loads(
+                await asyncio.to_thread(settings_path.read_text, encoding="utf-8")
+            )
             _cur_chunk_size = int(str(saved.get("chunk_size", 512)))
             _cur_chunk_overlap = int(str(saved.get("chunk_overlap", 64)))
-        except (json.JSONDecodeError, OSError, ValueError):
+        except (json.JSONDecodeError, OSError, ValueError):  # fmt: skip
             pass
 
     # Find the stored file in data/raw_uploads/ by doc_id.
     # Files are stored as {doc_id}{suffix} during upload (BUG-010-1 fix).
-    suffix = Path(request.filename).suffix
+    suffix = Path(canonical_filename).suffix
     raw_path = _raw_uploads_dir() / f"{request.doc_id}{suffix}"
 
     if not raw_path.exists():
-        logger.warning(
-            "Stored file no longer exists for re-ingestion: %s (doc_id=%s, filename=%s)",
-            raw_path,
-            request.doc_id,
-            request.filename,
-        )
+        logger.warning("reingest_source_missing")
         response.status_code = 200
         return ReingestResponse(
             status="skipped",
             file_id=request.doc_id,
-            message=f"Source file for '{request.filename}' no longer available. Skipping.",
+            message=f"Source file for '{canonical_filename}' no longer available. Skipping.",
             detail=f"Stored file no longer exists: {raw_path.name}",
         )
 
@@ -1352,20 +1317,17 @@ async def reingest_document(
         _ingest_file,
         file_id=file_id,
         file_path=str(tmp_path),
-        original_filename=request.filename,
+        original_filename=canonical_filename,
         content_type=None,
         client=client,
         chunk_size=_cur_chunk_size,
         chunk_overlap=_cur_chunk_overlap,
         file_hash=file_hash,
+        embedder=embedder,
     )
 
     logger.info(
-        "Re-ingestion queued for '%s': new file_id=%s, source=%s, "
-        "chunk_size=%d, chunk_overlap=%d",
-        request.filename,
-        file_id,
-        raw_path.name,
+        "reingest_queued chunk_size=%d chunk_overlap=%d",
         _cur_chunk_size,
         _cur_chunk_overlap,
     )
@@ -1373,5 +1335,5 @@ async def reingest_document(
     return ReingestResponse(
         status="processing",
         file_id=file_id,
-        message=f"Re-ingestion of '{request.filename}' started. Check progress at /api/ingest/progress/{file_id}",
+        message=f"Re-ingestion of '{canonical_filename}' started. Check progress at /api/ingest/progress/{file_id}",
     )

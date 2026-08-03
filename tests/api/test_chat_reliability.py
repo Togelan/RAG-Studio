@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Generator
+from collections.abc import AsyncIterator, Generator
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from src.graph.retry import ProviderFailureError
 from src.graph.session import SessionPersistenceError
 
 
@@ -99,3 +100,80 @@ def test_delete_checkpoint_error_preserves_session_and_hides_details(
     )
     assert "disk details" not in response.text
     assert client.get(f"/api/chat/sessions/{session_id}/messages").status_code == 200
+
+
+def test_terminal_auth_failure_is_safe_nonretryable_and_called_once(
+    client: TestClient,
+) -> None:
+    failure = ProviderFailureError(
+        code="provider_request_failed",
+        retryable=False,
+        stage="invoke",
+        attempt=1,
+    )
+    stream = AsyncMock(side_effect=failure)
+
+    with (
+        patch("src.api.routes.chat.stream_rag_graph", stream),
+        client.stream(
+            "POST",
+            "/api/chat/send",
+            json={"content": "prompt-secret-must-not-leak"},
+        ) as response,
+    ):
+        payloads = [
+            json.loads(line.removeprefix("data: "))
+            for line in response.iter_lines()
+            if line.startswith("data: ") and line != "data: {}"
+        ]
+
+    assert response.status_code == 200
+    assert payloads[-1]["code"] == "provider_request_failed"
+    assert payloads[-1]["retryable"] is False
+    assert "prompt-secret-must-not-leak" not in payloads[-1]["message"]
+    assert stream.await_count == 1
+    from src.api.routes import chat
+
+    assert not any(
+        message.get("role") == "assistant"
+        for messages in chat._session_messages.values()
+        for message in messages
+    )
+
+
+def test_post_token_failure_emits_safe_error_without_assistant_persistence(
+    client: TestClient,
+) -> None:
+    async def post_token_failure(**kwargs: Any) -> AsyncIterator[dict[str, Any]]:
+        del kwargs
+        yield {"type": "token", "token": "partial-secret"}
+        raise ProviderFailureError(
+            code="provider_temporary_unavailable",
+            retryable=True,
+            stage="stream",
+            attempt=1,
+        )
+
+    with (
+        patch("src.api.routes.chat.stream_rag_graph", post_token_failure),
+        client.stream(
+            "POST", "/api/chat/send", json={"content": "do not persist partial"}
+        ) as response,
+    ):
+        payloads = [
+            json.loads(line.removeprefix("data: "))
+            for line in response.iter_lines()
+            if line.startswith("data: ") and line != "data: {}"
+        ]
+
+    from src.api.routes import chat
+
+    assert response.status_code == 200
+    assert [item["token"] for item in payloads if "token" in item] == ["partial-secret"]
+    assert payloads[-1]["code"] == "provider_temporary_unavailable"
+    assert payloads[-1]["retryable"] is True
+    assert not any(
+        message.get("role") == "assistant"
+        for messages in chat._session_messages.values()
+        for message in messages
+    )
