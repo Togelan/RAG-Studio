@@ -71,3 +71,6 @@ docker-compose.override.yml
 # ============================================================
 short instruction of use.md
 blog-post-ru.md
+
+# OMO generated evidence (keep tracked historical records)
+.omo/evidence/*
