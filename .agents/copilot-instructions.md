@@ -223,6 +223,16 @@ understand the actual current checkout ($init-deep when project memory needs ref
 - Use `$remove-ai-slops` only for behavior-preserving cleanup after relevant tests pass.
 - Never report an implementation complete without recorded results from the relevant tests and quality checks.
 
+### Feature discussion before implementation
+
+For non-trivial feature requests, invoke the project skill
+`.agents/skills/feature-discussion/SKILL.md` before implementation. It starts
+with current-checkout inspection, asks exactly one architecture question at a
+time, and records the approved design in `CONTEXT.md`, `docs/adr/`, and
+`docs/features/<feature-slug>.md` before stopping for user approval. It is not
+needed for typo fixes, formatting, simple renames, or isolated one-line bug
+fixes. The user manually starts `$ulw-plan` after reviewing the documents.
+
 ### `$architect` entry point
 
 For a one-prompt architect-led workflow, accept this form:

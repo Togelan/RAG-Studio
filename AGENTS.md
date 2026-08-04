@@ -39,6 +39,20 @@ implement → test → review → update Graphify → commit** in this order:
 Use `$remove-ai-slops` only for behavior-preserving cleanup after tests are
 green; it is not a substitute for implementation or review.
 
+## Feature discussion gate
+
+For non-trivial feature requests, use the project skill
+`.agents/skills/feature-discussion/SKILL.md` first. A request such as “I want
+to add ...” should begin with repository inspection and a one-question-at-a-
+time architecture discussion. After consensus, the skill records stable
+context in `CONTEXT.md`, important decisions in `docs/adr/`, and the approved
+design in `docs/features/<feature-slug>.md`, then stops for user approval.
+
+The skill is not required for typo fixes, formatting, simple renames, or
+isolated one-line bug fixes. After the user approves the documents, the user
+manually invokes `$ulw-plan`; do not automatically invoke `$ulw-plan`,
+`$start-work`, `$ulw-loop`, or `$review-work` from the discussion skill.
+
 ## `$architect` single-prompt dispatch
 
 When a user message starts with `$architect`, treat it as a request for the
