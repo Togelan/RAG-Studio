@@ -3,33 +3,28 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
-from types import MappingProxyType
 from typing import Final
 
-from pydantic import ValidationError
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
-from qdrant_client.http.exceptions import (
-    ApiException,
-    ResponseHandlingException,
-    UnexpectedResponse,
-)
 
-from src.vector_store.contracts import (
-    VectorStore,
-    VectorStoreError,
-    VectorStoreErrorCode,
-)
+from src.vector_store.contracts import VectorStore
 from src.vector_store.models import (
     DocumentMetadata,
     DocumentReplacement,
-    SparseVector,
     VectorCollection,
     VectorRecord,
     VectorSearchHit,
     VectorSearchQuery,
 )
 from src.vector_store.pagination import MAX_SCANNED_POINTS, ListingPage
+from src.vector_store.qdrant_translation import (
+    to_qdrant_point,
+    to_qdrant_sparse,
+    to_search_hit,
+    translated_errors,
+)
+from src.vector_store.strategy_payloads import document_metadata
 
 _DENSE_VECTOR_NAME: Final = "dense"
 _SPARSE_VECTOR_NAME: Final = "sparse"
@@ -45,19 +40,9 @@ class QdrantVectorStore:
 
     async def search(self, query: VectorSearchQuery) -> tuple[VectorSearchHit, ...]:
         """Execute a dense or hybrid query and return domain hits."""
-        try:
+        async with translated_errors():
             response = await self._query_points(query)
-        except ValidationError:
-            raise _invalid_request_error() from None
-        except UnexpectedResponse as error:
-            raise _response_error(error) from None
-        except ResponseHandlingException:
-            raise _unavailable_error() from None
-        except TimeoutError:
-            raise _unavailable_error() from None
-        except ApiException:
-            raise _unavailable_error() from None
-        return tuple(_to_search_hit(point) for point in response.points)
+        return tuple(to_search_hit(point) for point in response.points)
 
     async def upsert(
         self,
@@ -65,27 +50,17 @@ class QdrantVectorStore:
         records: Sequence[VectorRecord],
     ) -> None:
         """Translate every record before submitting one atomic Qdrant request."""
-        try:
-            points = [_to_qdrant_point(record) for record in records]
+        async with translated_errors():
+            points = [to_qdrant_point(record) for record in records]
             await self._client.upsert(
                 collection_name=collection_name,
                 points=points,
                 wait=True,
             )
-        except ValidationError:
-            raise _invalid_request_error() from None
-        except UnexpectedResponse as error:
-            raise _response_error(error) from None
-        except ResponseHandlingException:
-            raise _unavailable_error() from None
-        except TimeoutError:
-            raise _unavailable_error() from None
-        except ApiException:
-            raise _unavailable_error() from None
 
     async def ensure_collection(self, collection: VectorCollection) -> None:
         """Create a named-vector collection through the adapter boundary."""
-        try:
+        async with translated_errors():
             if await self._client.collection_exists(collection.name):
                 return
             sparse_config = (
@@ -107,16 +82,6 @@ class QdrantVectorStore:
                 },
                 sparse_vectors_config=sparse_config,
             )
-        except ValidationError:
-            raise _invalid_request_error() from None
-        except UnexpectedResponse as error:
-            raise _response_error(error) from None
-        except ResponseHandlingException:
-            raise _unavailable_error() from None
-        except TimeoutError:
-            raise _unavailable_error() from None
-        except ApiException:
-            raise _unavailable_error() from None
 
     async def find_document(self, filename: str) -> DocumentMetadata | None:
         """Read one document metadata record without exposing SDK values."""
@@ -140,52 +105,30 @@ class QdrantVectorStore:
             with_vectors=False,
         )
         if not points:
+            points, _ = await self._client.scroll(
+                collection_name=COLLECTION_NAME,
+                scroll_filter=qmodels.Filter(
+                    must=[
+                        qmodels.FieldCondition(
+                            key="source", match=qmodels.MatchValue(value=filename)
+                        )
+                    ]
+                ),
+                limit=1,
+                with_payload=True,
+                with_vectors=False,
+            )
+        if not points:
             return None
-        payload = points[0].payload or {}
-        return DocumentMetadata(
-            doc_id=str(payload.get("doc_id", doc_id)),
-            filename=str(payload.get("source", filename)),
-            file_hash=str(payload.get("file_hash", "")),
-            chunk_count=int(str(payload.get("total_chunks", 0))),
-            chunk_size=int(str(payload.get("chunk_size", 0))),
-            chunk_overlap=int(str(payload.get("chunk_overlap", 0))),
-        )
+        return document_metadata(points[0].payload or {}, doc_id=doc_id, filename=filename)
 
     async def replace_document(self, replacement: DocumentReplacement) -> int:
         """Upsert the complete batch before deleting any stale chunk IDs."""
-        from src.ingestion.embedder import COLLECTION_NAME
-        from src.vector_store.document_index import index_document
+        from src.vector_store.document_replacement import replace_document
 
-        await self.ensure_collection(
-            VectorCollection(COLLECTION_NAME, 384, sparse=True)
+        return await replace_document(
+            self._client, self.ensure_collection, self.upsert, replacement
         )
-        await self.upsert(COLLECTION_NAME, replacement.records)
-        keep_ids = [record.point_id for record in replacement.records]
-        await self._client.delete(
-            collection_name=COLLECTION_NAME,
-            points_selector=qmodels.FilterSelector(
-                filter=qmodels.Filter(
-                    must=[
-                        qmodels.FieldCondition(
-                            key="doc_id",
-                            match=qmodels.MatchValue(value=replacement.doc_id),
-                        )
-                    ],
-                    must_not=[qmodels.HasIdCondition(has_id=keep_ids)],
-                )
-            ),
-            wait=True,
-        )
-        await index_document(
-            self._client,
-            replacement.doc_id,
-            replacement.filename,
-            len(replacement.records),
-            replacement.chunk_size,
-            replacement.chunk_overlap,
-            replacement.created_at,
-        )
-        return len(replacement.records)
 
     async def list_documents(self, cursor: str | None = None) -> ListingPage:
         """Return one bounded document page through the existing paginator."""
@@ -288,7 +231,7 @@ class QdrantVectorStore:
                 limit=query.limit * _PREFETCH_MULTIPLIER,
             ),
             qmodels.Prefetch(
-                query=_to_qdrant_sparse(query.sparse),
+                query=to_qdrant_sparse(query.sparse),
                 using=_SPARSE_VECTOR_NAME,
                 limit=query.limit * _PREFETCH_MULTIPLIER,
             ),
@@ -312,44 +255,3 @@ async def get_vector_store(
 
         client_factory = get_qdrant_client
     return QdrantVectorStore(await client_factory())
-
-
-def _to_qdrant_sparse(vector: SparseVector) -> qmodels.SparseVector:
-    return qmodels.SparseVector(
-        indices=list(vector.indices),
-        values=list(vector.values),
-    )
-
-
-def _to_qdrant_point(record: VectorRecord) -> qmodels.PointStruct:
-    vectors: dict[str, qmodels.Vector] = {_DENSE_VECTOR_NAME: list(record.dense.values)}
-    if record.sparse is not None:
-        vectors[_SPARSE_VECTOR_NAME] = _to_qdrant_sparse(record.sparse)
-    return qmodels.PointStruct(
-        id=record.point_id,
-        vector=vectors,
-        payload=dict(record.payload),
-    )
-
-
-def _to_search_hit(point: qmodels.ScoredPoint) -> VectorSearchHit:
-    return VectorSearchHit(
-        point_id=point.id,
-        score=point.score,
-        payload=MappingProxyType(dict(point.payload or {})),
-    )
-
-
-def _response_error(error: UnexpectedResponse) -> VectorStoreError:
-    status = error.status_code
-    if status is not None and 400 <= status < 500 and status != 429:
-        return _invalid_request_error()
-    return _unavailable_error()
-
-
-def _invalid_request_error() -> VectorStoreError:
-    return VectorStoreError(VectorStoreErrorCode.INVALID_REQUEST, retryable=False)
-
-
-def _unavailable_error() -> VectorStoreError:
-    return VectorStoreError(VectorStoreErrorCode.UNAVAILABLE, retryable=True)

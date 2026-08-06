@@ -114,6 +114,12 @@ class DocumentMetadata:
     chunk_count: int
     chunk_size: int
     chunk_overlap: int
+    strategy: str = "recursive"
+    schema_version: int = 1
+    chunking_fingerprint: str | None = None
+    chunking_settings: Payload = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,3 +132,10 @@ class DocumentReplacement:
     chunk_size: int
     chunk_overlap: int
     created_at: str
+    strategy: str = "recursive"
+    schema_version: int = 1
+    file_hash: str = ""
+    chunking_fingerprint: str | None = None
+    chunking_settings: Payload = field(
+        default_factory=lambda: MappingProxyType({})
+    )

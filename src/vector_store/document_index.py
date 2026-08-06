@@ -8,7 +8,12 @@ import anyio
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
 
-from src.vector_store.models import JsonValue
+from src.vector_store.models import DocumentMetadata, JsonValue
+from src.vector_store.strategy_payloads import (
+    document_payload,
+    json_payload,
+    metadata_payload,
+)
 
 DOCUMENT_INDEX_COLLECTION: Final = "rag_studio_document_index"
 _INDEX_NAMESPACE: Final = uuid.UUID("4daf3bd4-66a5-4e32-9d11-a2ad0d35822c")
@@ -59,6 +64,15 @@ async def prepare_document_index(
                 "total_chunks",
                 "chunk_size",
                 "chunk_overlap",
+                "file_hash",
+                "strategy",
+                "schema_version",
+                "chunking_strategy",
+                "chunking_schema_version",
+                "chunking_fingerprint",
+                "chunking_settings",
+                "parent_size",
+                "window_sentences",
             ],
             with_vectors=False,
             offset=next_offset,
@@ -68,7 +82,7 @@ async def prepare_document_index(
         response_exceeded_cap = len(points) > len(accepted_points)
         scanned += len(accepted_points)
         for point in accepted_points:
-            payload = _document_payload(point.payload or {})
+            payload = document_payload(point.payload or {})
             doc_id = str(payload.get("doc_id", ""))
             if doc_id and doc_id not in documents:
                 documents[doc_id] = IndexedDocument(_index_id(doc_id), payload)
@@ -105,20 +119,22 @@ async def index_document(
     chunk_size: int,
     chunk_overlap: int,
     created_at: str,
+    *,
+    metadata: DocumentMetadata | None = None,
 ) -> None:
     """Insert or replace one maintained document metadata record."""
     await _ensure_index(client)
+    persisted = metadata or DocumentMetadata(
+        doc_id=doc_id,
+        filename=filename,
+        file_hash="",
+        chunk_count=chunks_count,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
     document = IndexedDocument(
         point_id=_index_id(doc_id),
-        payload={
-            "record_type": "document",
-            "doc_id": doc_id,
-            "source": filename,
-            "total_chunks": chunks_count,
-            "chunk_size": chunk_size,
-            "chunk_overlap": chunk_overlap,
-            "created_at": created_at,
-        },
+        payload=metadata_payload(persisted, created_at),
     )
     await client.upsert(
         collection_name=DOCUMENT_INDEX_COLLECTION,
@@ -142,6 +158,40 @@ async def clear_document_index(client: AsyncQdrantClient) -> None:
     """Remove only the document index collection during application clear."""
     if await client.collection_exists(DOCUMENT_INDEX_COLLECTION):
         await client.delete_collection(collection_name=DOCUMENT_INDEX_COLLECTION)
+
+
+async def read_index_document(
+    client: AsyncQdrantClient, doc_id: str
+) -> IndexedDocument | None:
+    """Read one raw index record for replacement compensation."""
+    if not await client.collection_exists(DOCUMENT_INDEX_COLLECTION):
+        return None
+    points = await client.retrieve(
+        collection_name=DOCUMENT_INDEX_COLLECTION,
+        ids=[_index_id(doc_id)],
+        with_payload=True,
+        with_vectors=False,
+    )
+    if not points:
+        return None
+    return IndexedDocument(_index_id(doc_id), json_payload(points[0].payload or {}))
+
+
+async def restore_index_document(
+    client: AsyncQdrantClient,
+    doc_id: str,
+    previous: IndexedDocument | None,
+) -> None:
+    """Restore an index snapshot after an interrupted replacement."""
+    if previous is None:
+        await delete_index_document(client, doc_id)
+        return
+    await _ensure_index(client)
+    await client.upsert(
+        collection_name=DOCUMENT_INDEX_COLLECTION,
+        points=[_point(previous)],
+        wait=True,
+    )
 
 
 async def _ensure_index(client: AsyncQdrantClient) -> None:
@@ -198,25 +248,6 @@ def _point(document: IndexedDocument) -> qmodels.PointStruct:
 
 def _index_id(doc_id: str) -> str:
     return str(uuid.uuid5(_INDEX_NAMESPACE, doc_id))
-
-
-def _document_payload(raw: dict[str, object]) -> dict[str, JsonValue]:
-    return {
-        "record_type": "document",
-        "doc_id": str(raw.get("doc_id", "")),
-        "source": str(raw.get("source", "unknown")),
-        "created_at": str(raw.get("created_at", "")),
-        "total_chunks": _integer(raw.get("total_chunks")),
-        "chunk_size": _integer(raw.get("chunk_size")),
-        "chunk_overlap": _integer(raw.get("chunk_overlap")),
-    }
-
-
-def _integer(value: object) -> int:
-    try:
-        return int(str(value))
-    except ValueError:
-        return 0
 
 
 def _offset(value: object) -> int | str | None:
