@@ -17,7 +17,7 @@ _CHUNKING_SETTING_KEYS = (
     "window_sentences",
 )
 _VALID_STRATEGIES: Final = frozenset(
-    {"static", "recursive", "parent_document", "sentence_window"}
+    {"static", "recursive", "parent_document", "sentence_window", "csv_row"}
 )
 
 

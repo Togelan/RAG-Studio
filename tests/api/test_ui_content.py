@@ -421,3 +421,35 @@ class TestChunkSettingsColumn:
         assert docs[0]["chunk_overlap"] == 64
         assert docs[0]["filename"] == "test-doc.txt"
         assert docs[0]["chunks_count"] == 3
+
+
+class TestChunkingStrategyControls:
+    """Regression coverage for global chunking controls on Settings."""
+
+    def test_settings_page_exposes_global_strategy_and_conditional_panels(
+        self, client: TestClient
+    ) -> None:
+        """GET /settings renders the strategy selector and all parameter panels."""
+        response = client.get("/settings")
+
+        assert response.status_code == 200
+        assert 'id="settings-chunking-strategy"' in response.text
+        assert 'value="static"' in response.text
+        assert 'value="recursive"' in response.text
+        assert 'value="parent_document"' in response.text
+        assert 'value="sentence_window"' in response.text
+        assert 'data-chunking-panel="parent_document"' in response.text
+        assert 'data-chunking-panel="sentence_window"' in response.text
+
+    def test_settings_client_saves_before_safe_reingestion(self, client: TestClient) -> None:
+        """The browser client saves settings first and never clears the index."""
+        response = client.get("/static/js/app.js")
+
+        assert response.status_code == 200
+        source = response.text
+        assert "saveSettingsAndOfferReingestion" in source
+        assert "fetchAllDocumentsForReingestion" in source
+        assert "'/api/ingest/clear'" not in source
+        assert "reingestSucceeded" in source
+        assert "reingestSkipped" in source
+        assert "reingestFailed" in source

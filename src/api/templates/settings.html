@@ -58,7 +58,7 @@
           <input type="range" id="settings-temperature" class="input-field" data-testid="temperature-slider" min="0.0" max="2.0" step="0.01" value="1.0">
         </div>
 
-        <!-- Retrieval Settings Row (Top-K, Chunk Size, Chunk Overlap) -->
+        <!-- Retrieval and global chunking settings -->
         <div class="settings-card card retrieval-settings-row settings-card-equal-height" data-testid="retrieval-settings-row">
           <div class="retrieval-setting-item">
             <label for="settings-top-k" data-i18n="settings_top_k_label">Top-K</label>
@@ -70,6 +70,15 @@
             </select>
           </div>
           <div class="retrieval-setting-item">
+            <label for="settings-chunking-strategy" data-i18n="settings_chunking_strategy_label">Chunking Strategy</label>
+            <select id="settings-chunking-strategy" class="input-field" data-testid="chunking-strategy-select">
+              <option value="static" data-i18n="settings_chunking_strategy_static">Static</option>
+              <option value="recursive" selected data-i18n="settings_chunking_strategy_recursive">Recursive</option>
+              <option value="parent_document" data-i18n="settings_chunking_strategy_parent_document">Parent document</option>
+              <option value="sentence_window" data-i18n="settings_chunking_strategy_sentence_window">Sentence window</option>
+            </select>
+          </div>
+          <div class="retrieval-setting-item" data-chunking-panel="fixed">
             <label for="settings-chunk-size" data-i18n="settings_chunk_size_label">Chunk Size</label>
             <select id="settings-chunk-size" class="input-field" data-testid="chunk-size-select">
               <option value="256">256</option>
@@ -77,12 +86,29 @@
               <option value="1024">1024</option>
             </select>
           </div>
-          <div class="retrieval-setting-item">
+          <div class="retrieval-setting-item" data-chunking-panel="fixed">
             <label for="settings-chunk-overlap" data-i18n="settings_chunk_overlap_label">Chunk Overlap</label>
             <select id="settings-chunk-overlap" class="input-field" data-testid="chunk-overlap-select">
               <option value="32">32</option>
               <option value="64" selected>64</option>
               <option value="128">128</option>
+            </select>
+          </div>
+          <div class="retrieval-setting-item" data-chunking-panel="parent_document" hidden>
+            <label for="settings-parent-size" data-i18n="settings_parent_size_label">Parent Size</label>
+            <select id="settings-parent-size" class="input-field" data-testid="parent-size-select">
+              <option value="512">512</option>
+              <option value="1024">1024</option>
+              <option value="2048" selected>2048</option>
+              <option value="4096">4096</option>
+            </select>
+          </div>
+          <div class="retrieval-setting-item" data-chunking-panel="sentence_window" hidden>
+            <label for="settings-window-sentences" data-i18n="settings_window_sentences_label">Context Sentences</label>
+            <select id="settings-window-sentences" class="input-field" data-testid="window-sentences-select">
+              <option value="1">±1</option>
+              <option value="2" selected>±2</option>
+              <option value="3">±3</option>
             </select>
           </div>
         </div>
@@ -106,6 +132,7 @@
                 <div class="progress-bar-fill" id="reingest-progress-bar" style="width: 0%;"></div>
               </div>
               <p class="progress-text" id="reingest-progress-text" data-i18n="reingest_progress">Re-ingesting documents...</p>
+              <p class="progress-text" id="reingest-progress-summary" aria-live="polite"></p>
             </div>
             <div class="modal-actions">
               <button class="btn-secondary" id="reingest-modal-skip" data-i18n="reingest_skip">Skip</button>
@@ -140,6 +167,7 @@
             <th data-i18n="settings_doc_col_filename">Filename</th>
             <th data-i18n="settings_doc_col_type">Type</th>
             <th data-i18n="settings_doc_col_chunks">Chunks</th>
+            <th data-i18n="settings_doc_col_strategy">Strategy</th>
             <th data-i18n="settings_doc_col_chunk_settings">Chunk Settings</th>
             <th data-i18n="settings_doc_col_date">Date</th>
             <th data-i18n="settings_doc_col_actions">Actions</th>
@@ -148,7 +176,7 @@
         <tbody id="doc-table-body">
           <!-- Rows rendered by JS -->
           <tr class="doc-table-empty">
-            <td colspan="6" data-i18n="settings_no_documents">No documents uploaded yet.</td>
+            <td colspan="7" data-i18n="settings_no_documents">No documents uploaded yet.</td>
           </tr>
         </tbody>
       </table>

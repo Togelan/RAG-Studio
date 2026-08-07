@@ -217,8 +217,8 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 **Given** the Settings page
 **When** I configure retrieval parameters
 **Then** I can set **Top-K** (3/5/10/20) — the number of chunks returned to the LLM after reranking
-**And** I can set **Chunk Size** (256/512/1024 tokens) — token count per chunk during ingestion
-**And** I can set **Chunk Overlap** (32/64/128 tokens) — overlap between adjacent chunks
+**And** I can set **Chunk Size** (256/512/1024 characters) — character count per chunk during ingestion
+**And** I can set **Chunk Overlap** (32/64/128 characters) — overlap between adjacent chunks
 **And** all three settings are persisted via `POST /api/settings` and restored on reload
 
 ### Technical Notes
@@ -401,7 +401,7 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 **When** I view the right column
 **Then** I see a retrieval settings row with three dropdowns:
   - **Top-K** (3/5/10/20) — number of chunks returned to the LLM
-  - **Chunk Size** (256/512/1024) — token count per chunk during ingestion
+  - **Chunk Size** (256/512/1024) — character count per chunk during ingestion
   - **Chunk Overlap** (32/64/128) — overlap between adjacent chunks
 **And** all three settings are persisted with other settings and restored on reload
 
@@ -845,8 +845,8 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 #### AC-010.4: Re-Ingest All Path — Full Re-Ingestion
 **Given** the re-ingestion modal is shown and I have N documents in the document table
 **When** I click "Re-ingest All"
-**Then** the system calls `DELETE /api/ingest/clear` to remove all existing chunks
-**And** the document table clears
+**Then** the current settings are saved before re-ingestion begins
+**And** the system does not call `DELETE /api/ingest/clear` or clear the whole index
 **And** all N documents are re-uploaded/re-ingested sequentially using the current file list from the document table
 **And** a progress bar is shown for each document during re-ingestion
 **And** the overall progress is shown as "Re-ingesting document X of N..."
@@ -856,8 +856,8 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 #### AC-010.5: Chunk-Setting-Change Detection
 **Given** the Settings page is open
 **When** I click "Save Settings"
-**Then** the system compares the new chunk_size and chunk_overlap values against the previously saved values (fetched via `GET /api/settings` on page load)
-**And** the re-ingestion flow is triggered ONLY if chunk_size OR chunk_overlap has changed
+**Then** the system compares the selected strategy and its active parameters against the previously saved values (fetched via `GET /api/settings` on page load)
+**And** the re-ingestion flow is triggered ONLY if the strategy or an active chunking parameter has changed
 **And** changes to other settings (provider, model, temperature, max_tokens, top_k, system_prompt) do NOT trigger the re-ingestion flow
 
 #### AC-010.6: Error Handling During Re-Ingestion
@@ -876,6 +876,57 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 - Progress tracking reuses the existing `GET /api/ingest/progress/{file_id}` polling mechanism.
 - i18n keys to add: `reingest_modal_title`, `reingest_modal_message`, `reingest_skip`, `reingest_confirm`, `reingest_progress`, `reingest_complete`, `reingest_error`, `reingest_complete_errors`.
 - The `POST /api/settings` response should include a `chunks_changed: bool` field to signal whether chunk-related settings were modified, so the frontend can decide to show the modal.
+
+---
+
+## FR-011: Chunking Strategy Library and Mixed-Strategy Retrieval
+
+### User Story
+**As a** RAG-Studio user,
+**I want** to choose a bounded document chunking strategy and retrieve context from documents indexed with different strategies,
+**So that** I can tune context formation without losing existing documents or citation traceability.
+
+### Acceptance Criteria
+
+#### AC-011.1: Global Strategy Selection and Validation
+**Given** I am on the Settings page and the project has no per-document strategy override
+**When** I select `static`, `recursive`, `parent_document`, or `sentence_window` and save valid preset parameters
+**Then** the settings are persisted under a versioned `chunking` object with the selected strategy
+**And** only the selected strategy's controls are active and validated
+**And** an omitted or legacy strategy defaults to `recursive`
+
+#### AC-011.2: Safe Strategy Re-Ingestion
+**Given** the project contains documents indexed with one or more strategies and I change the global strategy
+**When** I choose "Re-ingest All"
+**Then** the new settings are saved before a document-at-a-time re-ingestion begins
+**And** the system does not clear the whole index before replacement
+**And** a failed document retains its prior complete index while other documents continue
+**And** each successfully replaced document records its actual strategy metadata
+
+#### AC-011.3: Mixed-Strategy Retrieval and Context Limits
+**Given** one searchable Qdrant collection contains static, recursive, parent-document, sentence-window, and legacy recursive points
+**When** a hybrid query is retrieved
+**Then** dense and sparse candidates from all strategies are fused and strategy-aware expansion occurs before reranking
+**And** parent and sentence-window duplicates are deduplicated without crossing paragraph boundaries
+**And** `top_k` counts final deduplicated context units sent to the LLM, subject to the hard context budget
+
+#### AC-011.4: CSV Marker and Citation Location Fallback
+**Given** a CSV document is ingested or a parsed source does not provide a usable location range
+**When** its points and citations are returned
+**Then** each CSV row keeps atomic row and header metadata and records the actual strategy marker `csv_row`, regardless of the selected text strategy
+**And** a citation with no usable source location records `location_unavailable` instead of inventing an offset
+
+#### AC-011.5: Informational Local Benchmark
+**Given** the application is evaluated with the actual `docker-compose.yml` limits of 4 GB memory and 2 CPU cores
+**When** a 50,000-point benchmark is run
+**Then** ingestion duration, memory, storage, retrieval latency, and failure behavior are recorded as informational measurements
+**And** the result is not represented as a universal SLA or a hard pass/fail gate
+
+### Technical Notes
+- The global settings contract is nested and versioned; strategy-specific values use characters for static, recursive, and parent-document sizes and sentence counts for sentence-window controls.
+- All strategies share the existing searchable Qdrant collection. A document's payload records its actual strategy, search-unit metadata, and location range where available. CSV rows override the configured text strategy with `csv_row` as their actual strategy marker.
+- Retrieval expands parent and sentence-window search units, deduplicates them, and applies final `top_k` and hard context limits before generation. Missing parser offsets use the explicit citation location value `location_unavailable`.
+- The 50,000-point benchmark is informational and must be reported against Compose's 4 GB/2 CPU limits; it does not establish the existing p95 or other NFR thresholds on every host.
 
 ---
 
@@ -934,6 +985,7 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 | FR-008 | AC-008.1–008.10 | — | `Dockerfile`, `docker-compose.yml`, `.env.example`, `src/api/main.py`, `src/api/dependencies.py` | `tests/test_deployment.py` |
 | FR-009 | AC-009.1–009.4 | — | `src/api/locales/en.json`, `src/api/locales/ru.json`, `src/api/routes/ui.py` | `tests/i18n/test_locales.py` |
 | FR-010 | AC-010.1–010.6 | ui-design, qdrant-operations | `src/api/templates/settings.html`, `src/api/routes/settings.py`, `src/api/static/js/app.js`, `src/ingestion/router.py` | `tests/api/test_settings_reingest.py` |
+| FR-011 | AC-011.1–011.5 | qdrant-operations, rag-best-practices | `src/ingestion/`, `src/vector_store/`, `src/retrieve/`, `src/api/routes/settings.py`, `src/api/templates/settings.html` | `tests/ingestion/`, `tests/vector_store/`, `tests/retrieve/`, `tests/api/` |
 
 ---
 

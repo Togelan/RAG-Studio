@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,12 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from src.api.chunking_settings import (
+    ChunkingSettings,
+    chunking_for_persistence,
+    merge_chunking_settings,
+    read_chunking_settings,
+)
 from src.api.dependencies import (
     decrypt_api_key,
     encrypt_api_key,
@@ -87,6 +93,7 @@ class SettingsData(BaseModel):
     top_k: int = Field(default=5, ge=1, le=100)
     chunk_size: int = Field(default=512, ge=128, le=4096)
     chunk_overlap: int = Field(default=64, ge=0, le=512)
+    chunking: ChunkingSettings | None = None
 
 
 class SaveSettingsResponse(BaseModel):
@@ -100,6 +107,7 @@ class SaveSettingsResponse(BaseModel):
     top_k: int
     chunk_size: int
     chunk_overlap: int
+    chunking: ChunkingSettings
     chunks_changed: bool = Field(
         default=False,
         description="True if chunk_size or chunk_overlap differs from previously saved values",
@@ -117,6 +125,7 @@ class GetSettingsResponse(BaseModel):
     top_k: int
     chunk_size: int
     chunk_overlap: int
+    chunking: ChunkingSettings
     api_key: str | None = None  # "********" if set, null otherwise
 
 
@@ -298,6 +307,7 @@ async def get_settings() -> GetSettingsResponse:
     if key_name in secrets or any(k.startswith(provider) for k in secrets):
         api_key_masked = "********"
 
+    chunking = read_chunking_settings(settings)
     return GetSettingsResponse(
         provider=provider,
         model=str(settings.get("model", "gpt-4o-mini")),
@@ -310,8 +320,9 @@ async def get_settings() -> GetSettingsResponse:
             )
         ),
         top_k=int(settings.get("top_k", 5)),
-        chunk_size=int(settings.get("chunk_size", 512)),
-        chunk_overlap=int(settings.get("chunk_overlap", 64)),
+        chunk_size=chunking.chunk_size,
+        chunk_overlap=chunking.chunk_overlap,
+        chunking=chunking,
         api_key=api_key_masked,
     )
 
@@ -340,13 +351,13 @@ async def save_settings(settings: SettingsData) -> SaveSettingsResponse:
 
     current = load_settings()
 
-    # Detect if chunk-related settings have changed (AC-010.5)
-    prev_chunk_size = int(current.get("chunk_size", 512))
-    prev_chunk_overlap = int(current.get("chunk_overlap", 64))
-    chunks_changed = (
-        settings.chunk_size != prev_chunk_size
-        or settings.chunk_overlap != prev_chunk_overlap
+    previous_chunking = read_chunking_settings(current)
+    submitted_chunking = settings.chunking or ChunkingSettings(
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
     )
+    chunking = merge_chunking_settings(previous_chunking, submitted_chunking)
+    chunks_changed = chunking.fingerprint != previous_chunking.fingerprint
 
     current["provider"] = settings.provider
     current["model"] = settings.model
@@ -354,8 +365,7 @@ async def save_settings(settings: SettingsData) -> SaveSettingsResponse:
     current["max_tokens"] = settings.max_tokens
     current["system_prompt"] = settings.system_prompt
     current["top_k"] = settings.top_k
-    current["chunk_size"] = settings.chunk_size
-    current["chunk_overlap"] = settings.chunk_overlap
+    current.update(chunking_for_persistence(chunking))
 
     _save_settings(current)
     logger.info(
@@ -372,8 +382,9 @@ async def save_settings(settings: SettingsData) -> SaveSettingsResponse:
         max_tokens=settings.max_tokens,
         system_prompt=settings.system_prompt,
         top_k=settings.top_k,
-        chunk_size=settings.chunk_size,
-        chunk_overlap=settings.chunk_overlap,
+        chunk_size=chunking.chunk_size,
+        chunk_overlap=chunking.chunk_overlap,
+        chunking=chunking,
         chunks_changed=chunks_changed,
     )
 
@@ -428,7 +439,7 @@ async def get_models(provider: str) -> ModelsResponse:
     if fetched_models and not error:
         cache[provider] = {
             "models": fetched_models,
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "fetched_at": datetime.now(UTC).isoformat(),
         }
         save_models_cache(cache)
         return ModelsResponse(provider=provider, models=fetched_models, cached=False)

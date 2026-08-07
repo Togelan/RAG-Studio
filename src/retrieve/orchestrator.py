@@ -15,6 +15,7 @@ from threading import Lock
 from typing import Any
 
 from src.paths import configured_path
+from src.retrieve.context_expansion import expand_context_units
 from src.vector_store.adapter import get_vector_store
 from src.vector_store.contracts import VectorSearcher
 from src.vector_store.models import DenseVector, SparseVector, VectorSearchQuery
@@ -36,6 +37,7 @@ def _flashrank_cache_dir() -> str:
 _RERANK_SCORE_THRESHOLD = 0.0
 # Number of final results after reranking (AC-002.2)
 _FINAL_TOP_K = 5
+_FINAL_CONTEXT_CHARACTER_BUDGET = 24_000
 
 # Module-level reranker state
 _reranker: Any = None
@@ -129,6 +131,7 @@ async def hybrid_search(
     top_k: int = 20,
     use_reranker: bool = True,
     vector_searcher: VectorSearcher | None = None,
+    context_character_budget: int = _FINAL_CONTEXT_CHARACTER_BUDGET,
 ) -> list[dict[str, Any]]:
     """Execute hybrid search with RRF fusion and FlashRank reranking (FR-002).
 
@@ -146,6 +149,7 @@ async def hybrid_search(
         collection_name: Qdrant collection to search.
         top_k: Number of fused candidates (default 20 per AC-002.1).
         use_reranker: Whether to attempt reranking (fallback always available).
+        context_character_budget: Maximum characters returned to the graph.
 
     Returns:
         List of up to 5 result dicts with keys: text, score, metadata.
@@ -174,37 +178,28 @@ async def hybrid_search(
 
     # AC-002.3: Empty result handling
     if not search_results:
-        logger.info("No search results for query: %s", query[:100])
+        logger.info("No search results")
         return []
 
-    # Debug: log raw prefetch-style results before reranking
-    logger.info(
-        "DEBUG prefetch total points before RRF: count=%d",
-        len(search_results),
+    context_units = expand_context_units(
+        search_results,
+        top_k=min(top_k, _FINAL_TOP_K),
+        character_budget=context_character_budget,
     )
-    for i, point in enumerate(search_results):
-        payload = point.payload
-        text_preview = str(payload.get("text", ""))[:200]
-        logger.info(
-            "DEBUG prefetch result[%d]: id=%s, score=%.6f, text_preview=%.200s",
-            i,
-            point.point_id,
-            float(point.score) if point.score else 0.0,
-            text_preview,
-        )
-
-    # Convert Qdrant points to candidate dicts
-    candidates: list[dict[str, Any]] = []
-    for point in search_results:
-        payload = point.payload
-        candidates.append(
-            {
-                "id": point.point_id,
-                "score": float(point.score),
-                "text": str(payload.get("text", "")),
-                "metadata": {k: v for k, v in payload.items() if k not in ("text",)},
-            }
-        )
+    candidates = [
+        {
+            "id": unit.point_id,
+            "score": unit.score,
+            "text": unit.text,
+            "metadata": dict(unit.metadata),
+        }
+        for unit in context_units
+    ]
+    logger.info(
+        "Expanded search results: raw=%d context_units=%d",
+        len(search_results),
+        len(candidates),
+    )
 
     # Step 3: FlashRank cross-encoder reranking (AC-002.2)
     if use_reranker:

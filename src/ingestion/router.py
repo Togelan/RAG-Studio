@@ -12,14 +12,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import shutil
 import tempfile
 import time
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -34,8 +32,31 @@ from fastapi import (
 )
 from pydantic import BaseModel
 
+from src.api.chunking_settings import ChunkingSettings, read_chunking_settings
 from src.api.dependencies import get_vector_store, log_audit
-from src.ingestion.chunker import chunk_csv_rows, chunk_text
+from src.ingestion.chunker import chunk_text
+from src.ingestion.chunking_dispatch import (
+    dispatch_csv,
+    dispatch_text,
+    settings_payload,
+    unit_payload,
+)
+from src.ingestion.document_admission import (  # noqa: F401
+    MAX_PENDING_UPLOADS,
+    FilenameReservedError,
+    UploadCapacityError,
+    _document_locks,
+    _document_locks_guard,
+    _DocumentLockState,
+    _pending_upload_names,
+    _raw_uploads_dir,
+    _reset_upload_admissions_for_tests,
+    document_operation_lock,
+    release_upload_name,
+    reserve_upload_name,
+    stored_files,
+    stored_files_lock,
+)
 from src.ingestion.embedder import (
     get_embedder,
     make_doc_id,
@@ -51,19 +72,16 @@ from src.ingestion.parser import (
     parse_csv_as_rows,
     validate_file,
 )
-from src.paths import configured_path, data_path
+from src.paths import configured_path
 from src.vector_store.contracts import VectorStore
 from src.vector_store.models import (
     DocumentReplacement,
     JsonValue,
+    Payload,
     VectorRecord,
 )
 from src.vector_store.pagination import CursorError
-
-
-def _raw_uploads_dir() -> Path:
-    """Return the persistent raw-upload directory under the data root."""
-    return data_path("raw_uploads")
+from src.vector_store.strategy_payloads import schema_version, strategy
 
 
 def _settings_path() -> Path:
@@ -75,111 +93,6 @@ def _settings_path() -> Path:
 # This limit applies to both uploads and re-ingestion before any embeddings or
 # Qdrant writes are attempted.
 MAX_CHUNKS_PER_DOCUMENT = 10_000
-MAX_PENDING_UPLOADS = 10
-
-# In-memory store of ingested file metadata for duplicate detection (AC-001.8–001.10)
-# Key: normalized filename (lowercase), Value: dict with hash, chunk_settings, chunk_count
-stored_files: dict[str, dict[str, object]] = {}
-stored_files_lock = asyncio.Lock()
-_pending_upload_names: set[str] = set()
-
-
-class FilenameReservedError(Exception):
-    """Raised when a canonical filename already has an active admission."""
-
-
-class UploadCapacityError(Exception):
-    """Raised when all bounded upload slots are occupied."""
-
-
-async def reserve_upload_name(
-    filename: str,
-    *,
-    rename: bool,
-    allow_stored: bool = False,
-) -> str:
-    """Atomically choose and reserve a canonical upload display name."""
-    canonical = canonicalize_filename(filename)
-    stem = Path(canonical).stem
-    suffix = Path(canonical).suffix
-    async with stored_files_lock:
-        stored_keys = {
-            filename_comparison_key(str(meta.get("original_filename", key)))
-            for key, meta in stored_files.items()
-        }
-        candidate = canonical
-        counter = 1
-        while rename and filename_comparison_key(candidate) in (
-            stored_keys | _pending_upload_names
-        ):
-            candidate = f"{stem} ({counter}){suffix}"
-            counter += 1
-        key = filename_comparison_key(candidate)
-        if key in _pending_upload_names or (not allow_stored and key in stored_keys):
-            raise FilenameReservedError
-        if len(_pending_upload_names) >= MAX_PENDING_UPLOADS:
-            raise UploadCapacityError
-        _pending_upload_names.add(key)
-        return candidate
-
-
-async def release_upload_name(filename_or_key: str) -> None:
-    """Release an upload reservation without waiting for capacity."""
-    key = filename_comparison_key(filename_or_key)
-    async with stored_files_lock:
-        _pending_upload_names.discard(key)
-
-
-async def _reset_upload_admissions_for_tests() -> None:
-    async with stored_files_lock:
-        _pending_upload_names.clear()
-
-
-@dataclass
-class _DocumentLockState:
-    """A per-document lock plus the number of operations using it."""
-
-    lock: asyncio.Lock
-    users: int = 0
-
-
-# A replacement consists of a delete followed by an upsert.  Those operations
-# must be serialized per doc_id, including deletion requests and re-ingestion.
-# The reference count lets us discard unused locks instead of retaining one for
-# every filename ever uploaded.
-_document_locks: dict[str, _DocumentLockState] = {}
-_document_locks_guard = asyncio.Lock()
-
-
-@asynccontextmanager
-async def document_operation_lock(doc_id: str) -> AsyncIterator[None]:
-    """Serialize vector-changing operations for one document.
-
-    A caller reserves the lock before waiting, so it cannot be removed while a
-    queued operation still needs it.  Different documents continue to ingest
-    concurrently.
-    """
-    async with _document_locks_guard:
-        state = _document_locks.get(doc_id)
-        if state is None:
-            state = _DocumentLockState(lock=asyncio.Lock())
-            _document_locks[doc_id] = state
-        state.users += 1
-
-    acquired = False
-    try:
-        await state.lock.acquire()
-        acquired = True
-        yield
-    finally:
-        if acquired:
-            state.lock.release()
-        async with _document_locks_guard:
-            state.users -= 1
-            if state.users == 0 and _document_locks.get(doc_id) is state:
-                del _document_locks[doc_id]
-
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ingest", tags=["ingestion"])
@@ -240,6 +153,8 @@ class DocumentInfo(BaseModel):
     chunk_size: int = 0
     chunk_overlap: int = 0
     created_at: str
+    strategy: str = "recursive"
+    schema_version: int = 1
 
 
 class DocumentsListResponse(BaseModel):
@@ -369,34 +284,32 @@ def generate_unique_filename(original_filename: str) -> str:
     return candidate
 
 
-def _get_current_chunk_settings() -> tuple[int, int]:
-    """Read current chunk_size and chunk_overlap from the settings file.
-
-    Returns (512, 64) as defaults if the settings file is not found
-    or the keys are missing.
-
-    Returns:
-        A tuple of (chunk_size, chunk_overlap).
-    """
-    import json
-
+def _read_current_chunking_settings() -> ChunkingSettings:
+    """Read the normalized chunking contract from persisted application settings."""
     settings_path = _settings_path()
     try:
         if settings_path.exists():
             data = json.loads(settings_path.read_text(encoding="utf-8"))
-            return (
-                int(data.get("chunk_size", 512)),
-                int(data.get("chunk_overlap", 64)),
-            )
+            return read_chunking_settings(data)
     except AttributeError:
         logger.debug("Could not read current chunk settings, using defaults.")
     except OSError:
         logger.debug("Could not read current chunk settings, using defaults.")
     except UnicodeError:
         logger.debug("Could not read current chunk settings, using defaults.")
-    except ValueError:
+    except json.JSONDecodeError:
         logger.debug("Could not read current chunk settings, using defaults.")
-    return (512, 64)
+    return read_chunking_settings({})
+
+
+def _get_current_chunk_settings() -> tuple[int, int]:
+    """Return the legacy size tuple without discarding normalized settings internally."""
+    settings = _read_current_chunking_settings()
+    return settings.chunk_size, settings.chunk_overlap
+
+
+_default_get_current_chunk_settings = _get_current_chunk_settings
+_default_chunk_text = chunk_text
 
 
 def _safe_int(value: object) -> int | None:
@@ -415,6 +328,25 @@ def _safe_int(value: object) -> int | None:
         return v if v > 0 else None
     except (ValueError, TypeError):  # fmt: skip
         return None
+
+
+def _normalized_durable_identity(
+    strategy_name: str, persisted_schema: int
+) -> tuple[str, int]:
+    if persisted_schema != 1:
+        return "recursive", 1
+    return strategy({"strategy": strategy_name}), 1
+
+
+def _listed_strategy(payload: Payload) -> str:
+    if schema_version(payload) != 1:
+        return "recursive"
+    return strategy(payload)
+
+
+def _listed_schema_version(payload: Payload) -> int:
+    del payload
+    return 1
 
 
 async def get_stored_file(filename: str) -> dict[str, object] | None:
@@ -445,6 +377,11 @@ async def store_file_metadata(
     chunk_size: int,
     chunk_overlap: int,
     doc_id: str | None = None,
+    chunking_settings: ChunkingSettings | None = None,
+    strategy_name: str | None = None,
+    schema: int = 1,
+    chunking_fingerprint: str | None = None,
+    durable_settings: dict[str, JsonValue] | None = None,
 ) -> None:
     """Store metadata for an ingested file in the tracking dict.
 
@@ -463,7 +400,7 @@ async def store_file_metadata(
             if existing is not None and "doc_id" in existing
             else str(make_document_doc_id(filename))
         )
-        stored_files[key] = {
+        metadata: dict[str, object] = {
             "original_filename": filename,
             "doc_id": preserved_doc_id,
             "file_hash": file_hash,
@@ -471,6 +408,19 @@ async def store_file_metadata(
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
         }
+        if chunking_settings is not None:
+            metadata["chunking_strategy"] = chunking_settings.strategy
+            metadata["chunking_fingerprint"] = chunking_settings.fingerprint
+            metadata["chunking_settings"] = settings_payload(chunking_settings)
+            metadata["schema_version"] = chunking_settings.schema_version
+        if strategy_name is not None:
+            metadata["chunking_strategy"] = strategy_name
+        if chunking_fingerprint is not None:
+            metadata["chunking_fingerprint"] = chunking_fingerprint
+        if durable_settings is not None:
+            metadata["chunking_settings"] = durable_settings
+        metadata["schema_version"] = schema
+        stored_files[key] = metadata
 
 
 async def remove_stored_file(filename: str) -> bool:
@@ -503,6 +453,15 @@ async def get_document_info_from_store(
     metadata = await vector_store.find_document(filename)
     if metadata is None:
         return None
+    durable_strategy, durable_schema = _normalized_durable_identity(
+        metadata.strategy, metadata.schema_version
+    )
+    durable_fingerprint = (
+        metadata.chunking_fingerprint if metadata.schema_version == 1 else None
+    )
+    durable_settings = (
+        dict(metadata.chunking_settings) if metadata.schema_version == 1 else {}
+    )
     info: dict[str, object] = {
         "original_filename": metadata.filename,
         "doc_id": metadata.doc_id,
@@ -510,6 +469,10 @@ async def get_document_info_from_store(
         "chunk_count": metadata.chunk_count,
         "chunk_size": metadata.chunk_size,
         "chunk_overlap": metadata.chunk_overlap,
+        "chunking_strategy": durable_strategy,
+        "schema_version": durable_schema,
+        "chunking_fingerprint": durable_fingerprint,
+        "chunking_settings": durable_settings,
     }
     await store_file_metadata(
         filename=metadata.filename,
@@ -518,6 +481,10 @@ async def get_document_info_from_store(
         chunk_size=metadata.chunk_size or 512,
         chunk_overlap=metadata.chunk_overlap or 64,
         doc_id=metadata.doc_id,
+        strategy_name=durable_strategy,
+        schema=durable_schema,
+        chunking_fingerprint=durable_fingerprint,
+        durable_settings=durable_settings,
     )
     return info
 
@@ -557,6 +524,7 @@ async def _ingest_file(
     *,
     chunk_size: int | None = None,
     chunk_overlap: int | None = None,
+    chunking_settings: ChunkingSettings | None = None,
     file_hash: str = "",
     doc_id: str | None = None,
     reservation_key: str | None = None,
@@ -580,6 +548,7 @@ async def _ingest_file(
                 client=client,
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
+                chunking_settings=chunking_settings,
                 file_hash=file_hash,
                 doc_id=preserved_doc_id,
                 staged_raw_path=staged_raw_path,
@@ -599,6 +568,7 @@ async def _ingest_file_locked(
     *,
     chunk_size: int | None = None,
     chunk_overlap: int | None = None,
+    chunking_settings: ChunkingSettings | None = None,
     file_hash: str = "",
     doc_id: str | None = None,
     staged_raw_path: str | None = None,
@@ -618,13 +588,18 @@ async def _ingest_file_locked(
             If None, reads from current settings file.
         file_hash: SHA-256 hex digest of the file content (for duplicate tracking).
     """
-    # Read current settings if not explicitly provided
-    if chunk_size is None or chunk_overlap is None:
-        _cs, _co = _get_current_chunk_settings()
-        if chunk_size is None:
-            chunk_size = _cs
-        if chunk_overlap is None:
-            chunk_overlap = _co
+    chunking_settings = chunking_settings or _read_current_chunking_settings()
+    if chunk_size is not None or chunk_overlap is not None:
+        chunking_settings = chunking_settings.model_copy(
+            update={
+                "chunk_size": chunk_size or chunking_settings.chunk_size,
+                "chunk_overlap": chunk_overlap
+                if chunk_overlap is not None
+                else chunking_settings.chunk_overlap,
+            }
+        )
+    chunk_size = chunking_settings.chunk_size
+    chunk_overlap = chunking_settings.chunk_overlap
 
     try:
         await _set_progress(file_id, "processing", "Parsing document...")
@@ -638,16 +613,25 @@ async def _ingest_file_locked(
         if ext == ".csv":
             await _set_progress(file_id, "processing", "Parsing CSV rows...")
             row_texts, row_metadata = parse_csv_as_rows(file_path)
-            chunks = chunk_csv_rows(row_texts, chunk_size=chunk_size)
+            batch = dispatch_csv(row_texts, chunking_settings, preserved_doc_id)
             csv_meta = row_metadata  # Pass row metadata to upsert
             extra_payload: list[dict[str, object]] | None = csv_meta
         else:
             await _set_progress(file_id, "processing", "Parsing document text...")
             text, _ = detect_and_parse(file_path, original_filename, content_type)
-            chunks = chunk_text(
-                text, chunk_size=chunk_size, chunk_overlap=chunk_overlap
-            )
+            if (
+                chunking_settings.strategy == "recursive"
+                and chunk_text is not _default_chunk_text
+            ):
+                compatibility_chunks = chunk_text(
+                    text, chunk_size=chunk_size, chunk_overlap=chunk_overlap
+                )
+                if len(compatibility_chunks) > MAX_CHUNKS_PER_DOCUMENT:
+                    raise ChunkLimitExceededError(len(compatibility_chunks))
+            batch = dispatch_text(text, chunking_settings, preserved_doc_id)
             extra_payload = None
+
+        chunks = list(batch.texts)
 
         if not chunks:
             await _set_progress(
@@ -685,10 +669,21 @@ async def _ingest_file_locked(
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap,
             }
+            payload.update(unit_payload(batch, batch.units[index]))
             if extra_payload is not None and index < len(extra_payload):
-                payload.update(
-                    {key: str(value) for key, value in extra_payload[index].items()}
-                )
+                csv_metadata = extra_payload[index]
+                csv_headers = csv_metadata.get("csv_headers")
+                if isinstance(csv_headers, list):
+                    payload["csv_headers"] = [str(value) for value in csv_headers]
+                csv_row_data = csv_metadata.get("csv_row_data")
+                if isinstance(csv_row_data, dict):
+                    payload["csv_row_data"] = {
+                        str(key): None if value is None else str(value)
+                        for key, value in csv_row_data.items()
+                    }
+                row_index = csv_metadata.get("row_index")
+                if isinstance(row_index, (str, int, float, bool)):
+                    payload["row_index"] = row_index
             records.append(
                 VectorRecord(
                     point_id=make_doc_id(original_filename, index),
@@ -705,6 +700,11 @@ async def _ingest_file_locked(
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
                 created_at=created_at,
+                strategy=batch.strategy,
+                schema_version=chunking_settings.schema_version,
+                file_hash=file_hash,
+                chunking_fingerprint=chunking_settings.fingerprint,
+                chunking_settings=settings_payload(chunking_settings),
             )
         )
         if staged_raw_path is not None:
@@ -740,6 +740,8 @@ async def _ingest_file_locked(
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap,
                 doc_id=preserved_doc_id,
+                chunking_settings=chunking_settings,
+                strategy_name=batch.strategy,
             )
 
         logger.info("ingestion_completed chunk_count=%d", len(chunks))
@@ -888,6 +890,16 @@ async def upload_document(
         # concurrent re-ingest) and can leave the document temporarily empty.
         logger.info("upload_decision action=replace")
 
+    current_chunking = _read_current_chunking_settings()
+    if _get_current_chunk_settings is not _default_get_current_chunk_settings:
+        compatibility_size, compatibility_overlap = _get_current_chunk_settings()
+        current_chunking = current_chunking.model_copy(
+            update={
+                "chunk_size": compatibility_size,
+                "chunk_overlap": compatibility_overlap,
+            }
+        )
+
     # --- Duplicate detection (AC-001.8) ---
     if action == "default" and stored is not None:
         # If the stored entry has chunk_count == 0, it's a stale placeholder
@@ -922,10 +934,14 @@ async def upload_document(
             else 64
         )
 
-        # Read current chunk settings to detect changes
-        current_cs, current_co = _get_current_chunk_settings()
-        settings_changed = stored_has_chunk_settings and (
-            stored_chunk_size != current_cs or stored_chunk_overlap != current_co
+        current_cs = current_chunking.chunk_size
+        current_co = current_chunking.chunk_overlap
+        stored_fingerprint = stored.get("chunking_fingerprint")
+        settings_changed = (
+            stored_fingerprint != current_chunking.fingerprint
+            if isinstance(stored_fingerprint, str) and stored_fingerprint
+            else stored_has_chunk_settings
+            and (stored_chunk_size != current_cs or stored_chunk_overlap != current_co)
         )
         logger.info(
             "SETTINGS COMPARISON: stored=(cs=%s, co=%s), current=(cs=%s, co=%s), changed=%s",
@@ -1027,12 +1043,6 @@ async def upload_document(
 
     reservation_key = filename_comparison_key(original_filename)
 
-    # Store file metadata NOW (synchronously) so duplicate detection works
-    # on subsequent uploads (AC-001.8–001.10). The chunk_count is updated
-    # in _ingest_file after background processing completes.
-    # Read current chunk settings for metadata storage
-    _cs, _co = _get_current_chunk_settings()
-
     # Write file to temp location
     suffix = Path(original_filename).suffix
     tmp_path = Path(tempfile.gettempdir()) / f"rag-studio-{file_id}{suffix}"
@@ -1071,8 +1081,7 @@ async def upload_document(
         content_type=file.content_type,
         client=client,
         file_hash=new_hash,
-        chunk_size=_cs,
-        chunk_overlap=_co,
+        chunking_settings=current_chunking,
         doc_id=preserved_doc_id,
         reservation_key=reservation_key,
         staged_raw_path=str(staged_raw_path),
@@ -1144,6 +1153,8 @@ async def list_documents(
             chunk_size=int(str(point.payload.get("chunk_size", 0))),
             chunk_overlap=int(str(point.payload.get("chunk_overlap", 0))),
             created_at=str(point.payload.get("created_at", "")),
+            strategy=_listed_strategy(point.payload),
+            schema_version=_listed_schema_version(point.payload),
         )
         for point in page.items
     ]
@@ -1262,26 +1273,13 @@ async def reingest_document(
     Returns:
         ReingestResponse with new file_id and status.
     """
-    import json
-
     try:
         canonical_filename = canonicalize_filename(request.filename)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid filename") from None
 
-    # Read current chunk settings from saved settings
-    _cur_chunk_size = 512
-    _cur_chunk_overlap = 64
-    settings_path = _settings_path()
-    if settings_path.exists():
-        try:
-            saved: dict[str, object] = json.loads(
-                await asyncio.to_thread(settings_path.read_text, encoding="utf-8")
-            )
-            _cur_chunk_size = int(str(saved.get("chunk_size", 512)))
-            _cur_chunk_overlap = int(str(saved.get("chunk_overlap", 64)))
-        except (json.JSONDecodeError, OSError, ValueError):  # fmt: skip
-            pass
+    # Read the current normalized contract while preserving legacy size callers.
+    current_chunking = _read_current_chunking_settings()
 
     # Find the stored file in data/raw_uploads/ by doc_id.
     # Files are stored as {doc_id}{suffix} during upload (BUG-010-1 fix).
@@ -1320,16 +1318,15 @@ async def reingest_document(
         original_filename=canonical_filename,
         content_type=None,
         client=client,
-        chunk_size=_cur_chunk_size,
-        chunk_overlap=_cur_chunk_overlap,
+        chunking_settings=current_chunking,
         file_hash=file_hash,
         embedder=embedder,
     )
 
     logger.info(
         "reingest_queued chunk_size=%d chunk_overlap=%d",
-        _cur_chunk_size,
-        _cur_chunk_overlap,
+        current_chunking.chunk_size,
+        current_chunking.chunk_overlap,
     )
 
     return ReingestResponse(

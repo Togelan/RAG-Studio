@@ -296,6 +296,7 @@ class TestFullGraphFlow:
                 "filename": "ai_intro.md",
                 "chunk_index": "3",
                 "score": 0.95,
+                "location_unavailable": True,
             }
         ]
 

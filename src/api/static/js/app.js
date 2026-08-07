@@ -628,6 +628,7 @@
 
   /** @type {number|null} Original chunk overlap loaded from GET /api/settings */
   var originalChunkOverlap = null;
+  var chunkingDrafts = null;
 
   /**
    * Monotonically increasing request counter for model fetches.
@@ -900,6 +901,11 @@
         if (chunkOverlap && data.chunk_overlap != null) {
           chunkOverlap.value = String(data.chunk_overlap);
         }
+        hydrateChunkingControls(data.chunking || {
+          strategy: 'recursive',
+          chunk_size: data.chunk_size || 512,
+          chunk_overlap: data.chunk_overlap || 64
+        });
 
         // Set system prompt
         var systemPrompt = document.getElementById('settings-system-prompt');
@@ -960,6 +966,7 @@
     if (providerEl) {
       providerEl.addEventListener('change', updateModelSelector);
     }
+    initChunkingStrategyControls();
 
     // Refresh models button
     if (refreshBtn) {
@@ -1012,8 +1019,6 @@
       var tempSlider = document.getElementById('settings-temperature');
       var maxTokens = document.getElementById('settings-max-tokens');
       var topK = document.getElementById('settings-top-k');
-      var chunkSize = document.getElementById('settings-chunk-size');
-      var chunkOverlap = document.getElementById('settings-chunk-overlap');
       var systemPrompt = document.getElementById('settings-system-prompt');
       var apiKeyInput = document.getElementById('settings-api-key');
 
@@ -1031,15 +1036,8 @@
         max_tokens: maxTokens ? parseInt(maxTokens.value, 10) : 2048,
         system_prompt: systemPrompt ? systemPrompt.value : '',
         top_k: topK ? parseInt(topK.value, 10) : 5,
-        chunk_size: chunkSize ? parseInt(chunkSize.value, 10) : 512,
-        chunk_overlap: chunkOverlap ? parseInt(chunkOverlap.value, 10) : 64
+        chunking: buildChunkingPayload()
       };
-
-      // FR-010: Check if re-ingestion is needed before saving
-      var shouldContinue = await handleSettingsSave();
-      if (!shouldContinue) {
-        return; // User dismissed or re-ingestion is in progress
-      }
 
       // Show saving state
       if (statusEl) {
@@ -1047,7 +1045,7 @@
         statusEl.className = 'settings-save-status status-info';
       }
 
-      // Step 1: Save settings
+      var savedSettings = null;
       fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1059,7 +1057,8 @@
           }
           return resp.json();
         })
-        .then(function () {
+        .then(function (saved) {
+          savedSettings = saved;
           // Step 2: Validate API key if provided
           if (apiKeyInput && apiKeyInput.value.trim()) {
             return fetch('/api/settings/validate-key', {
@@ -1096,7 +1095,10 @@
             apiKeyInput.value = '';
             apiKeyInput.placeholder = '••••••••';
           }
-          // Refresh original chunk settings after save
+          if (savedSettings.chunks_changed) {
+            return saveSettingsAndOfferReingestion();
+          }
+          hydrateChunkingControls(savedSettings.chunking);
           captureOriginalChunkSettings();
         })
         .catch(function (err) {
@@ -1123,12 +1125,92 @@
     originalChunkOverlap = chunkOverlapEl ? parseInt(chunkOverlapEl.value, 10) : 64;
   }
 
+  function initChunkingStrategyControls() {
+    var strategy = document.getElementById('settings-chunking-strategy');
+    if (!strategy) return;
+    strategy.addEventListener('change', function () {
+      captureChunkingDraft();
+      applyChunkingPanelVisibility();
+    });
+  }
+
+  function hydrateChunkingControls(chunking) {
+    var strategy = document.getElementById('settings-chunking-strategy');
+    var chunkSize = document.getElementById('settings-chunk-size');
+    var chunkOverlap = document.getElementById('settings-chunk-overlap');
+    var parentSize = document.getElementById('settings-parent-size');
+    var windowSentences = document.getElementById('settings-window-sentences');
+    if (!strategy || !chunkSize || !chunkOverlap || !parentSize || !windowSentences) return;
+    var normalized = chunking || {};
+    var current = {
+      chunk_size: Number(normalized.chunk_size || 512),
+      chunk_overlap: Number(normalized.chunk_overlap || 64),
+      parent_size: Number(normalized.parent_size || 2048),
+      window_sentences: Number(normalized.window_sentences || 2)
+    };
+    chunkingDrafts = {
+      static: Object.assign({}, current),
+      recursive: Object.assign({}, current),
+      parent_document: Object.assign({}, current),
+      sentence_window: Object.assign({}, current)
+    };
+    strategy.value = normalized.strategy || 'recursive';
+    applyChunkingDraft();
+  }
+
+  function captureChunkingDraft() {
+    var strategy = document.getElementById('settings-chunking-strategy');
+    if (!strategy || !chunkingDrafts) return;
+    chunkingDrafts[strategy.value] = {
+      chunk_size: Number(document.getElementById('settings-chunk-size').value),
+      chunk_overlap: Number(document.getElementById('settings-chunk-overlap').value),
+      parent_size: Number(document.getElementById('settings-parent-size').value),
+      window_sentences: Number(document.getElementById('settings-window-sentences').value)
+    };
+  }
+
+  function applyChunkingDraft() {
+    var strategy = document.getElementById('settings-chunking-strategy');
+    if (!strategy || !chunkingDrafts) return;
+    var draft = chunkingDrafts[strategy.value];
+    document.getElementById('settings-chunk-size').value = String(draft.chunk_size);
+    document.getElementById('settings-chunk-overlap').value = String(draft.chunk_overlap);
+    document.getElementById('settings-parent-size').value = String(draft.parent_size);
+    document.getElementById('settings-window-sentences').value = String(draft.window_sentences);
+    applyChunkingPanelVisibility();
+  }
+
+  function applyChunkingPanelVisibility() {
+    var strategy = document.getElementById('settings-chunking-strategy');
+    if (!strategy) return;
+    var selected = strategy.value;
+    document.querySelectorAll('[data-chunking-panel="fixed"]').forEach(function (element) {
+      element.hidden = selected === 'sentence_window';
+    });
+    document.querySelector('[data-chunking-panel="parent_document"]').hidden = selected !== 'parent_document';
+    document.querySelector('[data-chunking-panel="sentence_window"]').hidden = selected !== 'sentence_window';
+  }
+
+  function buildChunkingPayload() {
+    captureChunkingDraft();
+    var strategy = document.getElementById('settings-chunking-strategy').value;
+    var draft = chunkingDrafts[strategy];
+    return {
+      schema_version: 1,
+      strategy: strategy,
+      chunk_size: draft.chunk_size,
+      chunk_overlap: draft.chunk_overlap,
+      parent_size: strategy === 'parent_document' ? draft.parent_size : null,
+      window_sentences: strategy === 'sentence_window' ? draft.window_sentences : null
+    };
+  }
+
   /**
    * Check if chunk-related settings changed and handle re-ingestion flow.
    * Called before saving settings.
    * @returns {Promise<boolean>} true if save should proceed
    */
-  async function handleSettingsSave() {
+  async function saveSettingsAndOfferReingestion() {
     var newChunkSize = parseInt(document.getElementById('settings-chunk-size')?.value || '512');
     var newChunkOverlap = parseInt(document.getElementById('settings-chunk-overlap')?.value || '64');
 
@@ -1192,9 +1274,7 @@
 
         try {
           // Get document list before clearing
-          var docsResp = await fetch('/api/ingest/documents');
-          var docsData = await docsResp.json();
-          var documents = docsData.documents || [];
+          var documents = await fetchAllDocumentsForReingestion();
 
           if (documents.length === 0) {
             hideModal();
@@ -1202,12 +1282,10 @@
             return;
           }
 
-          // Clear all documents
-          await fetch('/api/ingest/clear', { method: 'DELETE' });
-
-          // Re-ingest each document
           var completed = 0;
-          var errors = 0;
+          var reingestSucceeded = 0;
+          var reingestSkipped = 0;
+          var reingestFailed = 0;
           var total = documents.length;
 
           for (var i = 0; i < documents.length; i++) {
@@ -1227,16 +1305,15 @@
                 var result = await reingestResp.json();
                 if (result.status === 'skipped') {
                   // Source file no longer exists — skip silently (already cleared from Qdrant)
-                  completed++;
+                  reingestSkipped++;
                 } else {
                   // Poll for completion
                   await pollReingestionProgress(result.file_id);
-                  completed++;
+                  reingestSucceeded++;
                 }
               } else {
                 // AC-010.6: failed document — skip with toast
-                errors++;
-                completed++;
+                reingestFailed++;
                 var errData = await reingestResp.json().catch(function() { return {}; });
                 showToast(
                   (translations['reingest_error'] || 'Re-ingestion failed.') +
@@ -1246,21 +1323,26 @@
               }
             } catch (e) {
               // AC-010.6: failed document — skip, continue
-              errors++;
-              completed++;
+              reingestFailed++;
               showToast(
                 (translations['reingest_error'] || 'Re-ingestion failed.') +
                 ' ' + doc.filename,
                 'error'
               );
             }
+            completed++;
           }
 
           progressBar.style.width = '100%';
-          if (errors > 0) {
+          if (reingestFailed > 0) {
             progressText.textContent = translations['reingest_complete_errors'] || 'Re-ingestion completed with errors.';
           } else {
             progressText.textContent = translations['reingest_complete'] || 'Re-ingestion complete.';
+          }
+          var summary = document.getElementById('reingest-progress-summary');
+          if (summary) {
+            summary.textContent = 'Succeeded: ' + reingestSucceeded +
+              ' · Skipped: ' + reingestSkipped + ' · Failed: ' + reingestFailed;
           }
 
           // Refresh document table
@@ -1292,6 +1374,27 @@
    * @param {string} fileId
    * @returns {Promise<void>}
    */
+  async function fetchAllDocumentsForReingestion() {
+    var documents = [];
+    var cursor = null;
+    var seenCursors = {};
+    do {
+      var url = '/api/ingest/documents' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : '');
+      var response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Document list could not be loaded');
+      }
+      var page = await response.json();
+      documents = documents.concat(page.documents || []);
+      cursor = page.next_cursor || null;
+      if (cursor && seenCursors[cursor]) {
+        throw new Error('Document pagination did not advance');
+      }
+      if (cursor) seenCursors[cursor] = true;
+    } while (cursor);
+    return documents;
+  }
+
   function pollReingestionProgress(fileId) {
     return new Promise(function (resolve, reject) {
       var maxPolls = 120; // 2 minutes max
@@ -1579,6 +1682,17 @@
    * @param {string|null} isoStr - ISO 8601 timestamp.
    * @returns {string} Formatted date-time or '—' if invalid.
    */
+  function formatChunkingStrategy(strategy) {
+    var labels = {
+      static: translations['settings_chunking_strategy_static'] || 'Static',
+      recursive: translations['settings_chunking_strategy_recursive'] || 'Recursive',
+      parent_document: translations['settings_chunking_strategy_parent_document'] || 'Parent document',
+      sentence_window: translations['settings_chunking_strategy_sentence_window'] || 'Sentence window',
+      csv_row: 'CSV row'
+    };
+    return labels[strategy] || labels.recursive;
+  }
+
   function formatDateTime(isoStr) {
     if (!isoStr) return '—';
     var d = new Date(isoStr);
@@ -1619,7 +1733,7 @@
         if (docs.length === 0 && !append) {
           var emptyRow = document.createElement('tr');
           emptyRow.className = 'doc-table-empty';
-          emptyRow.innerHTML = '<td colspan="6" data-i18n="settings_no_documents">' +
+          emptyRow.innerHTML = '<td colspan="7" data-i18n="settings_no_documents">' +
             (translations['settings_no_documents'] || 'No documents uploaded yet.') + '</td>';
           tbody.appendChild(emptyRow);
           return;
@@ -1640,6 +1754,9 @@
 
           var chunksCell = document.createElement('td');
           chunksCell.textContent = String(doc.chunks_count || 0);
+
+          var strategyCell = document.createElement('td');
+          strategyCell.textContent = formatChunkingStrategy(doc.strategy || 'recursive');
 
           var chunkSettingsCell = document.createElement('td');
           var cs = parseInt(doc.chunk_size) || 0;
@@ -1693,6 +1810,7 @@
           row.appendChild(filenameCell);
           row.appendChild(typeCell);
           row.appendChild(chunksCell);
+          row.appendChild(strategyCell);
           row.appendChild(chunkSettingsCell);
           row.appendChild(dateCell);
           row.appendChild(actionsCell);
@@ -1703,7 +1821,7 @@
           var continuationRow = document.createElement('tr');
           continuationRow.className = 'document-load-more';
           var continuationCell = document.createElement('td');
-          continuationCell.colSpan = 6;
+          continuationCell.colSpan = 7;
           var continuationButton = document.createElement('button');
           continuationButton.className = 'btn-load-more-documents';
           continuationButton.textContent = translations['settings_load_more'] || 'Load more';

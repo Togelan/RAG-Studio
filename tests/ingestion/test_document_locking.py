@@ -68,6 +68,40 @@ async def test_different_documents_do_not_share_a_lock() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cancelled_waiter_releases_document_lock_state() -> None:
+    router = import_module("src.ingestion.router")
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def holder() -> None:
+        async with router.document_operation_lock("doc-cancel"):
+            entered.set()
+            await release.wait()
+
+    async def waiter() -> None:
+        async with router.document_operation_lock("doc-cancel"):
+            pytest.fail("cancelled waiter acquired the document lock")
+
+    holder_task = asyncio.create_task(holder())
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    waiter_task = asyncio.create_task(waiter())
+    for _ in range(10):
+        await asyncio.sleep(0)
+        if router._document_locks["doc-cancel"].users == 2:
+            break
+    else:
+        pytest.fail("queued waiter did not reserve the document lock")
+
+    waiter_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiter_task
+    release.set()
+    await holder_task
+
+    assert router._document_locks == {}
+
+
+@pytest.mark.asyncio
 async def test_qdrant_delete_waits_before_replacement_upsert() -> None:
     """A replacement waits for delete completion before issuing its upsert."""
     from qdrant_client.http import models as qmodels

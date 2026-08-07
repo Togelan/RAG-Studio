@@ -1,4 +1,12 @@
 {
+  "settings_chunking_strategy_label": "Chunking Strategy",
+  "settings_chunking_strategy_static": "Static",
+  "settings_chunking_strategy_recursive": "Recursive",
+  "settings_chunking_strategy_parent_document": "Parent document",
+  "settings_chunking_strategy_sentence_window": "Sentence window",
+  "settings_parent_size_label": "Parent Size",
+  "settings_window_sentences_label": "Context Sentences",
+  "settings_doc_col_strategy": "Strategy",
   "nav_welcome": "Home",
   "nav_settings": "Settings",
   "nav_chat": "Chat",

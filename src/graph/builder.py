@@ -725,17 +725,29 @@ def _normalize_graph_result(result: object, *, session_id: str) -> dict[str, Any
         except (TypeError, ValueError) as exc:
             raise GraphResultError("Graph returned an invalid document score") from exc
         retrieved_docs.append(doc)
-        citations.append(
-            {
-                "index": index + 1,
-                "chunk_text": str(doc.get("text", "")),
-                "filename": str(
-                    metadata.get("filename", metadata.get("source", "unknown"))
-                ),
-                "chunk_index": str(metadata.get("chunk_index", "?")),
-                "score": score,
-            }
-        )
+        citation: dict[str, object] = {
+            "index": index + 1,
+            "chunk_text": str(doc.get("text", "")),
+            "filename": str(
+                metadata.get("filename", metadata.get("source", "unknown"))
+            ),
+            "chunk_index": str(metadata.get("chunk_index", "?")),
+            "score": score,
+            "location_unavailable": True,
+        }
+        start_offset = metadata.get("start_offset")
+        end_offset = metadata.get("end_offset")
+        if (
+            isinstance(start_offset, int)
+            and not isinstance(start_offset, bool)
+            and isinstance(end_offset, int)
+            and not isinstance(end_offset, bool)
+            and start_offset <= end_offset
+        ):
+            citation["start_offset"] = start_offset
+            citation["end_offset"] = end_offset
+            citation["location_unavailable"] = False
+        citations.append(citation)
 
     try:
         faithfulness_score = float(result.get("faithfulness_score", 0.0))
