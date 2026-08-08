@@ -1206,21 +1206,10 @@
   }
 
   /**
-   * Check if chunk-related settings changed and handle re-ingestion flow.
-   * Called before saving settings.
-   * @returns {Promise<boolean>} true if save should proceed
+   * Offer re-ingestion after the server confirms a chunking fingerprint change.
+   * @returns {Promise<boolean>} true when the prompt flow completes
    */
   async function saveSettingsAndOfferReingestion() {
-    var newChunkSize = parseInt(document.getElementById('settings-chunk-size')?.value || '512');
-    var newChunkOverlap = parseInt(document.getElementById('settings-chunk-overlap')?.value || '64');
-
-    var chunksChanged = (originalChunkSize !== null && originalChunkSize !== newChunkSize) ||
-                        (originalChunkOverlap !== null && originalChunkOverlap !== newChunkOverlap);
-
-    if (!chunksChanged) {
-      return true; // No chunk changes, save normally (AC-010.5)
-    }
-
     // Check if documents exist (AC-010.1: no docs → silent save)
     try {
       var resp = await fetch('/api/ingest/documents');

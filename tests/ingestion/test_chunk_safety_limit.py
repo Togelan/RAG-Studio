@@ -14,14 +14,16 @@ async def test_oversized_document_stops_before_embedding(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     router = import_module("src.ingestion.router")
+    strategies = import_module("src.ingestion.strategies")
     path = tmp_path / "oversized.txt"
-    path.write_text("content", encoding="utf-8")
     chunks = ["x" * 20] * (router.MAX_CHUNKS_PER_DOCUMENT + 1)
+    content = "".join(chunks)
+    path.write_text(content, encoding="utf-8")
     embedder = MagicMock()
     store = AsyncMock()
     monkeypatch.setattr(router, "detect_file_type", lambda *_: ".txt")
-    monkeypatch.setattr(router, "detect_and_parse", lambda *_: ("content", {}))
-    monkeypatch.setattr(router, "chunk_text", lambda *_args, **_kwargs: chunks)
+    monkeypatch.setattr(router, "detect_and_parse", lambda *_: (content, {}))
+    monkeypatch.setattr(strategies, "chunk_text", lambda *_args, **_kwargs: chunks)
 
     await router._ingest_file(
         "job-oversized",
@@ -45,16 +47,18 @@ async def test_document_at_chunk_limit_is_ingested(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     router = import_module("src.ingestion.router")
+    strategies = import_module("src.ingestion.strategies")
     path = tmp_path / "at-limit.txt"
-    path.write_text("content", encoding="utf-8")
     chunks = ["x" * 20] * router.MAX_CHUNKS_PER_DOCUMENT
+    content = "".join(chunks)
+    path.write_text(content, encoding="utf-8")
     embedder = MagicMock()
     embedder.embed_dense.return_value = (DenseVector((0.0,)),) * len(chunks)
     embedder.embed_sparse.return_value = (SparseVector((1,), (1.0,)),) * len(chunks)
     store = AsyncMock()
     monkeypatch.setattr(router, "detect_file_type", lambda *_: ".txt")
-    monkeypatch.setattr(router, "detect_and_parse", lambda *_: ("content", {}))
-    monkeypatch.setattr(router, "chunk_text", lambda *_args, **_kwargs: chunks)
+    monkeypatch.setattr(router, "detect_and_parse", lambda *_: (content, {}))
+    monkeypatch.setattr(strategies, "chunk_text", lambda *_args, **_kwargs: chunks)
 
     await router._ingest_file(
         "job-limit",

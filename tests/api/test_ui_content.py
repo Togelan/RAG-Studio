@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture(name="client")
-def fixture_client() -> Generator[TestClient, Any, None]:
+def fixture_client() -> Generator[TestClient, Any]:
     """Pytest fixture providing a TestClient with mocked Qdrant."""
     with (
         patch(
@@ -441,7 +441,9 @@ class TestChunkingStrategyControls:
         assert 'data-chunking-panel="parent_document"' in response.text
         assert 'data-chunking-panel="sentence_window"' in response.text
 
-    def test_settings_client_saves_before_safe_reingestion(self, client: TestClient) -> None:
+    def test_settings_client_saves_before_safe_reingestion(
+        self, client: TestClient
+    ) -> None:
         """The browser client saves settings first and never clears the index."""
         response = client.get("/static/js/app.js")
 
@@ -453,3 +455,13 @@ class TestChunkingStrategyControls:
         assert "reingestSucceeded" in source
         assert "reingestSkipped" in source
         assert "reingestFailed" in source
+
+    def test_strategy_only_change_can_offer_reingestion(
+        self, client: TestClient
+    ) -> None:
+        """A server-confirmed strategy change must not be filtered by legacy size checks."""
+        response = client.get("/static/js/app.js")
+
+        assert response.status_code == 200
+        source = response.text
+        assert "if (!chunksChanged)" not in source

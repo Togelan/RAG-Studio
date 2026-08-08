@@ -41,6 +41,7 @@ from src.ingestion.chunking_dispatch import (
     settings_payload,
     unit_payload,
 )
+from src.ingestion.chunking_models import ChunkingLimitExceeded
 from src.ingestion.document_admission import (  # noqa: F401
     MAX_PENDING_UPLOADS,
     FilenameReservedError,
@@ -752,6 +753,9 @@ async def _ingest_file_locked(
         )
     except ChunkLimitExceededError as error:
         await _record_ingestion_failure(file_id, str(error), "chunk_limit")
+    except ChunkingLimitExceeded as error:
+        limit_error = ChunkLimitExceededError(error.max_units + 1)
+        await _record_ingestion_failure(file_id, str(limit_error), "chunk_limit")
     except ValueError:
         await _record_ingestion_failure(file_id, "ingestion_invalid_document", "parse")
     except asyncio.CancelledError:
