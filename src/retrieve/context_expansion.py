@@ -81,13 +81,13 @@ def _expanded_text(
 
 
 def _set_location(metadata: dict[str, JsonValue], start_key: str, end_key: str) -> None:
-    start = metadata.get(start_key)
-    end = metadata.get(end_key)
-    if _offset(start) is None or _offset(end) is None or _offset(start) > _offset(end):
+    start = _offset(metadata.get(start_key))
+    end = _offset(metadata.get(end_key))
+    if start is None or end is None or start > end:
         metadata["location_unavailable"] = True
         return
-    metadata["start_offset"] = _offset(start)
-    metadata["end_offset"] = _offset(end)
+    metadata["start_offset"] = start
+    metadata["end_offset"] = end
     metadata["location_unavailable"] = False
 
 
