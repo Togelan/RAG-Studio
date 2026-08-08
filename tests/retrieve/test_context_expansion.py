@@ -130,6 +130,27 @@ def test_malformed_strategy_or_offsets_use_safe_raw_context_and_location_fallbac
     assert units[0].metadata["location_unavailable"] is True
 
 
+def test_csv_rows_do_not_expose_synthetic_text_offsets_as_citations() -> None:
+    units = expand_context_units(
+        (
+            _hit(
+                "csv-row",
+                0.8,
+                "name,amount",
+                strategy="csv_row",
+                start_offset=0,
+                end_offset=11,
+            ),
+        ),
+        top_k=1,
+        character_budget=100,
+    )
+
+    assert units[0].metadata["location_unavailable"] is True
+    assert "start_offset" not in units[0].metadata
+    assert "end_offset" not in units[0].metadata
+
+
 class _Searcher:
     def __init__(self, hits: tuple[VectorSearchHit, ...]) -> None:
         self._hits = hits

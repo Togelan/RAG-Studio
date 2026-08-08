@@ -19,6 +19,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.dependencies import get_vector_store
+from src.ingestion.embedder import make_document_doc_id
 
 # ============================================================
 # Fixtures
@@ -187,7 +188,7 @@ class TestSettingsReingest:
 
         raw_dir = data_path("raw_uploads")
         raw_dir.mkdir(parents=True, exist_ok=True)
-        test_doc_id = "test-doc-id-123"
+        test_doc_id = str(make_document_doc_id("test.txt"))
         raw_path = raw_dir / f"{test_doc_id}.txt"
         raw_path.write_text("Test content for re-ingestion.", encoding="utf-8")
 
@@ -239,7 +240,10 @@ class TestSettingsReingest:
         try:
             resp = client.post(
                 "/api/ingest/reingest",
-                json={"doc_id": "test-doc-id", "filename": "nonexistent.xyz"},
+            json={
+                "doc_id": str(make_document_doc_id("nonexistent.xyz")),
+                "filename": "nonexistent.xyz",
+            },
             )
 
             assert resp.status_code == 200
@@ -249,6 +253,47 @@ class TestSettingsReingest:
             assert data["detail"] is not None
         finally:
             app.dependency_overrides.pop(get_vector_store, None)
+
+    def test_reingest_rejects_path_traversal_doc_id(self, client: TestClient) -> None:
+        """A re-ingest request cannot use its document id to escape raw uploads."""
+        app = cast(FastAPI, client.app)
+
+        async def override_get_vector_store() -> AsyncMock:
+            return AsyncMock()
+
+        app.dependency_overrides[get_vector_store] = override_get_vector_store
+        try:
+            response = client.post(
+                "/api/ingest/reingest",
+                json={"doc_id": "../../settings", "filename": "report.txt"},
+            )
+        finally:
+            app.dependency_overrides.pop(get_vector_store, None)
+
+        assert response.status_code == 422
+
+    def test_reingest_rejects_doc_id_for_a_different_filename(
+        self, client: TestClient
+    ) -> None:
+        """A valid UUID cannot select a raw source belonging to another filename."""
+        app = cast(FastAPI, client.app)
+
+        async def override_get_vector_store() -> AsyncMock:
+            return AsyncMock()
+
+        app.dependency_overrides[get_vector_store] = override_get_vector_store
+        try:
+            response = client.post(
+                "/api/ingest/reingest",
+                json={
+                    "doc_id": str(make_document_doc_id("other.txt")),
+                    "filename": "different.txt",
+                },
+            )
+        finally:
+            app.dependency_overrides.pop(get_vector_store, None)
+
+        assert response.status_code == 400
 
     # ----------------------------------------------------------
     # AC-010.4: Clear Then Re-Ingest Flow

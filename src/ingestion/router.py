@@ -218,7 +218,7 @@ class DuplicateResponse(BaseModel):
 class ReingestRequest(BaseModel):
     """Request schema for POST /api/ingest/reingest."""
 
-    doc_id: str
+    doc_id: uuid.UUID
     filename: str
 
 
@@ -1282,20 +1282,27 @@ async def reingest_document(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid filename") from None
 
+    expected_doc_id = uuid.UUID(make_document_doc_id(canonical_filename))
+    if request.doc_id != expected_doc_id:
+        raise HTTPException(status_code=400, detail="Document does not match filename")
+
     # Read the current normalized contract while preserving legacy size callers.
     current_chunking = _read_current_chunking_settings()
 
     # Find the stored file in data/raw_uploads/ by doc_id.
     # Files are stored as {doc_id}{suffix} during upload (BUG-010-1 fix).
     suffix = Path(canonical_filename).suffix
-    raw_path = _raw_uploads_dir() / f"{request.doc_id}{suffix}"
+    raw_root = _raw_uploads_dir().resolve()
+    raw_path = (raw_root / f"{request.doc_id}{suffix}").resolve()
+    if raw_path.parent != raw_root:
+        raise HTTPException(status_code=400, detail="Invalid document source")
 
     if not raw_path.exists():
         logger.warning("reingest_source_missing")
         response.status_code = 200
         return ReingestResponse(
             status="skipped",
-            file_id=request.doc_id,
+            file_id=str(request.doc_id),
             message=f"Source file for '{canonical_filename}' no longer available. Skipping.",
             detail=f"Stored file no longer exists: {raw_path.name}",
         )

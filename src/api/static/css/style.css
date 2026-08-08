@@ -2259,6 +2259,12 @@ input[type="range"]:focus::-moz-range-track {
     grid-template-columns: 1fr;
   }
 
+  .settings-left,
+  .settings-right {
+    width: 100%;
+    min-width: 0;
+  }
+
   .welcome-video-placeholder {
     width: 100%;
     max-width: 100%;

@@ -16,7 +16,7 @@ from src.api.chunking_settings import (
 
 
 @pytest.fixture(name="client")
-def fixture_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Generator[TestClient, None]:
+def fixture_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Generator[TestClient]:
     monkeypatch.setenv("RAG_STUDIO_SETTINGS_PATH", str(tmp_path / "settings.enc.json"))
     with (
         patch(
@@ -47,6 +47,14 @@ def test_read_chunking_settings_migrates_legacy_flat_fields() -> None:
     # Then: legacy data receives the compatible recursive default.
     assert chunking == ChunkingSettings(
         strategy="recursive", chunk_size=1024, chunk_overlap=128
+    )
+
+
+def test_read_chunking_settings_preserves_valid_legacy_nonpreset_values() -> None:
+    chunking = read_chunking_settings({"chunk_size": 128, "chunk_overlap": 0})
+
+    assert chunking == ChunkingSettings(
+        strategy="recursive", chunk_size=128, chunk_overlap=0
     )
 
 

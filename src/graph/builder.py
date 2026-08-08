@@ -646,6 +646,7 @@ def _graph_inputs(
     temperature: float,
     max_tokens: int,
     system_prompt: str,
+    top_k: int,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build isolated LangGraph config and initial state for one user turn."""
     from langchain_core.messages import HumanMessage
@@ -672,6 +673,7 @@ def _graph_inputs(
         "temperature": temperature,
         "max_tokens": max_tokens,
         "system_prompt": system_prompt,
+        "top_k": top_k,
     }
     return config, initial_state
 
@@ -799,6 +801,7 @@ async def stream_rag_graph(
     temperature: float = 1.0,
     max_tokens: int = 2048,
     system_prompt: str = "",
+    top_k: int = 5,
 ) -> AsyncIterator[dict[str, Any]]:
     """Yield genuine generation chunks followed by one validated graph result.
 
@@ -815,6 +818,7 @@ async def stream_rag_graph(
         temperature=temperature,
         max_tokens=max_tokens,
         system_prompt=system_prompt,
+        top_k=top_k,
     )
 
     final_state: object | None = None
@@ -858,6 +862,7 @@ async def run_rag_graph(
     temperature: float = 1.0,
     max_tokens: int = 2048,
     system_prompt: str = "",
+    top_k: int = 5,
 ) -> dict[str, Any]:
     """Run the RAG graph for a single query.
 
@@ -888,6 +893,7 @@ async def run_rag_graph(
         temperature=temperature,
         max_tokens=max_tokens,
         system_prompt=system_prompt,
+        top_k=top_k,
     )
     result = await compiled_graph.ainvoke(initial_state, config)
     return _normalize_graph_result(result, session_id=session_id)

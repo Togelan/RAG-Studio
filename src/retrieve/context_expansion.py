@@ -56,7 +56,12 @@ def _expand_hit(hit: VectorSearchHit) -> ContextUnit:
     text, start_key, end_key = _expanded_text(metadata, strategy)
     metadata["strategy"] = strategy
     metadata["context_strategy"] = strategy
-    _set_location(metadata, start_key, end_key)
+    if strategy == "csv_row":
+        metadata.pop("start_offset", None)
+        metadata.pop("end_offset", None)
+        metadata["location_unavailable"] = True
+    else:
+        _set_location(metadata, start_key, end_key)
     return ContextUnit(
         point_id=str(hit.point_id),
         score=hit.score,

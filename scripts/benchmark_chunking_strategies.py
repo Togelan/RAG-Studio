@@ -41,6 +41,28 @@ def _points(start: int, count: int) -> list[qmodels.PointStruct]:
     ]
 
 
+def _storage_bytes(data_root: Path) -> int:
+    """Return the size of the isolated Qdrant storage directory."""
+    return sum(path.stat().st_size for path in data_root.rglob("*") if path.is_file())
+
+
+def _cgroup_memory_bytes() -> dict[str, int | None]:
+    """Read Linux cgroup memory counters when the benchmark runs in Docker."""
+    cgroup_root = Path("/sys/fs/cgroup")
+
+    def read_counter(name: str) -> int | None:
+        try:
+            return int((cgroup_root / name).read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            return None
+
+    return {
+        "current": read_counter("memory.current"),
+        "peak": read_counter("memory.peak"),
+        "limit": read_counter("memory.max"),
+    }
+
+
 def run_benchmark(data_root: Path, points: int, queries: int) -> dict[str, object]:
     if points < 1 or queries < 1:
         raise ValueError("points_and_queries_must_be_positive")
@@ -90,6 +112,8 @@ def run_benchmark(data_root: Path, points: int, queries: int) -> dict[str, objec
             "query_count": queries,
             "strategy_distribution": distribution,
             "ingestion_seconds": round(ingestion_seconds, 3),
+            "storage_bytes": _storage_bytes(data_root),
+            "memory_bytes": _cgroup_memory_bytes(),
             "retrieval_ms": {
                 "p50": round(statistics.median(latencies), 3),
                 "p95": round(_percentile(latencies, 0.95), 3),

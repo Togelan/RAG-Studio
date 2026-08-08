@@ -53,3 +53,4 @@ class RAGState(TypedDict):
     temperature: float  # 0.0–2.0
     max_tokens: int  # max tokens for generation
     system_prompt: str  # custom system prompt from settings
+    top_k: int  # final retrieval context-unit limit from settings

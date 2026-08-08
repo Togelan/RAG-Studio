@@ -345,6 +345,7 @@ async def _sse_stream(
     temperature: float = 1.0,
     max_tokens: int = 2048,
     system_prompt: str = "",
+    top_k: int = 5,
 ) -> AsyncGenerator[str]:
     """Generate a Server-Sent Events stream using the real LangGraph pipeline.
 
@@ -399,6 +400,7 @@ async def _sse_stream(
             temperature=temperature,
             max_tokens=max_tokens,
             system_prompt=system_prompt,
+            top_k=top_k,
         )
         if inspect.isawaitable(stream_candidate):
             buffered_result = await stream_candidate
@@ -716,6 +718,7 @@ async def send_message(
     temperature = float(settings_data.get("temperature", 1.0))
     max_tokens_val = int(settings_data.get("max_tokens", 2048))
     system_prompt_val = str(settings_data.get("system_prompt", ""))
+    top_k = int(settings_data.get("top_k", 5))
 
     # Priority 1: Load decrypted API key from secrets store (user-saved keys).
     # The outer Fernet layer is decrypted by load_secrets(), but each
@@ -756,6 +759,7 @@ async def send_message(
                     temperature=temperature,
                     max_tokens=max_tokens_val,
                     system_prompt=system_prompt_val,
+                    top_k=top_k,
                 ):
                     await publish(event)
             finally:

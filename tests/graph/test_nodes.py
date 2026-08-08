@@ -269,6 +269,18 @@ class TestRetrieveNode:
 
         assert result["retrieved_docs"] == []
 
+    @pytest.mark.asyncio
+    async def test_retrieve_uses_the_configured_context_unit_limit(self) -> None:
+        embedder = MagicMock()
+        embedder.embed_dense.return_value = (DenseVector((0.1,) * 384),)
+        embedder.embed_sparse.return_value = (SparseVector((1,), (0.1,)),)
+        search = AsyncMock(return_value=[])
+
+        with patch("src.graph.nodes.hybrid_search", search):
+            await retrieve_node(_make_state(top_k=3), embedder=embedder)
+
+        assert search.await_args.kwargs["top_k"] == 3
+
 
 # ============================================================
 # AC-003.2: Generate from Cache Node
