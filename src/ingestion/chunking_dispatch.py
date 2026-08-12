@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src.api.chunking_settings import ChunkingSettings
-from src.ingestion.chunking_models import ChunkingConfig, ChunkingStrategy, ChunkUnit
+from src.ingestion.chunking_models import (
+    DEFAULT_PARENT_SIZE,
+    DEFAULT_WINDOW_SENTENCES,
+    ChunkingConfig,
+    ChunkingStrategy,
+    ChunkUnit,
+)
 from src.ingestion.strategies import (
     chunk_csv_rows_with_strategy,
     chunk_text_with_strategy,
@@ -32,12 +38,18 @@ def dispatch_text(
     text: str, settings: ChunkingSettings, source_id: str
 ) -> ChunkingBatch:
     """Build text search units with the selected normalized strategy."""
+    parent_size = None
+    if settings.strategy == "parent_document":
+        parent_size = settings.parent_size or DEFAULT_PARENT_SIZE
+    window_sentences = None
+    if settings.strategy == "sentence_window":
+        window_sentences = settings.window_sentences or DEFAULT_WINDOW_SENTENCES
     config = ChunkingConfig(
         strategy=ChunkingStrategy(settings.strategy),
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
-        parent_size=settings.parent_size or 2_048,
-        window_sentences=settings.window_sentences or 2,
+        parent_size=parent_size,
+        window_sentences=window_sentences,
         source_id=source_id,
     )
     return ChunkingBatch(

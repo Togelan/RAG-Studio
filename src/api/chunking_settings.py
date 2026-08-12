@@ -57,10 +57,10 @@ class ChunkingSettings(BaseModel):
     @model_validator(mode="after")
     def validate_strategy_parameters(self) -> ChunkingSettings:
         """Enforce bounded presets and relationships at the configuration boundary."""
-        if not 128 <= self.chunk_size <= 4096:
-            raise ValueError("chunk_size must remain within supported bounds")
-        if not 0 <= self.chunk_overlap <= 512:
-            raise ValueError("chunk_overlap must remain within supported bounds")
+        if self.chunk_size not in CHUNK_SIZE_PRESETS and self.chunk_size != 128:
+            raise ValueError("chunk_size must use a supported preset")
+        if self.chunk_overlap not in CHUNK_OVERLAP_PRESETS and self.chunk_overlap != 0:
+            raise ValueError("chunk_overlap must use a supported preset")
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError("chunk_overlap must be smaller than chunk_size")
         if self.parent_size is not None and self.parent_size not in PARENT_SIZE_PRESETS:

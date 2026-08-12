@@ -7,6 +7,8 @@ from uuid import NAMESPACE_URL, uuid5
 
 from src.ingestion.chunker import chunk_text
 from src.ingestion.chunking_models import (
+    DEFAULT_PARENT_SIZE,
+    DEFAULT_WINDOW_SENTENCES,
     MAX_CONTEXT_UNITS,
     ChunkingConfig,
     ChunkingConfigurationError,
@@ -39,7 +41,9 @@ def chunk_text_with_strategy(text: str, config: ChunkingConfig) -> list[ChunkUni
 
 
 def chunk_csv_rows_with_strategy(
-    row_texts: list[str], source_id: str = "document", max_units: int = MAX_CONTEXT_UNITS
+    row_texts: list[str],
+    source_id: str = "document",
+    max_units: int = MAX_CONTEXT_UNITS,
 ) -> list[ChunkUnit]:
     """Preserve each non-blank CSV row as one atomic metadata-bearing unit."""
     _validate_unit_limit(max_units)
@@ -97,8 +101,9 @@ def _recursive_units(text: str, config: ChunkingConfig) -> list[ChunkUnit]:
 
 def _parent_document_units(text: str, config: ChunkingConfig) -> list[ChunkUnit]:
     units: list[ChunkUnit] = []
+    parent_size = config.parent_size or DEFAULT_PARENT_SIZE
     for paragraph_index, paragraph_range in enumerate(split_paragraphs(text)):
-        parent_ranges = _parent_ranges(text, paragraph_range, config.parent_size)
+        parent_ranges = _parent_ranges(text, paragraph_range, parent_size)
         for parent_range in parent_ranges:
             identity = (
                 f"{config.source_id}:{config.strategy.value}:"
@@ -170,6 +175,7 @@ def _child_ranges(
 
 def _sentence_window_units(text: str, config: ChunkingConfig) -> list[ChunkUnit]:
     units: list[ChunkUnit] = []
+    window_sentences = config.window_sentences or DEFAULT_WINDOW_SENTENCES
     for paragraph_index, paragraph_range in enumerate(split_paragraphs(text)):
         sentences = split_sentences(text, paragraph_range)
         for sentence_index, sentence in enumerate(sentences):
@@ -178,8 +184,10 @@ def _sentence_window_units(text: str, config: ChunkingConfig) -> list[ChunkUnit]
             )
             oversized = len(fragments) > 1
             for fragment in fragments:
-                window_range = fragment if oversized else _window_range(
-                    sentences, sentence_index, config.window_sentences
+                window_range = (
+                    fragment
+                    if oversized
+                    else _window_range(sentences, sentence_index, window_sentences)
                 )
                 unit = ChunkUnit(
                     unit_id=_unit_identifier(config, fragment),
@@ -235,9 +243,7 @@ def _unit_identifier(config: ChunkingConfig, text_range: TextRange) -> str:
     return str(uuid5(NAMESPACE_URL, identity))
 
 
-def _append_bounded(
-    units: list[ChunkUnit], unit: ChunkUnit, max_units: int
-) -> None:
+def _append_bounded(units: list[ChunkUnit], unit: ChunkUnit, max_units: int) -> None:
     if len(units) >= max_units:
         raise ChunkingLimitExceeded(max_units)
     units.append(unit)

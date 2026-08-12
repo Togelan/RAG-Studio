@@ -30,7 +30,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from src.api.chunking_settings import ChunkingSettings, read_chunking_settings
 from src.api.dependencies import get_vector_store, log_audit
@@ -218,8 +218,16 @@ class DuplicateResponse(BaseModel):
 class ReingestRequest(BaseModel):
     """Request schema for POST /api/ingest/reingest."""
 
-    doc_id: uuid.UUID
+    doc_id: str
     filename: str
+
+    @field_validator("doc_id")
+    @classmethod
+    def validate_doc_id(cls, value: str) -> str:
+        """Allow safe legacy ids while rejecting path-like values."""
+        if not value or Path(value).name != value or value in {".", ".."}:
+            raise ValueError("Invalid document id")
+        return value
 
 
 class ReingestResponse(BaseModel):
@@ -1282,8 +1290,12 @@ async def reingest_document(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid filename") from None
 
-    expected_doc_id = uuid.UUID(make_document_doc_id(canonical_filename))
-    if request.doc_id != expected_doc_id:
+    expected_doc_id = str(make_document_doc_id(canonical_filename))
+    try:
+        request_doc_id = str(uuid.UUID(request.doc_id))
+    except ValueError:
+        request_doc_id = None
+    if request_doc_id is not None and request_doc_id != expected_doc_id:
         raise HTTPException(status_code=400, detail="Document does not match filename")
 
     # Read the current normalized contract while preserving legacy size callers.

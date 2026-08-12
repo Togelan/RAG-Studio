@@ -54,6 +54,23 @@ def test_recursive_strategy_matches_the_legacy_compatibility_facade() -> None:
     assert [unit.text for unit in units] == legacy_chunks
 
 
+def test_non_parent_strategies_allow_large_chunk_sizes_without_parent_bounds() -> None:
+    # Given: a valid static configuration at the maximum supported chunk size.
+    config = ChunkingConfig(
+        strategy=ChunkingStrategy.STATIC,
+        chunk_size=4096,
+        chunk_overlap=64,
+        source_id="large-static",
+    )
+
+    # When: the text crosses the internal strategy boundary.
+    units = chunk_text_with_strategy("x" * 5000, config)
+
+    # Then: parent-document-only validation does not block large static chunks.
+    assert len(units) == 2
+    assert all(len(unit.text) <= config.chunk_size for unit in units)
+
+
 def test_parent_document_strategy_keeps_children_inside_bounded_parents() -> None:
     # Given: two paragraphs including a blank separator.
     text = (
@@ -78,7 +95,10 @@ def test_parent_document_strategy_keeps_children_inside_bounded_parents() -> Non
     assert all(unit.parent_id is not None for unit in units)
     assert all(unit.parent_range is not None for unit in units)
     assert all(
-        unit.parent_range.start <= unit.text_range.start < unit.text_range.end <= unit.parent_range.end
+        unit.parent_range.start
+        <= unit.text_range.start
+        < unit.text_range.end
+        <= unit.parent_range.end
         for unit in units
         if unit.parent_range is not None
     )
@@ -107,7 +127,9 @@ def test_sentence_window_strategy_never_builds_a_window_across_paragraphs() -> N
     )
 
 
-def test_sentence_window_default_expands_two_sentences_per_side_within_paragraph() -> None:
+def test_sentence_window_default_expands_two_sentences_per_side_within_paragraph() -> (
+    None
+):
     # Given: a middle sentence with two neighbors on each side in one paragraph.
     text = "S0. S1. S2. S3. S4.\n\nOutside the sentence window paragraph."
     config = ChunkingConfig(

@@ -66,8 +66,8 @@ class ChunkingConfig:
     strategy: ChunkingStrategy = ChunkingStrategy.RECURSIVE
     chunk_size: int = DEFAULT_CHUNK_SIZE
     chunk_overlap: int = DEFAULT_CHUNK_OVERLAP
-    parent_size: int = DEFAULT_PARENT_SIZE
-    window_sentences: int = DEFAULT_WINDOW_SENTENCES
+    parent_size: int | None = None
+    window_sentences: int | None = None
     max_units: int = MAX_CONTEXT_UNITS
     source_id: str = "document"
 
@@ -77,13 +77,19 @@ class ChunkingConfig:
         if self.chunk_size <= 0:
             raise ChunkingConfigurationError("chunk_size_must_be_positive")
         if self.chunk_overlap < 0 or self.chunk_overlap >= self.chunk_size:
-            raise ChunkingConfigurationError("chunk_overlap_must_be_smaller_than_chunk_size")
-        if self.parent_size < self.chunk_size:
-            raise ChunkingConfigurationError("parent_size_must_cover_one_child")
-        if self.window_sentences < 0:
+            raise ChunkingConfigurationError(
+                "chunk_overlap_must_be_smaller_than_chunk_size"
+            )
+        if self.strategy is ChunkingStrategy.PARENT_DOCUMENT:
+            parent_size = self.parent_size or DEFAULT_PARENT_SIZE
+            if parent_size < self.chunk_size:
+                raise ChunkingConfigurationError("parent_size_must_cover_one_child")
+        if self.window_sentences is not None and self.window_sentences < 0:
             raise ChunkingConfigurationError("window_sentences_must_not_be_negative")
         if self.max_units <= 0 or self.max_units > MAX_CONTEXT_UNITS:
-            raise ChunkingConfigurationError("max_units_must_be_between_one_and_hard_cap")
+            raise ChunkingConfigurationError(
+                "max_units_must_be_between_one_and_hard_cap"
+            )
         if not self.source_id:
             raise ChunkingConfigurationError("source_id_must_not_be_empty")
 

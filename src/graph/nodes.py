@@ -276,7 +276,7 @@ async def retrieve_node(
         dense_vector=list(dense_vector.values),
         sparse_indices=list(sparse_vector.indices),
         sparse_values=list(sparse_vector.values),
-        top_k=state["top_k"],
+        top_k=state.get("top_k", 5),
         vector_searcher=vector_searcher,
     )
     logger.info("Retrieve completed: result_count=%d", len(results))
