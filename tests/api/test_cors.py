@@ -31,8 +31,7 @@ def test_default_cors_allows_local_origin_and_required_request_headers(
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:8000"
     assert (
-        response.headers["access-control-allow-methods"]
-        == "GET, POST, PATCH, DELETE"
+        response.headers["access-control-allow-methods"] == "GET, POST, PATCH, DELETE"
     )
     allowed_headers = response.headers["access-control-allow-headers"].lower()
     assert "content-type" in allowed_headers

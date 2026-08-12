@@ -240,10 +240,10 @@ class TestSettingsReingest:
         try:
             resp = client.post(
                 "/api/ingest/reingest",
-            json={
-                "doc_id": str(make_document_doc_id("nonexistent.xyz")),
-                "filename": "nonexistent.xyz",
-            },
+                json={
+                    "doc_id": str(make_document_doc_id("nonexistent.xyz")),
+                    "filename": "nonexistent.xyz",
+                },
             )
 
             assert resp.status_code == 200

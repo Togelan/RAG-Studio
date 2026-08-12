@@ -117,9 +117,7 @@ class DocumentMetadata:
     strategy: str = "recursive"
     schema_version: int = 1
     chunking_fingerprint: str | None = None
-    chunking_settings: Payload = field(
-        default_factory=lambda: MappingProxyType({})
-    )
+    chunking_settings: Payload = field(default_factory=lambda: MappingProxyType({}))
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +134,4 @@ class DocumentReplacement:
     schema_version: int = 1
     file_hash: str = ""
     chunking_fingerprint: str | None = None
-    chunking_settings: Payload = field(
-        default_factory=lambda: MappingProxyType({})
-    )
+    chunking_settings: Payload = field(default_factory=lambda: MappingProxyType({}))

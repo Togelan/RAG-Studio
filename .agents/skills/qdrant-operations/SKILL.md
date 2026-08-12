@@ -44,7 +44,10 @@ from qdrant_client.http import models as qmodels
 import uuid
 
 COLLECTION_NAME = "rag_studio_docs"
-DENSE_VECTOR_SIZE = 384  # paraphrase-multilingual-MiniLM-L12-v2 (local ONNX, cached in models/)
+DENSE_VECTOR_SIZE = (
+    384  # paraphrase-multilingual-MiniLM-L12-v2 (local ONNX, cached in models/)
+)
+
 
 async def create_collection(client: AsyncQdrantClient) -> None:
     """Create a Qdrant collection supporting both dense and sparse vectors."""
@@ -77,13 +80,14 @@ import uuid
 # Use a fixed namespace UUID for your project
 RAG_STUDIO_NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 
+
 def make_doc_id(filename: str, chunk_index: int) -> str:
     """Generate a deterministic UUID5 for a document chunk.
-    
+
     Args:
         filename: The original file name (e.g., 'report.pdf').
         chunk_index: Zero-based index of the chunk within the document.
-    
+
     Returns:
         A UUID5 string, deterministic and collision-free.
     """
@@ -102,6 +106,7 @@ def make_doc_id(filename: str, chunk_index: int) -> str:
 
 ```python
 from qdrant_client.http import models as qmodels
+
 
 async def upsert_chunk(
     client: AsyncQdrantClient,
@@ -189,6 +194,7 @@ from sentence_transformers import CrossEncoder
 # Load once at module level (expensive)
 _reranker: CrossEncoder | None = None
 
+
 def get_reranker() -> CrossEncoder:
     """Lazy-load the cross-encoder reranker model."""
     global _reranker
@@ -218,10 +224,7 @@ async def rerank_results(
     model = get_reranker()
 
     # Build (query, document_text) pairs
-    pairs = [
-        (query, point.payload.get("text", ""))
-        for point in candidates
-    ]
+    pairs = [(query, point.payload.get("text", "")) for point in candidates]
 
     scores = model.predict(pairs)  # returns list[float]
 

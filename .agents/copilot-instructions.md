@@ -66,6 +66,7 @@
 # CORRECT
 from __future__ import annotations
 
+
 async def search_documents(
     query: str,
     collection_name: str,
@@ -75,9 +76,9 @@ async def search_documents(
     """Search Qdrant collection and return ranked results."""
     ...
 
+
 # WRONG — missing return type, bare Optional
-async def search_documents(query, collection_name, limit=20, filters=None):
-    ...
+async def search_documents(query, collection_name, limit=20, filters=None): ...
 ```
 
 ---

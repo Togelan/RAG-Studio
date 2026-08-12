@@ -30,7 +30,7 @@ async def translated_errors() -> AsyncIterator[None]:
         raise invalid_request_error() from None
     except UnexpectedResponse as error:
         raise response_error(error) from None
-    except (ApiException, ResponseHandlingException, TimeoutError):
+    except ApiException, ResponseHandlingException, TimeoutError:
         raise unavailable_error() from None
 
 
@@ -44,9 +44,7 @@ def to_qdrant_sparse(vector: SparseVector) -> qmodels.SparseVector:
 
 def to_qdrant_point(record: VectorRecord) -> qmodels.PointStruct:
     """Translate one domain vector record into a Qdrant point."""
-    vectors: dict[str, qmodels.Vector] = {
-        _DENSE_VECTOR_NAME: list(record.dense.values)
-    }
+    vectors: dict[str, qmodels.Vector] = {_DENSE_VECTOR_NAME: list(record.dense.values)}
     if record.sparse is not None:
         vectors[_SPARSE_VECTOR_NAME] = to_qdrant_sparse(record.sparse)
     return qmodels.PointStruct(

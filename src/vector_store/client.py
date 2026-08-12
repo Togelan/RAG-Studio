@@ -60,7 +60,7 @@ class QdrantClientManager:
         - Remote: QDRANT_URL set to a remote server
         - Local: QDRANT_URL unset → uses in-process Qdrant with persistent
           disk storage at QDRANT_PATH (default: <data-root>/qdrant_storage)
-        """  # noqa: D205
+        """
         if self._client is None:
             lock = self._lock
             if lock is None:
@@ -100,7 +100,7 @@ class QdrantClientManager:
             client = await self.get_client()
             await client.get_collections()
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - Qdrant transports expose provider-specific failures
             logger.warning("Qdrant health check failed: %s", e)
             return False
 
@@ -150,7 +150,7 @@ class QdrantClientManager:
             try:
                 await self._client.close()
                 logger.info("Qdrant client closed.")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - shutdown must release local client after close failure
                 logger.warning("Error closing Qdrant client: %s", e)
             finally:
                 self._client = None

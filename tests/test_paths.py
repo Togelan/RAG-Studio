@@ -48,7 +48,9 @@ def test_data_root_override_and_relative_component_overrides(
     assert _qdrant_path() == tmp_path / "qdrant"
 
 
-def test_relative_paths_are_anchored_at_project_root(monkeypatch, tmp_path: Path) -> None:
+def test_relative_paths_are_anchored_at_project_root(
+    monkeypatch, tmp_path: Path
+) -> None:
     """Relative values never resolve from the mutable process CWD."""
     monkeypatch.chdir(tmp_path)
 

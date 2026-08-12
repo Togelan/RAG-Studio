@@ -53,7 +53,7 @@ def _cgroup_memory_bytes() -> dict[str, int | None]:
     def read_counter(name: str) -> int | None:
         try:
             return int((cgroup_root / name).read_text(encoding="utf-8").strip())
-        except (OSError, ValueError):
+        except OSError, ValueError:
             return None
 
     return {

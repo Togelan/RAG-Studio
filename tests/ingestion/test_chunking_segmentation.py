@@ -32,7 +32,10 @@ def test_blank_paragraphs_are_ignored_without_changing_source_offsets() -> None:
         "Alpha paragraph.",
         "Beta paragraph.",
     ]
-    assert [(paragraph.start, paragraph.end) for paragraph in paragraphs] == [(2, 18), (22, 37)]
+    assert [(paragraph.start, paragraph.end) for paragraph in paragraphs] == [
+        (2, 18),
+        (22, 37),
+    ]
 
 
 def test_sentence_segmentation_handles_initials_ellipsis_and_closing_quotes() -> None:

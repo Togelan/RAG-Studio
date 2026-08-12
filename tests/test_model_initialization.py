@@ -10,8 +10,8 @@ from types import ModuleType
 from typing import Any
 from unittest.mock import patch
 
-import src.ingestion.embedder as embedder
-import src.retrieve.orchestrator as orchestrator
+from src.ingestion import embedder
+from src.retrieve import orchestrator
 
 
 def _concurrently_call(factory: Any, workers: int = 8) -> list[Any]:

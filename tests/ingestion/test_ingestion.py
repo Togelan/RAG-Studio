@@ -1071,7 +1071,7 @@ class TestAC0018DuplicateDetection:
             temp_path = tf.name
 
         try:
-            with open(temp_path, "rb") as f:
+            with open(temp_path, "rb") as f:  # noqa: ASYNC230 - isolated temporary test fixture
                 file_content = f.read()
 
             client = TestClient(app)

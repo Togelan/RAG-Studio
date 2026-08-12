@@ -191,14 +191,17 @@ from typing import Optional
 # Simple in-memory cache with TTL
 _cache: dict[str, tuple[float, str]] = {}  # key -> (expiry, answer)
 
+
 def cache_key(query: str, doc_ids: list[str]) -> str:
     normalized = query.strip().lower()
     query_hash = hashlib.md5(normalized.encode()).hexdigest()[:12]
     doc_ids_sorted = "-".join(sorted(doc_ids))
     return f"{query_hash}:{doc_ids_sorted}"
 
+
 def cache_set(key: str, answer: str, ttl: int = 3600) -> None:
     _cache[key] = (time.time() + ttl, answer)
+
 
 def cache_get(key: str) -> Optional[str]:
     entry = _cache.get(key)
@@ -209,6 +212,7 @@ def cache_get(key: str) -> Optional[str]:
         del _cache[key]
         return None
     return answer
+
 
 def invalidate_by_doc_id(doc_id: str) -> int:
     """Remove all cache entries that reference a specific doc_id. Returns count removed."""

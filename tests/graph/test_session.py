@@ -62,7 +62,9 @@ async def test_unicode_messages_and_metadata_survive_restart(tmp_path: Any) -> N
 
     assert restored is not None
     assert restored.metadata["source"] == "test"
-    assert [message.content for message in restored.checkpoint["channel_values"]["messages"]] == [
+    assert [
+        message.content for message in restored.checkpoint["channel_values"]["messages"]
+    ] == [
         "Привет, 世界",
         "Ответ: всё сохранено.",
     ]

@@ -27,6 +27,7 @@ from langchain_core.messages import BaseMessage
 
 class RAGState(TypedDict):
     """Custom state for the RAG-Studio chat graph."""
+
     # Messages (accumulated via add_messages reducer)
     messages: Annotated[list[BaseMessage], add_messages]
 
@@ -219,9 +220,7 @@ async def generate_from_retrieval_node(state: RAGState) -> dict:
     context_parts: list[str] = []
     for i, doc in enumerate(state["retrieved_docs"]):
         source = doc.get("metadata", {}).get("filename", "unknown")
-        context_parts.append(
-            f"[DOC {i+1}] (source: {source}): {doc['text']}"
-        )
+        context_parts.append(f"[DOC {i + 1}] (source: {source}): {doc['text']}")
     context = "\n\n---\n\n".join(context_parts)
 
     system_prompt = f"""{GROUNDING_INSTRUCTION}
@@ -268,8 +267,7 @@ async def validate_node(state: RAGState) -> dict:
 
     # Build context for validation
     context = "\n\n".join(
-        f"[DOC {i+1}]: {doc['text']}"
-        for i, doc in enumerate(state["retrieved_docs"])
+        f"[DOC {i + 1}]: {doc['text']}" for i, doc in enumerate(state["retrieved_docs"])
     )
 
     validation_prompt = f"""You are a faithfulness evaluator. Score whether the ANSWER
@@ -334,9 +332,7 @@ async def save_to_cache_node(state: RAGState) -> dict:
     query_dense = await get_dense_embedding(state["query"])
 
     # UUID5 deterministic ID: same question → same cache key
-    point_id = str(
-        uuid.uuid5(CACHE_NAMESPACE, state["query"].strip().lower())
-    )
+    point_id = str(uuid.uuid5(CACHE_NAMESPACE, state["query"].strip().lower()))
 
     await client.upsert(
         collection_name="rag_studio_cache",
@@ -492,6 +488,7 @@ graph_builder.add_conditional_edges(
 ```python
 from langgraph.graph import StateGraph, END
 
+
 def build_rag_graph() -> StateGraph:
     """Build the complete RAG-Studio chat graph with 7 nodes.
 
@@ -547,7 +544,9 @@ def build_rag_graph() -> StateGraph:
 
 
 # Compile with checkpointer (prod-ready)
-graph = build_rag_graph().compile(checkpointer=SqliteSaver.from_conn_string("checkpoints.db"))
+graph = build_rag_graph().compile(
+    checkpointer=SqliteSaver.from_conn_string("checkpoints.db")
+)
 ```
 
 ---

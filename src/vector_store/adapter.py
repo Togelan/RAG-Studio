@@ -120,7 +120,9 @@ class QdrantVectorStore:
             )
         if not points:
             return None
-        return document_metadata(points[0].payload or {}, doc_id=doc_id, filename=filename)
+        return document_metadata(
+            points[0].payload or {}, doc_id=doc_id, filename=filename
+        )
 
     async def replace_document(self, replacement: DocumentReplacement) -> int:
         """Upsert the complete batch before deleting any stale chunk IDs."""

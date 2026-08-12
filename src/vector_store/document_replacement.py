@@ -199,8 +199,6 @@ def _records_with_metadata(
 def _document_filter(doc_id: str) -> qmodels.Filter:
     return qmodels.Filter(
         must=[
-            qmodels.FieldCondition(
-                key="doc_id", match=qmodels.MatchValue(value=doc_id)
-            )
+            qmodels.FieldCondition(key="doc_id", match=qmodels.MatchValue(value=doc_id))
         ]
     )

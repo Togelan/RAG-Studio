@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture(name="client")
-def fixture_client() -> Generator[TestClient, Any, None]:
+def fixture_client() -> Generator[TestClient, Any]:
     """Pytest fixture providing a TestClient with mocked Qdrant."""
     with (
         patch(

@@ -42,16 +42,30 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         general_rpm: int | None = None,
     ) -> None:
         super().__init__(app)
-        self._chat_rpm = chat_rpm if chat_rpm is not None else _env_int("RAG_STUDIO_CHAT_RPM_LIMIT", 30)
-        self._upload_rpm = upload_rpm if upload_rpm is not None else _env_int("RAG_STUDIO_UPLOAD_RPM_LIMIT", 10)
-        self._general_rpm = general_rpm if general_rpm is not None else _env_int("RAG_STUDIO_GENERAL_RPM_LIMIT", 60)
+        self._chat_rpm = (
+            chat_rpm
+            if chat_rpm is not None
+            else _env_int("RAG_STUDIO_CHAT_RPM_LIMIT", 30)
+        )
+        self._upload_rpm = (
+            upload_rpm
+            if upload_rpm is not None
+            else _env_int("RAG_STUDIO_UPLOAD_RPM_LIMIT", 10)
+        )
+        self._general_rpm = (
+            general_rpm
+            if general_rpm is not None
+            else _env_int("RAG_STUDIO_GENERAL_RPM_LIMIT", 60)
+        )
         self._window: dict[tuple[str, str], list[float]] = {}
         self._lock = asyncio.Lock()
         self._last_sweep = time.monotonic()
 
     @staticmethod
     def _client_id(request: Request) -> str:
-        return request.client.host if request.client and request.client.host else "unknown"
+        return (
+            request.client.host if request.client and request.client.host else "unknown"
+        )
 
     def _tier_and_limit(self, path: str) -> tuple[str | None, int]:
         if path.startswith(_HEALTH_PREFIX):
@@ -67,7 +81,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def _sweep_stale_clients(self, now: float) -> None:
         """Delete windows inactive for a complete limit window; lock is held."""
         cutoff = now - _WINDOW_SECONDS
-        for key in [key for key, values in self._window.items() if not values or values[-1] <= cutoff]:
+        for key in [
+            key
+            for key, values in self._window.items()
+            if not values or values[-1] <= cutoff
+        ]:
             del self._window[key]
         self._last_sweep = now
 
@@ -85,7 +103,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 self._sweep_stale_clients(now)
 
             cutoff = now - _WINDOW_SECONDS
-            timestamps = [timestamp for timestamp in self._window.get(client_key, []) if timestamp > cutoff]
+            timestamps = [
+                timestamp
+                for timestamp in self._window.get(client_key, [])
+                if timestamp > cutoff
+            ]
             if len(timestamps) >= limit:
                 self._window[client_key] = timestamps
                 retry_after = max(1, int(timestamps[0] + _WINDOW_SECONDS - now))

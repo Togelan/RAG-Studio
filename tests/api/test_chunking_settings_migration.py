@@ -16,7 +16,9 @@ from src.api.chunking_settings import (
 
 
 @pytest.fixture(name="client")
-def fixture_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Generator[TestClient]:
+def fixture_client(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Generator[TestClient]:
     monkeypatch.setenv("RAG_STUDIO_SETTINGS_PATH", str(tmp_path / "settings.enc.json"))
     with (
         patch(

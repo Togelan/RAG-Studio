@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # Models cache
 # ============================================================
+
 
 def _models_cache_path() -> Path:
     """Return the provider-model cache location under the data root."""
@@ -104,7 +105,7 @@ def load_models_cache() -> dict[str, Any]:
     try:
         with open(cache_path, encoding="utf-8") as f:
             return cast("dict[str, Any]", json.load(f))
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return {}
 
 
@@ -132,7 +133,7 @@ def is_cache_valid(entry: dict[str, Any] | None) -> bool:
     if not entry or "fetched_at" not in entry:
         return False
     fetched = datetime.fromisoformat(entry["fetched_at"])
-    return datetime.now(timezone.utc) - fetched < timedelta(hours=24)
+    return datetime.now(UTC) - fetched < timedelta(hours=24)
 
 
 # ============================================================
@@ -254,7 +255,7 @@ async def check_anthropic_auth(api_key: str) -> bool:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(url, headers=headers, json=payload)
             return resp.status_code in (200, 429)  # 429 = rate-limited but auth valid
-    except (httpx.TimeoutException, httpx.RequestError, OSError):
+    except httpx.TimeoutException, httpx.RequestError, OSError:
         return False
 
 

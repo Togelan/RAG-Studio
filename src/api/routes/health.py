@@ -36,7 +36,7 @@ async def simple_health() -> SimpleHealthResponse:
 
 @router.get("/api/health", response_model=HealthResponse)
 async def health_check(
-    client: AsyncQdrantClient = Depends(get_qdrant_client),
+    client: AsyncQdrantClient = Depends(get_qdrant_client),  # noqa: B008 - FastAPI dependency injection
 ) -> HealthResponse:
     """Return application health status.
 
@@ -54,7 +54,7 @@ async def health_check(
         # without adding safety — the AttributeError fallback below
         # handles the case where the method is genuinely absent.
         qdrant_ok = await client.health_check()  # type: ignore[attr-defined]
-    except (AttributeError, Exception):
+    except Exception:  # noqa: BLE001 - health endpoint must degrade for provider-specific failures
         qdrant_ok = False
 
     qdrant_status = "ok" if qdrant_ok else "unavailable"
@@ -107,7 +107,7 @@ async def health_status() -> StatusResponse:
 
         client = await get_qdrant_client()
         qdrant_ok = await client.collection_exists("rag_studio_docs")
-    except Exception:
+    except Exception:  # noqa: BLE001 - status polling must degrade for provider-specific failures
         qdrant_ok = False
 
     overall = "ready" if qdrant_ok else "degraded"
