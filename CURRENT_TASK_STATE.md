@@ -4,10 +4,10 @@ Updated: 2026-08-12
 
 ## Scope
 
-The active task is to complete the local-first RAG-Studio chunking strategy
-library for static, recursive, parent-document, and sentence-window strategies.
-The application remains a single Docker container with embedded persistent
-Qdrant; this is not a SaaS or multi-tenant change.
+The active feature is the local-first RAG-Studio chunking strategy library for
+static, recursive, parent-document, and sentence-window strategies. The
+application remains a single Docker container with embedded persistent Qdrant;
+this is not a SaaS or multi-tenant change.
 
 ## Implemented
 
@@ -28,54 +28,56 @@ Qdrant; this is not a SaaS or multi-tenant change.
 - Added re-ingest ownership/path-traversal validation.
 - Added benchmark resource reporting and a responsive Settings mobile-width
   fix.
+- Hardened legacy strategy defaults and re-ingest compatibility.
 
-## Verification completed
+## Current Checkout
 
-- Targeted chunking/retrieval/vector-store/settings/re-ingest suite:
-  `64 passed` before the final legacy compatibility regression was added.
-- Legacy settings migration suite after compatibility repair: `9 passed`.
-- Docker syntax compilation for `src/` and `tests/`: passed.
-- Source LSP diagnostics for modified Python files: no diagnostics.
-- Docker Compose application startup: passed.
-- Embedded Qdrant health: `HTTP 200 {"status":"ok"}`.
+- Branch: `features-v2`
+- HEAD: `33b53a5dcf1682b68fd21e06abea8e4fa6383097`
+- Current feature commits:
+  - `661c366` strategy units and durable metadata
+  - `d996180` strategy library
+  - `a6030ef` re-ingestion and chunk-cap safety
+  - `02061e2` retrieval location safety
+  - `ddcb307` strategy configuration hardening and benchmark/mobile fixes
+  - `33b53a5` legacy default and re-ingest compatibility hardening
+
+## Verification Completed
+
+All commands below were run on this checkout using the project `venv` with
+Python 3.14.5 unless noted otherwise.
+
+- Full test suite: `python -m pytest tests/ -v --tb=short` — `625 passed`.
+- Lint: `python -m ruff check .` — passed.
+- Formatting: `python -m ruff format --check .` — passed.
+- Type checking: `python -m mypy --strict src/` — passed with no issues in
+  48 source files.
+- Security scan: `python -m bandit -r src/` — no issues identified.
+- Docker image: `docker compose build` — passed.
+- Docker runtime: `rag-studio` is healthy with embedded Qdrant.
+- HTTP smoke checks: `GET /health` and `GET /api/settings` — HTTP 200.
 - Informational 50,000-point benchmark under 4 GB RAM / 2 CPU Docker limits:
   ingestion `683.315 s`, peak cgroup memory `211.96 MB`, storage `24.41 MB`,
   retrieval p95 `3.138 ms`; completed successfully.
 
-## Current commits
+## Remaining Limitations
 
-The chunking implementation and follow-up hardening are committed on
-`features-v2`:
-
-- `661c366` strategy units and durable metadata
-- `d996180` strategy library
-- `a6030ef` re-ingestion and chunk-cap safety
-- `02061e2` retrieval location safety
-- `ddcb307` strategy configuration hardening, top-k propagation, benchmark
-  measurements, legacy compatibility, and mobile-width fix
-
-## Remaining limitations
-
-- The full repository suite and full quality commands have not been confirmed
-  green in the current checkout. Earlier broad checks reported unrelated
-  existing Ruff/format issues, and an independent QA pass reported additional
-  failures that require a fresh current-checkout run.
-- The final five-lane review/debugging gate has not passed for the final commit.
-- Browser evidence covers strategy panel switching and Docker startup, but a
-  complete current-checkout browser pass for every manual re-ingest scenario is
-  still outstanding.
-- The benchmark is informational. Qdrant emitted its expected warning that
+- Browser evidence covers strategy-panel switching and Docker startup, but a
+  fresh complete browser pass for every manual re-ingest scenario remains
+  outstanding.
+- The benchmark is informational. Qdrant emits its expected warning that
   embedded local mode is not recommended above 20,000 points.
-- The host Python virtual environments currently cannot launch their configured
-  Python 3.14 executable; verification was therefore run in Docker.
+- Upstream dependency warnings remain during tests: LangGraph coroutine API,
+  Starlette `TemplateResponse`, FastEmbed pooling behavior, and PyPDF2
+  deprecation. They do not fail the suite.
+- Final `$review-work`/Graphify evidence has not yet been recorded for the
+  current uncommitted quality/documentation update.
 
-## Runtime state
+## Runtime And Worktree State
 
-Docker Compose is running the `rag-studio` service with embedded Qdrant on
+Docker Compose runs `rag-studio` with embedded Qdrant on
 `http://localhost:8000`. Project `rag-data` was not cleared or replaced.
 
-## Git/worktree state
-
-The product changes are committed. `.omo/` contains local LazyCodex workflow
-state and remains intentionally untracked; it must not be included in product
-commits.
+The baseline lint/format remediation and `init-deep` child guidance are present
+on this branch. `.omo/`, `rag-data/`, secrets, caches, and the locally
+installed `grill-with-docs` skill remain excluded from product commits.
