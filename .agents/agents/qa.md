@@ -23,14 +23,18 @@ You are a **subagent** — you receive tasks from @architect and return structur
 1. **Read** `.agents/copilot-instructions.md` for DoD, RAGAS thresholds, and coding standards.
 2. **Read** the assigned FR from `system_spec.md` (the ACs you need to verify).
 3. **Review** the `DEV_RESULT` JSON from @dev (changedFiles, testFiles, acResults).
+4. **Independently verify** the affected journey in the running web application
+   with the in-app `@Browser`; do not rely only on the developer's report.
+   Record the URL, steps, observed result, viewport where relevant, and
+   screenshots for visual changes.
 
 ### Phase 1 — Functional Testing
 
-4. Run the unit tests:
+5. Run the unit tests:
    ```bash
    pytest tests/<module>/ -v --tb=short
    ```
-5. Verify each AC independently:
+6. Verify each AC independently:
    - Check that each AC has a corresponding test.
    - Confirm test evidence matches the expected behavior.
    - Note any discrepancies.
@@ -40,7 +44,7 @@ You are a **subagent** — you receive tasks from @architect and return structur
 
 ### Phase 2 — Code Quality Checks
 
-6. Run **linting + formatting** with ruff:
+7. Run **linting + formatting** with ruff:
    ```bash
    ruff check . && ruff format --check .
    ```
@@ -48,14 +52,14 @@ You are a **subagent** — you receive tasks from @architect and return structur
    - All files must be correctly formatted.
    - If ruff makes suggestions, treat them as warnings but do NOT fail the verdict unless there are errors.
 
-7. Run **strict type checking** with mypy:
+8. Run **strict type checking** with mypy:
    ```bash
    mypy --strict src/
    ```
    - Zero type errors required for PASS.
    - Any `type: ignore` comments are treated as warnings — flag them.
 
-8. Run **security scanning** with bandit:
+9. Run **security scanning** with bandit:
    ```bash
    bandit -r src/ -f json -o bandit_report.json
    ```
@@ -65,47 +69,54 @@ You are a **subagent** — you receive tasks from @architect and return structur
 
 ### Phase 3 — RAGAS Evaluation
 
-9. **Invoke** the LangSmith evaluation skill:
+10. **Invoke** the LangSmith evaluation skill:
    - `@skill langsmith-eval`
    - Run RAGAS metrics: `faithfulness`, `context_recall`, `answer_relevancy`.
    - Verify thresholds: faithfulness > 0.7, context_recall > 0.8, answer_relevancy > 0.7.
 
 ### Phase 4 — UI-Specific Verification (for FR-004 through FR-007)
 
-10. **i18n Key Parity Check:**
+For SaaS React UI work, first read `DESIGN.md` and the three UI skills:
+`design-system-style-intelligence`, `frontend-design-director`, and
+`react-shadcn-ui-contract`. Verify the implemented screen against the approved
+design contract with `omo:visual-qa` in a real browser; test desktop and mobile
+viewports, keyboard navigation, focus visibility, reduced motion, and all
+loading, empty, error, and disabled states.
+
+11. **i18n Key Parity Check:**
     ```bash
     python -c "import json; en=json.load(open('src/api/locales/en.json')); ru=json.load(open('src/api/locales/ru.json')); assert en.keys()==ru.keys(), 'Key mismatch!'"
     ```
     - All keys in `en.json` must exist in `ru.json` and vice versa. No missing keys.
     - No empty or `null` values allowed.
 
-11. **Responsive Layout Check (manual):**
+12. **Responsive Layout Check (manual):**
     - Verify no horizontal scrollbar at viewport widths: 1920px, 1024px, 768px, 360px.
     - Verify touch targets ≥ 44×44px on viewports < 768px.
     - Verify sidebar collapses to hamburger menu on mobile.
 
-12. **Accessibility Check (manual):**
+13. **Accessibility Check (manual):**
     - All `<input>`, `<select>`, `<textarea>` have associated `<label>`.
     - All buttons have visible `:focus-visible` ring.
     - Color contrast meets WCAG AA (use browser DevTools contrast checker).
 
-13. **Template Rendering Check:**
+14. **Template Rendering Check:**
     - All templates render without Jinja2 errors (`GET /` returns 200, not 500).
     - Language switch updates all UI text without page reload.
 
 ### Phase 5 — Code Review (Optional, on request)
 
-14. If @architect requests a code review, **invoke**:
+15. If @architect requests a code review, **invoke**:
     - `@skill code-review`
     - Attach the review findings to the `codeReview` field in `QA_VERDICT`.
 
 ### After Testing
 
-15. If any phase fails: document bugs with steps to reproduce.
-16. If tests pass but RAGAS thresholds fail: document as high-severity bug.
-17. If lint/type/security checks fail: document each finding in the bugs array with the `code-quality` category.
-18. If i18n keys mismatch or UI layout breaks: document in bugs array with category `ui`.
-19. Return a **structured `QA_VERDICT` JSON`** to @architect.
+16. If any phase fails: document bugs with steps to reproduce.
+17. If tests pass but RAGAS thresholds fail: document as high-severity bug.
+18. If lint/type/security checks fail: document each finding in the bugs array with the `code-quality` category.
+19. If i18n keys mismatch or UI layout breaks: document in bugs array with category `ui`.
+20. Return a **structured `QA_VERDICT` JSON`** to @architect.
 
 ---
 

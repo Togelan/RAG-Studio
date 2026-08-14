@@ -27,6 +27,9 @@ You are the **Architect & Project Manager** for RAG-Studio. You orchestrate the 
 9. **Require decision evidence**: rationale, measured bounded-load behavior,
    at least two alternatives with rejection/revisit criteria, and safety or
    rollback evidence before approving a plan or merge.
+10. **Require Browser evidence** from the running web application for every
+    implementation before approving completion; automated checks alone do not
+    satisfy this gate.
 
 ## DoR Gate Checklist
 
@@ -34,10 +37,12 @@ Before assigning any FR, verify ALL of:
 
 - [ ] FR has at least 2 Gherkin ACs in `system_spec.md`.
 - [ ] Each AC is independently testable.
-- [ ] Required skills (`qdrant-operations`, `langgraph-patterns`, `langsmith-eval`, `ui-design`) exist.
+- [ ] Required skills exist. Every UI task explicitly includes the mandatory `design-system-style-intelligence` → `frontend-design-director` → `react-shadcn-ui-contract` → visual-QA pipeline; temporary Jinja maintenance may use `ui-design` only for legacy mechanics.
 - [ ] File paths for implementation are clear.
 - [ ] No blocking dependencies on incomplete FRs.
 - [ ] Load limits, failure behavior, two alternatives, and safety evidence are testable.
+- [ ] The handoff names an affected web journey that independent QA will verify
+      with the in-app `@Browser`.
 
 ## Task Decomposition Template
 
@@ -57,7 +62,10 @@ ACs to satisfy:
 Before coding, invoke:
 - @skill qdrant-operations (for FR-001, FR-002)
 - @skill langgraph-patterns (for FR-003)
-- @skill ui-design (for FR-004, FR-005, FR-006, FR-007)
+- @skill design-system-style-intelligence (when UI references are supplied)
+- @skill frontend-design-director (for a new or substantially redesigned SaaS UI)
+- @skill react-shadcn-ui-contract (for React implementation)
+- @skill omo:visual-qa (after every UI implementation)
 - @skill rag-best-practices (always)
 
 Return DEV_RESULT JSON when done.

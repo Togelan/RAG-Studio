@@ -23,7 +23,10 @@ You are a **subagent** — you receive tasks from @architect and return structur
 3. **Invoke skills** to learn patterns before writing code:
    - `@skill qdrant-operations` — for QdrantClient, collections, UUID5, hybrid search, reranker.
    - `@skill langgraph-patterns` — for StateGraph, async nodes, checkpointer, conditional edges.
-   - `@skill ui-design` — for Jinja2 templates, CSS, layout, color palette, typography.
+   - `@skill ui-design` — only for maintenance of legacy Jinja2 screens.
+   - `@skill design-system-style-intelligence` — to extract supplied UI references into `DESIGN.md`.
+   - `@skill frontend-design-director` — before a new or substantially redesigned SaaS UI.
+   - `@skill react-shadcn-ui-contract` — for React, Tailwind, shadcn/ui, tokens, and accessibility.
    - `@skill rag-best-practices` — for chunk size, overlap, metadata, hybrid search weights.
 
 ### During Implementation
@@ -39,7 +42,12 @@ You are a **subagent** — you receive tasks from @architect and return structur
 ### After Implementation
 
 9. Run the full test suite: `pytest tests/ -v`
-10. Return a **structured `DEV_RESULT` JSON** to @architect.
+10. Exercise the affected user journey in the running web application with the
+    in-app `@Browser`. Record the URL, steps, observed result, viewport where
+    relevant, and screenshots for visual changes. For backend-only changes,
+    use the closest web journey that consumes the changed behavior.
+11. Return a **structured `DEV_RESULT` JSON** to @architect, including Browser
+    evidence. Do not claim completion from automated tests alone.
 
 ## File Boundary Rules
 
@@ -48,7 +56,7 @@ You are a **subagent** — you receive tasks from @architect and return structur
 - Never import test utilities into production code.
 - Use `pydantic` models for all data schemas.
 
-## UI Development Rules (for FR-004 through FR-007)
+## Legacy UI Development Rules (for remaining Jinja2 screens)
 
 - Templates: `src/api/templates/*.html` (Jinja2 with `{% extends "base.html" %}`).
 - Styles: `src/api/static/style.css` (CSS custom properties from `style and colors.png` palette).
@@ -57,6 +65,14 @@ You are a **subagent** — you receive tasks from @architect and return structur
 - All UI strings use `{{ _('key') }}` Jinja2 filter or `data-i18n` attribute for JS-rendered text.
 - Before writing HTML/CSS, view reference images in `.agents/skills/ui-design/references/`.
 - Test one AC per test file; use `TestClient` (httpx) for endpoint tests, manual verification for layout tests.
+
+## SaaS UI Development Rules
+
+- For every UI task, complete `design-system-style-intelligence` → `frontend-design-director` → `react-shadcn-ui-contract` before writing UI code, then finish with `omo:visual-qa`.
+- Inspect user-provided references and create or update `DESIGN.md` during the first two stages.
+- Use `react-shadcn-ui-contract` for React, TypeScript, Tailwind CSS, shadcn/ui, Lucide, responsive states, and accessibility. Use `ui-design` only to maintain remaining Jinja2 implementation mechanics.
+- Do not replace a legacy Jinja surface without an approved feature plan that names its API, routing, i18n, and rollback impact.
+- Run `omo:visual-qa` after implementation in real browser desktop and mobile viewports.
 
 ## DEV_RESULT JSON Schema
 

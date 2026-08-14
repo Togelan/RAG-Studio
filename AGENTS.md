@@ -13,6 +13,12 @@ Ready/Done, security, and coding-convention reference. The existing specialist
 guidance lives in `.agents/skills/`, and the existing BA, architect, developer,
 and QA roles remain documented in `.agents/agents/`.
 
+For every UI task, use the mandatory project-local pipeline:
+`design-system-style-intelligence` → `frontend-design-director` →
+`react-shadcn-ui-contract` → `omo:visual-qa`. Use `ui-design` only for
+temporary legacy Jinja2 implementation mechanics; do not start UI code before
+the design stages are complete.
+
 **MUST USE ONLY THE ACTUAL CODE IN THE CURRENT CHECKOUT.** Do not inspect,
 modify, create, switch, or rely on alternate, stale, prunable, or deleted
 branches/worktrees—or cached session memory—as the source of truth unless the
@@ -21,7 +27,8 @@ user explicitly requests it.
 ## Canonical Codex workflow
 
 For work that needs implementation, follow **understand → plan with LazyCodex →
-implement → test → review → update Graphify → commit** in this order:
+implement → test → Browser confirmation → review → update Graphify → commit**
+in this order:
 
 1. Understand the actual current checkout; use `$init-deep` when the repository
    shape or local guidance has changed.
@@ -31,10 +38,15 @@ implement → test → review → update Graphify → commit** in this order:
    reversible changes.
 4. Test with `$ulw-loop "Verify the implementation, run all relevant tests, and fix remaining issues"`
    to gather verification evidence and resolve remaining issues.
-5. Review with `$review-work` for the post-implementation review.
-6. Update Graphify using the team's existing local workflow only when architecture
+5. Confirm every implementation in the running web application with the
+   in-app `@Browser`. Exercise the affected user journey and record the URL,
+   scenario, observed result, viewport where relevant, and screenshots for
+   visual changes. Backend-only changes use the closest web flow that consumes
+   them; automated tests alone are not completion evidence.
+6. Review with `$review-work` for the post-implementation review.
+7. Update Graphify using the team's existing local workflow only when architecture
    or code-graph output needs refreshing; do not replace it with LazyCodex.
-7. Commit only after review and relevant verification pass.
+8. Commit only after review and relevant verification pass.
 
 Use `$remove-ai-slops` only for behavior-preserving cleanup after tests are
 green; it is not a substitute for implementation or review.

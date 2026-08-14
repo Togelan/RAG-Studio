@@ -19,7 +19,7 @@
 | Vector DB | Qdrant (dense + sparse, hybrid search, RRF, reranker) | latest |
 | Observability | LangSmith (traces, datasets, experiments, RAGAS) | latest |
 | Testing | Pytest (unit + integration) | latest |
-| UI | Jinja2 + HTML + vanilla CSS/JS (responsive, i18n-ready) | latest |
+| UI | React + TypeScript + Tailwind CSS + shadcn/ui (approved SaaS migration target); retain legacy Jinja2 only until its replacement is planned | latest |
 
 ---
 
@@ -139,7 +139,7 @@ A Functional Requirement is **ready for implementation** when:
 
 1. The FR has at least 2 Gherkin Acceptance Criteria (ACs) in `system_spec.md`.
 2. Each AC is independently testable.
-3. All required skills (`qdrant-operations`, `langgraph-patterns`, `langsmith-eval`, `rag-best-practices`) are available.
+3. All required skills are available. SaaS UI work additionally requires `frontend-design-director`, `design-system-style-intelligence`, and `react-shadcn-ui-contract`.
 4. The architect has reviewed and approved the FR.
 5. File paths for implementation are specified.
 
@@ -207,13 +207,14 @@ or best do not satisfy Definition of Done.
 
 ### Codex + LazyCodex orchestration (canonical)
 
-For Codex sessions, LazyCodex is the orchestration layer and the existing roles below remain the project-domain workflow. The canonical sequence is **understand → plan with LazyCodex → implement → test → review → update Graphify → commit**. Use this sequence for work that changes the application:
+For Codex sessions, LazyCodex is the orchestration layer and the existing roles below remain the project-domain workflow. The canonical sequence is **understand → plan with LazyCodex → implement → test → Browser confirmation → review → update Graphify → commit**. Use this sequence for work that changes the application:
 
 ```
 understand the actual current checkout ($init-deep when project memory needs refresh)
     -> plan with LazyCodex: $ulw-plan "<feature or bug>" (plan only)
     -> implement: $start-work (execute the approved plan)
     -> test: $ulw-loop "Verify the implementation, run all relevant tests, and fix remaining issues"
+    -> confirm the affected journey in the running web app with @Browser
     -> review: $review-work
     -> update Graphify with the team's existing local graph workflow when needed
     -> commit only after verification
@@ -223,6 +224,10 @@ understand the actual current checkout ($init-deep when project memory needs ref
 - Keep the existing `@ba -> @architect -> @dev -> @qa` responsibilities for requirements and specialist project review. Do not create duplicate roles or hooks for LazyCodex.
 - Use `$remove-ai-slops` only for behavior-preserving cleanup after relevant tests pass.
 - Never report an implementation complete without recorded results from the relevant tests and quality checks.
+- Never report any implementation complete without in-app `@Browser` evidence
+  from the running web application. Record the URL, scenario, observed result,
+  viewport where relevant, and screenshots for visual changes. For backend-only
+  work, exercise the closest web journey that consumes the changed behavior.
 
 ### Feature discussion before implementation
 
@@ -233,6 +238,22 @@ time, and records the approved design in `CONTEXT.md`, `docs/adr/`, and
 `docs/features/<feature-slug>.md` before stopping for user approval. It is not
 needed for typo fixes, formatting, simple renames, or isolated one-line bug
 fixes. The user manually starts `$ulw-plan` after reviewing the documents.
+
+### SaaS UI skill chain
+
+For **every UI task**, complete this mandatory nested pipeline during the
+canonical implementation and testing stages:
+
+```text
+design-system-style-intelligence → frontend-design-director → react-shadcn-ui-contract → visual QA
+```
+
+The first two establish or update `DESIGN.md`; the contract skill governs all
+new SaaS React UI. For the temporary legacy Jinja2 surfaces, apply the first
+two design stages and use `ui-design` only for the existing implementation
+mechanics. Do not write UI code until the applicable design stages are complete.
+Run `omo:visual-qa` after every UI change and do not treat source inspection as
+visual verification.
 
 ### `$architect` entry point
 
