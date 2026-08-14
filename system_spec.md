@@ -2,8 +2,15 @@
 
 > **Owner:** @ba (Business Analyst)
 > **Status:** APPROVED
-> **Version:** 2.0.0
-> **Last Updated:** 2026-07-09
+> **Version:** 3.0.0
+> **Last Updated:** 2026-08-14
+>
+> **v3.0.0 Changelog (Approved staged SaaS migration):**
+> - FR-011 and its changes to FR-001/002/005/008/010 are the completed Stage 1 regression baseline.
+> - Added FR-012 for the Stage 2 React UI migration with existing-function parity.
+> - Added FR-013–FR-020 for Stage 3 authentication, tenant isolation, chatbot management, widget, billing, landing page, local/hosting readiness, and launch demonstration.
+> - Replaced the future UI constraint with React/TypeScript/Tailwind/shadcn while retaining Jinja only as a reversible legacy path during migration.
+> - Added mandatory in-app Browser confirmation for every implementation.
 >
 > **v2.0.0 Changelog (Audit against v1.0 codebase):**
 > - AC-001.2: Corrected "tokens" → "characters" (chunker uses character counts); noted configurable chunk sizes
@@ -16,18 +23,20 @@
 
 ## Product Overview
 
-RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring their own API key (OpenAI, DeepSeek, Anthropic, or local models via Ollama), upload documents (txt, md, pdf, docx, csv), and chat with them via Retrieval-Augmented Generation (RAG). The product ships as a **single Docker container** (FastAPI backend + Qdrant vector DB + Web UI on Jinja2/HTML). All data (API keys, documents, chat history) is persisted on the user's machine with **encryption at rest** for secrets.
+RAG-Studio currently runs as a **local-first Desktop tool** that lets ordinary users bring their own API key, upload documents, and chat with them through RAG. FR-001–FR-011 define this implemented baseline.
 
-**Target Audience:** non-technical users who want a private, local "ChatGPT over my files" experience. No cloud dependencies required (except the LLM API).
+The approved target is a **locally runnable, hosting-ready multi-tenant SaaS**. It retains FastAPI, LangGraph, and Qdrant, introduces a React/TypeScript/Tailwind/shadcn frontend, uses Supabase for authentication and organization data, uses Stripe test mode for billing, isolates each workspace in a separate Qdrant collection, and provides an embeddable Shadow-DOM chatbot widget. The complete customer flow must work locally before production hosting is provisioned.
 
-**Three-tab Web UI (server-rendered pages with hash-based tab detection):**
+**Target Audience:** company owners, administrators, and members who need a shared knowledge chatbot for internal testing and approved public websites. The legacy personal workflow remains intact until its staged replacement is verified.
+
+**Current three-tab Web UI (Stage 1 baseline):**
 1. **Welcome** (`/`) — background image, animated stats with breathing counters, video placeholder with pulsing play icon, "Get Started" CTA.
 2. **Settings** (`/settings`) — API provider & key, model selector with refresh button, temperature slider, max tokens, retrieval settings (Top-K, Chunk Size, Chunk Overlap), document upload & management, LangSmith connect (coming next version).
 3. **Chat** (`/chat`) — collapsible sidebar with session list + context menu, RAG chat with SSE streaming, source citations with hover tooltips and expandable cards, like/dislike/copy feedback, toast notifications.
 
 **Languages:** English + Russian (i18n via JSON dictionaries with full key parity, language switcher in header, cookie + localStorage persistence).
 
-**Design System:** Light warm theme (`--color-bg-primary: #EFEEE9`) with orange accent (`--color-accent: #E85D26`). Gradient accents use `#E85D26 → #6C5CE7`. Inter font for UI, JetBrains Mono for code. Pure custom CSS with design tokens (CSS custom properties).
+**Target design system:** established from user-supplied references in `docs/design/references/saas-ui/` and recorded in `DESIGN.md`. Every UI task follows `design-system-style-intelligence → frontend-design-director → react-shadcn-ui-contract → omo:visual-qa`, followed by independent in-app Browser confirmation.
 
 ---
 
@@ -50,6 +59,21 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 └─────────────────────────────────────────────────┘
 ```
 
+The diagram above is the current Stage 1 runtime. The approved migration target is:
+
+```text
+React SaaS frontend and Shadow-DOM widget
+                 |
+                 v
+             FastAPI BFF
+       /         |          \
+Supabase auth  LangGraph RAG  Stripe webhook/entitlements
+and workspace       |                  |
+data            per-workspace Qdrant collections
+                 |
+          bounded ingestion worker
+```
+
 ---
 
 ## Tech Stack Constraints
@@ -69,7 +93,10 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 | DOCX Parsing | python-docx | >=1.0.0 |
 | Observability | LangSmith (traces, datasets, experiments, RAGAS) | latest |
 | Testing | Pytest (unit + integration) | latest |
-| UI | Jinja2 + HTML + vanilla CSS/JS (responsive, i18n-ready) | latest |
+| UI baseline | Jinja2 + HTML + vanilla CSS/JS (retained only during migration) | current checkout |
+| UI target | React + TypeScript + Tailwind CSS + shadcn/ui + Lucide | versions pinned during FR-012 planning |
+| Authentication and tenant data | Supabase Auth + Postgres/RLS | version/config pinned during FR-013 planning |
+| Billing | Stripe test mode + signed webhooks | SDK/API version pinned during FR-017 planning |
 
 ---
 
@@ -644,6 +671,8 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 
 ## FR-008: Deployment, Persistence & Security
 
+> **Stage status:** FR-008 records the implemented Stage 1 single-container baseline. For the approved SaaS target, FR-019 supersedes AC-008.1 and AC-008.4 only where a multi-service local Compose runtime is required; FR-008 persistence, security, resource, health, and redaction behavior remains a regression requirement.
+
 ### User Story
 **As a** RAG-Studio user,
 **I want** to run RAG-Studio as a single Docker container with all data persisted on my machine,
@@ -930,6 +959,440 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 
 ---
 
+## FR-012: React UI Migration with Existing-Function Parity
+
+### User Story
+**As a** current RAG-Studio user,
+**I want** the implemented local application migrated to a deliberate React design system,
+**So that** I receive a high-quality, mobile-compatible UI without losing any Stage 1 capability.
+
+### Acceptance Criteria
+
+#### AC-012.1: Reference-Grounded Design Gate
+**Given** the user has supplied UI reference images in `docs/design/references/saas-ui/`
+**When** Stage 2 UI planning begins
+**Then** the evidence from those references is recorded in `DESIGN.md`
+**And** every UI task follows `design-system-style-intelligence -> frontend-design-director -> react-shadcn-ui-contract -> omo:visual-qa`
+**And** React UI implementation does not begin until the design direction and reusable tokens are approved
+
+#### AC-012.2: Implemented-Function Parity
+**Given** FR-001 through FR-011 are the implemented Stage 1 baseline
+**When** the React application replaces the Welcome, Settings, and Chat surfaces
+**Then** every user-visible behavior in FR-004, FR-005, FR-006, FR-007, FR-009, FR-010, and FR-011 remains available
+**And** the React UI consumes FastAPI endpoints through an explicit frontend API boundary
+**And** Stage 3 authentication, tenant, chatbot, widget, and billing controls are not represented as working before their owning FR is implemented
+
+#### AC-012.3: Responsive and Accessible Product Shell
+**Given** a viewport width of 360 px or greater
+**When** I navigate every migrated Stage 2 route using a mouse, keyboard, or touch input
+**Then** no page has unintended horizontal scrolling
+**And** interactive controls have visible focus, associated accessible names, and touch targets of at least 44 by 44 px on mobile
+**And** reduced-motion preferences disable non-essential animation
+**And** the information hierarchy remains usable on mobile, tablet, and desktop layouts
+
+#### AC-012.4: Reversible Cutover
+**Given** a migrated route has not passed automated parity checks and the in-app Browser journey
+**When** the local application is started
+**Then** the verified legacy Jinja route remains available as the rollback path
+**And** the legacy route is removed only after its React replacement passes the same acceptance criteria
+**And** the migration does not alter or delete existing documents, vectors, settings, or chat data
+
+#### AC-012.5: UI Completion Evidence
+**Given** a Stage 2 UI task has passed its targeted automated checks
+**When** verification is completed
+**Then** `omo:visual-qa` records reference fidelity, responsive behavior, and relevant visual states
+**And** the running application is exercised independently with the in-app Browser
+**And** the evidence records the URL, scenario, viewport, observed result, and screenshots for visual changes
+
+### Technical Notes
+- Stage 2 modifies FR-004, FR-005, FR-006, FR-007, and FR-009 while preserving FR-001 through FR-011 behavior. It must not implement FR-013 through FR-020 implicitly.
+- Expected change areas are `frontend/`, `DESIGN.md`, `docs/design/references/saas-ui/`, FastAPI UI/API routing under `src/api/`, frontend tests, and Browser/visual-QA evidence. Exact frontend package versions are selected and pinned during the approved FR-012 plan.
+- Use React, TypeScript, Tailwind CSS, shadcn/ui, and Lucide. Reusable design tokens and components own repeated visual decisions; one-off hard-coded styling is not completion evidence.
+
+---
+
+## FR-013: Supabase Authentication, Workspaces, Invitations, and RBAC
+
+### User Story
+**As a** company user,
+**I want** secure authentication and a shared workspace with explicit member roles,
+**So that** my organization can collaborate without exposing another company's data or privileged actions.
+
+### Acceptance Criteria
+
+#### AC-013.1: Authentication Lifecycle
+**Given** the local Supabase-compatible services and FastAPI BFF are running
+**When** a user signs up, signs in, refreshes a session, or signs out through the React application
+**Then** Supabase is the identity provider
+**And** FastAPI validates the session server-side before returning protected data
+**And** expired or invalid sessions return a sanitized `401` and the UI offers a recoverable sign-in path
+
+#### AC-013.2: Shared Workspace Membership
+**Given** an authenticated owner or admin belongs to a workspace
+**When** they invite a user by email and the invited user accepts
+**Then** one membership is created for that user and workspace with role `admin` or `member`
+**And** invitations cannot grant the `owner` role
+**And** a user may switch only among workspaces where an active membership exists
+
+#### AC-013.3: Owner, Admin, and Member Authorization
+**Given** a workspace has `owner`, `admin`, and `member` memberships
+**When** each role uses a protected operation
+**Then** owners can manage billing, workspace deletion, ownership transfer, memberships, sources, and chatbot/widget settings
+**And** admins can manage invitations, sources, and chatbot/widget settings but cannot manage billing, delete the workspace, or transfer ownership
+**And** members can use and test chatbots but cannot upload, delete, or re-index company knowledge
+**And** denied operations return a sanitized `403` without performing a partial write
+
+#### AC-013.4: Tenant Data Isolation
+**Given** two authenticated users belong to different workspaces
+**When** either user modifies route parameters, request bodies, or identifiers to reference the other workspace
+**Then** FastAPI rejects the request before accessing tenant resources
+**And** Supabase row-level security independently prevents cross-workspace reads and writes
+**And** automated adversarial tests observe zero cross-workspace records
+
+### Technical Notes
+- Expected change areas are `supabase/migrations/`, FastAPI authentication/workspace dependencies and routes under `src/api/`, React authentication/workspace surfaces under `frontend/`, and authorization/integration tests.
+- Membership and authorization are resolved server-side. A client-provided workspace ID is never sufficient authority.
+- The launch organization model is shared workspaces with invitations and exactly three roles: owner, admin, and member.
+
+---
+
+## FR-014: FastAPI BFF and Workspace-Isolated Qdrant Collections
+
+### User Story
+**As a** workspace member,
+**I want** every RAG operation resolved through a trusted workspace boundary,
+**So that** documents, retrieval results, and conversations never cross company boundaries.
+
+### Acceptance Criteria
+
+#### AC-014.1: Trusted Workspace Resolution
+**Given** an authenticated frontend request or validated public-widget request
+**When** the request reaches a tenant-aware RAG endpoint
+**Then** FastAPI resolves the workspace and permissions from trusted identity or widget credentials
+**And** the client cannot select an arbitrary Qdrant collection name
+**And** the resolved internal collection identifier is not exposed as a public authorization mechanism
+
+#### AC-014.2: Separate Collection per Workspace
+**Given** two workspaces ingest identical filenames and ask identical questions
+**When** ingestion, retrieval, re-ingestion, deletion, or chat runs
+**Then** each operation uses only that workspace's separate Qdrant collection
+**And** results and citations contain no content from the other workspace
+**And** collection creation and lookup are deterministic and safe to retry
+
+#### AC-014.3: Existing RAG Behavior Under Tenant Scope
+**Given** a workspace contains documents indexed with any FR-011 strategy
+**When** its members ingest, retrieve, chat, or re-ingest
+**Then** FR-001, FR-002, FR-003, FR-010, and FR-011 behavior remains intact inside that workspace boundary
+**And** failed document replacement retains the prior complete workspace index
+**And** cancellation does not commit partial assistant output or partial tenant writes
+
+#### AC-014.4: Bounded Concurrency and Failure Mode
+**Given** the application is at the stated limit of 10 concurrent users or the bounded chat/ingestion capacity is exhausted
+**When** another operation is admitted
+**Then** it is rejected or queued according to the endpoint contract with a deterministic `429`, `409`, or `503`
+**And** the response includes a bounded retry instruction where applicable
+**And** internal collection names, secrets, stack traces, and data from other workspaces are not returned
+
+#### AC-014.5: Clean-Start Migration Boundary
+**Given** the legacy local application contains documents, vectors, settings, or API keys
+**When** the multi-tenant runtime starts for the first time
+**Then** it creates empty workspace-scoped data stores
+**And** it does not automatically copy, delete, reinterpret, or expose legacy data
+**And** any future import requires a separate explicit user-controlled workflow
+
+### Technical Notes
+- Expected change areas are tenant dependencies/middleware under `src/api/`, `src/ingestion/`, `src/retrieve/`, `src/graph/`, `src/vector_store/`, workspace schemas/services, and cross-tenant integration tests.
+- Separate collections are required for separate companies. Use an internal deterministic mapping rather than accepting collection names from browsers or widgets.
+- The FastAPI BFF remains the sole trusted boundary for frontend and widget access to Supabase, Qdrant, LangGraph, and billing entitlements.
+
+---
+
+## FR-015: Workspace Chatbot Management
+
+### User Story
+**As a** workspace owner or admin,
+**I want** to configure multiple chatbots over my company's approved knowledge,
+**So that** each use case can have its own behavior and public-widget configuration.
+
+### Acceptance Criteria
+
+#### AC-015.1: Chatbot Lifecycle
+**Given** I am an owner or admin in the active workspace
+**When** I create, edit, disable, or delete a chatbot with valid localized name, instructions, model settings, and source scope
+**Then** the change is persisted only in the active workspace
+**And** the chatbot list reflects the change without exposing another workspace's chatbots
+**And** invalid settings produce field-level errors without a partial update
+
+#### AC-015.2: Role Enforcement
+**Given** I am a member rather than an owner or admin
+**When** I attempt to create, edit, disable, or delete a chatbot through the UI or direct API call
+**Then** the operation is rejected with `403`
+**And** I can still use and test an enabled chatbot when its workspace policy permits
+
+#### AC-015.3: In-App Testing
+**Given** an enabled chatbot has valid configuration and accessible workspace sources
+**When** an authorized user opens its test surface and sends a question
+**Then** the answer streams through the existing tenant-scoped RAG graph
+**And** citations and feedback behavior satisfy FR-006
+**And** test traffic is distinguishable from public-widget traffic for metering
+
+#### AC-015.4: Safe Disable and Deletion
+**Given** a chatbot has conversations or a published widget key
+**When** an owner or admin disables or confirms deletion
+**Then** new chatbot and widget conversations are blocked deterministically
+**And** company documents and the workspace Qdrant collection are not deleted
+**And** the action is auditable and can be retried without duplicate side effects
+
+### Technical Notes
+- Expected change areas are chatbot schemas/services/routes under `src/api/`, Supabase migrations, React chatbot management/test surfaces under `frontend/`, tenant-scoped graph integration, and role/lifecycle tests.
+- A chatbot is workspace-owned configuration over workspace knowledge. Destructive knowledge deletion is a separate explicitly authorized operation.
+
+---
+
+## FR-016: Embeddable Shadow-DOM Chat Widget
+
+### User Story
+**As a** workspace owner or admin,
+**I want** to embed an isolated chatbot widget on approved websites,
+**So that** visitors can use the configured chatbot without the host site's styles breaking it or copied embed code being freely abused.
+
+### Acceptance Criteria
+
+#### AC-016.1: Isolated Embed Runtime
+**Given** an approved website includes the documented widget script and public widget key
+**When** the custom element initializes
+**Then** its interface renders inside a Shadow DOM boundary
+**And** host CSS does not alter widget typography, spacing, layout, or states
+**And** widget styles and overlays do not leak into the host document
+
+#### AC-016.2: Public Key and Origin Enforcement
+**Given** a public widget key is tied to exactly one workspace and chatbot
+**When** a browser sends a widget request
+**Then** FastAPI validates the request `Origin` against that key's approved-origin allowlist
+**And** `localhost` origins are accepted only in the development environment
+**And** a missing, disabled, unknown, or disallowed key/origin is rejected without revealing workspace details
+
+#### AC-016.3: Tenant Resolution and Rate Limits
+**Given** a valid public widget key and approved origin
+**When** a visitor sends a message
+**Then** FastAPI resolves the key's chatbot, workspace, entitlement, and separate Qdrant collection server-side
+**And** public-widget rate limits and monthly message limits are enforced before RAG execution
+**And** exceeded limits return a deterministic `429` with a sanitized retry or plan-limit message
+
+#### AC-016.4: Controlled Theming and Accessibility
+**Given** an owner or admin configures supported semantic theme tokens
+**When** the widget renders on light, dark, Bootstrap, Tailwind, or aggressively styled host pages
+**Then** only documented widget tokens change its visual appearance
+**And** it remains keyboard operable, screen-reader labelled, mobile compatible at 360 px, and usable with reduced motion
+**And** overlays remain within the widget's stacking and focus boundary
+
+#### AC-016.5: Host-Page Browser Verification
+**Given** the widget implementation passes automated component and API tests
+**When** it is verified in the in-app Browser on the reference host fixtures
+**Then** open, close, send, stream, error, offline, and rate-limit states are observed
+**And** evidence includes approved and rejected origins plus mobile and desktop screenshots
+
+### Technical Notes
+- Expected change areas are an isolated `widget/` package, public widget routes/services under `src/api/`, Supabase widget-key/allowlist records, tenant and entitlement dependencies, host-page fixtures, and Browser/API tests.
+- The public widget key is an identifier, not a secret. Origin validation, rate limits, entitlement checks, and tenant resolution are mandatory server-side controls.
+
+---
+
+## FR-017: Stripe Test-Mode Billing and Entitlements
+
+### User Story
+**As a** workspace owner,
+**I want** a safe self-service subscription flow with predictable plan limits,
+**So that** I can trial, select, change, and manage service without real charges during local customer validation.
+
+### Acceptance Criteria
+
+#### AC-017.1: Trial and Three-Plan Catalog
+**Given** a new billable workspace is created
+**When** its billing record is initialized
+**Then** it receives a 14-day trial
+**And** exactly three launch plans are available from one versioned server-side catalog
+**And** each plan defines measurable limits for active chatbots, indexed storage, and monthly public-widget messages
+**And** pricing and quota values are configurable without changing authorization code
+
+#### AC-017.2: Test-Mode Checkout and Portal
+**Given** I am the workspace owner and Stripe test-mode configuration is valid
+**When** I start checkout, change a plan, or open the customer portal
+**Then** FastAPI creates the corresponding Stripe test-mode session
+**And** test cards create no real charge
+**And** admins and members cannot initiate owner-only billing operations
+
+#### AC-017.3: Signed Webhooks as Source of Truth
+**Given** Stripe sends a subscription, checkout, invoice, or cancellation event
+**When** the webhook reaches FastAPI
+**Then** its signature is verified before processing
+**And** the event ID is recorded idempotently so replay does not duplicate state changes
+**And** entitlements change from the verified webhook, not from browser redirect parameters
+**And** invalid signatures receive a sanitized error and perform no write
+
+#### AC-017.4: Server-Side Entitlement Enforcement
+**Given** a workspace exceeds an active-chatbot, indexed-storage, or monthly-widget-message limit
+**When** a user or widget attempts the limited operation
+**Then** FastAPI blocks the operation before the resource is consumed
+**And** existing company data remains readable and is not deleted automatically
+**And** the UI shows the current usage, limit, and owner-directed upgrade action
+
+#### AC-017.5: Plan Change and Failure Behavior
+**Given** a subscription is upgraded, downgraded, cancelled, past due, or still awaiting a webhook
+**When** the workspace makes an entitled request
+**Then** the last verified entitlement and documented grace behavior are applied deterministically
+**And** repeated or out-of-order events converge to the Stripe subscription state
+**And** Stripe secrets, webhook payload internals, and stack traces are not exposed to the browser
+
+### Technical Notes
+- Expected change areas are billing routes/services under `src/api/`, Supabase billing/usage migrations, React pricing and billing surfaces under `frontend/`, webhook fixtures, and entitlement/integration tests.
+- Stripe test mode is required for local validation. Webhooks, not success/cancel redirects, are authoritative.
+- Exact prices and quotas are selected in the FR-017 implementation plan and stored in a versioned plan catalog; the three dimensions above are fixed acceptance requirements.
+
+---
+
+## FR-018: SaaS Landing Page, Pricing, and Conversion Flow
+
+### User Story
+**As a** prospective customer,
+**I want** a credible, responsive explanation of the product and its plans,
+**So that** I can understand the value, choose a plan, and begin the correct account journey.
+
+### Acceptance Criteria
+
+#### AC-018.1: Complete Marketing Content
+**Given** the approved design references and product copy are available
+**When** I open the public landing page
+**Then** it presents a complete product narrative, primary capabilities, trust-relevant information, pricing, FAQ, and final call to action
+**And** it contains no lorem ipsum, fake customer claims, broken links, or non-functional controls
+
+#### AC-018.2: Pricing Consistency
+**Given** FR-017 defines the versioned three-plan catalog
+**When** pricing is displayed on the landing page or authenticated billing page
+**Then** names, prices, trial duration, and measurable limits come from the same approved catalog
+**And** plan comparison clearly distinguishes active chatbots, indexed storage, and monthly public-widget messages
+
+#### AC-018.3: Session-Aware Conversion
+**Given** a visitor selects the primary call to action or a plan
+**When** the visitor is unauthenticated
+**Then** they are routed to sign-up with the intended plan preserved safely
+**And** an authenticated user is routed to the appropriate workspace or owner-only checkout flow
+**And** browser query parameters alone never grant an entitlement
+
+#### AC-018.4: Responsive, Localized, and Verified UI
+**Given** English and Russian locales and a viewport width of 360 px or greater
+**When** the landing and pricing surfaces render
+**Then** all user-visible strings have locale parity, keyboard navigation works, focus is visible, and no unintended horizontal scroll occurs
+**And** visual QA demonstrates fidelity to `DESIGN.md`
+**And** the in-app Browser verifies navigation and conversion paths at mobile and desktop viewports
+
+### Technical Notes
+- Expected change areas are public React routes/components/locales under `frontend/`, the shared plan-catalog API, accessibility/responsive tests, and Browser/visual-QA evidence.
+- Marketing UI still follows the pinned UI skill pipeline and must use real product behavior and server data rather than hard-coded fake SaaS controls.
+
+---
+
+## FR-019: Local Compose Runtime and Hosting Readiness
+
+### User Story
+**As a** local evaluator and future operator,
+**I want** the complete product to run locally with deployment-ready configuration,
+**So that** customer functionality can be validated before the same services are hosted on a server.
+
+### Acceptance Criteria
+
+#### AC-019.1: Complete Local Startup
+**Given** documented prerequisites and valid local/test environment variables
+**When** I start the approved Docker Compose project
+**Then** the React frontend, FastAPI BFF/RAG service, Qdrant, Supabase-compatible local services, and required supporting services become healthy without source-code edits
+**And** the startup procedure is deterministic and documented from a clean checkout
+
+#### AC-019.2: Environment and Secret Safety
+**Given** separate local, test, and hosting environments
+**When** configuration is loaded
+**Then** service URLs, secrets, origins, Stripe keys, and feature modes come from validated environment variables
+**And** `.env.example` contains names and safe descriptions but no usable secret
+**And** startup fails clearly and safely when mandatory configuration is absent
+
+#### AC-019.3: Persistence and Restart
+**Given** a workspace has tenant data, Qdrant vectors, and verified billing state
+**When** the local stack is stopped and restarted without deleting volumes
+**Then** the data remains available to the same authorized workspace
+**And** health/readiness checks prevent requests from reaching unavailable dependencies
+**And** a failed dependency produces a bounded, sanitized error rather than corrupting stored state
+
+#### AC-019.4: Hosting-Ready Service Boundaries
+**Given** the complete local stack passes its automated and Browser journeys
+**When** an operator follows the deployment documentation
+**Then** each service has a pinned build, health check, explicit network/storage dependency, and environment contract suitable for a server
+**And** backup, restore, rollback, and migration responsibilities are documented
+**And** production provisioning or real charges are not required to pass local acceptance
+
+#### AC-019.5: Resource and Runtime Verification
+**Given** the Compose-limited profile and stated concurrency target
+**When** the stack is built and exercised
+**Then** resolved Compose configuration, image builds, service health, persistence, and bounded overload behavior are recorded
+**And** Docker operations follow the repository's sequential safety procedure
+**And** the in-app Browser verifies the primary customer journey only after target services report healthy
+
+### Technical Notes
+- Expected change areas are `docker-compose.yml`, service Dockerfiles, `.env.example`, health/readiness endpoints, migration/startup scripts, and deployment/runbook documentation.
+- This is a microservice-style deployment boundary with independently healthy services, while FastAPI remains the application BFF and RAG authority. It does not require splitting the Python domain into unnecessary network services.
+
+---
+
+## FR-020: Launch Demonstration and Customer Validation Package
+
+### User Story
+**As a** local customer evaluator,
+**I want** a reproducible demonstration of the completed SaaS journey,
+**So that** I can confirm the migration works before approving server hosting.
+
+### Acceptance Criteria
+
+#### AC-020.1: Reproducible Customer Journey
+**Given** the complete local stack starts from the documented clean state
+**When** the launch demonstration is followed
+**Then** it covers sign-up, workspace setup, invitation and roles, document ingestion, chatbot creation/testing, widget publication on an approved origin, Stripe test checkout/webhook entitlement, and restart persistence
+**And** each step names its expected visible result and owning FR
+
+#### AC-020.2: Evidence Captured from the Actual Application
+**Given** FR-012 through FR-019 have passed their automated checks
+**When** tutorial screenshots or the preferred narrated video are recorded
+**Then** they are captured from the running application rather than mockups
+**And** secrets, API keys, private customer content, and personal data are absent or redacted
+**And** no placeholder screen or undocumented manual data edit is required
+
+#### AC-020.3: Requirement Verification Matrix
+**Given** the customer validation package is complete
+**When** it is reviewed
+**Then** a matrix maps FR-012 through FR-019 to automated checks, in-app Browser scenarios, observed results, and artifact locations
+**And** failures or unverified conditions remain explicitly open rather than being reported as complete
+
+#### AC-020.4: Hosting Approval Boundary
+**Given** the local customer has reviewed the demonstration and verification matrix
+**When** they approve hosting
+**Then** the project is identified as locally validated and hosting-ready
+**And** deployment to a production server, live Stripe mode, DNS changes, and production credentials remain separate explicitly authorized actions
+
+### Technical Notes
+- Expected artifacts are under `docs/demo/` and approved evidence directories, with links to test results and Browser screenshots. Large generated media must follow repository storage policy rather than being committed automatically.
+- FR-020 validates the delivered product; it does not substitute a scripted demo for automated tests or Browser verification of each implementation.
+
+---
+
+## Delivery Stage and FR Allocation
+
+| Stage | Owning FRs | Existing FRs Modified or Verified | Planning Boundary |
+|-------|------------|-----------------------------------|-------------------|
+| Stage 1: completed chunking strategies | FR-011 | FR-001, FR-002, FR-005, FR-008, FR-010 | Completed regression baseline; verify but do not reimplement unless a regression is found. |
+| Stage 2: UI migration | FR-012 | FR-004, FR-005, FR-006, FR-007, FR-009; preserves all FR-001–FR-011 behavior | Wait for UI references and approved `DESIGN.md`; implement parity only. |
+| Stage 3: migration functionality | FR-013–FR-020 | Tenant-scopes or extends FR-001–FR-011 where stated by each acceptance criterion | Plan and implement as bounded FR-owned tasks after Stage 2 acceptance. |
+
+Every implementation task must name one primary owning FR, list each existing FR it modifies or regression-tests, and use only the acceptance criteria relevant to that bounded task. Passing an earlier FR does not imply a later-stage FR is implemented.
+
+---
+
 ## Non-Functional Requirements (NFRs)
 
 ### Backend NFRs
@@ -945,12 +1408,16 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 | NFR-007 | Security | User API keys never logged or stored in plaintext | Code audit + bandit |
 | NFR-008 | Security | Session-level isolation (no cross-user data leak) | Multi-session test |
 | NFR-009 | Reliability | Graceful degradation when Qdrant is unreachable | Error response with retry |
-| NFR-010 | Portability | Single Docker container (FastAPI + Qdrant + UI) | `docker build && docker run` |
+| NFR-010 | Portability | One documented local Compose project starts the complete environment-driven stack and preserves hosting-ready service boundaries | `docker compose config`, build, health, restart, and customer-journey checks |
 | NFR-023 | Reliability | Startup integrity: poll Qdrant `/health` with 30s timeout, 2s retries; exit on failure | FastAPI lifespan startup |
 | NFR-024 | Security | Rate limiting: 30 req/min per session on `/api/chat/send`; HTTP 429 with `Retry-After` | Load test |
 | NFR-025 | Resource | Max container memory ≤ 3.8 GB under sustained load (5 concurrent users); CI pipeline fails if exceeded | Memory profiling + load test |
 | NFR-026 | Reliability | Chat streams are bounded to 10 global and one per session; overload returns deterministic 409/503 responses | Deterministic admission test + 10-session benchmark |
 | NFR-027 | Safety | Cancellation/disconnect never persists partial assistant output or leaks internal errors | Socket/browser cancellation tests + SSE redaction test |
+| NFR-028 | Tenant isolation | No request can read, write, retrieve, or generate from a workspace without trusted membership or validated widget resolution | Two-workspace adversarial API, RLS, Qdrant, and chat tests with zero leaked records |
+| NFR-029 | Authorization | Owner/admin/member permissions are enforced server-side for every protected mutation | Role-matrix integration tests covering allowed and denied operations |
+| NFR-030 | Public access safety | Widget origins, public-key status, rate limits, and entitlements are validated before RAG execution | Approved/rejected-origin tests, disabled-key tests, and deterministic 429 checks |
+| NFR-031 | Billing reliability | Stripe entitlements use signed, idempotent webhooks and converge under replay or out-of-order delivery | Signature, replay, ordering, and no-partial-write integration tests |
 
 ### UI/UX NFRs
 
@@ -968,6 +1435,8 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 | NFR-020 | Persistence | All user data survives container stop/start | Integration test |
 | NFR-021 | Security | API key encryption at rest (AES-256 via Fernet) | `tests/test_security.py` |
 | NFR-022 | UX | First-time user can upload a document and ask a question in < 3 minutes | User journey timing |
+| NFR-032 | Manual QA | Every implementation is exercised in the running web application with the in-app Browser after automated checks | Evidence records URL, scenario, observed result, viewport where relevant, and screenshots for visual changes |
+| NFR-033 | Design consistency | Every UI task follows the approved reference-to-design-system pipeline and uses recorded tokens/components | `DESIGN.md` review, `omo:visual-qa`, component audit, and reference-fidelity screenshots |
 
 ---
 
@@ -986,10 +1455,19 @@ RAG-Studio is a **local-first Desktop tool** that lets ordinary users bring thei
 | FR-009 | AC-009.1–009.4 | — | `src/api/locales/en.json`, `src/api/locales/ru.json`, `src/api/routes/ui.py` | `tests/i18n/test_locales.py` |
 | FR-010 | AC-010.1–010.6 | ui-design, qdrant-operations | `src/api/templates/settings.html`, `src/api/routes/settings.py`, `src/api/static/js/app.js`, `src/ingestion/router.py` | `tests/api/test_settings_reingest.py` |
 | FR-011 | AC-011.1–011.5 | qdrant-operations, rag-best-practices | `src/ingestion/`, `src/vector_store/`, `src/retrieve/`, `src/api/routes/settings.py`, `src/api/templates/settings.html` | `tests/ingestion/`, `tests/vector_store/`, `tests/retrieve/`, `tests/api/` |
+| FR-012 | AC-012.1–012.5 | design-system-style-intelligence, frontend-design-director, react-shadcn-ui-contract, omo:visual-qa | `frontend/`, `DESIGN.md`, `docs/design/references/saas-ui/`, `src/api/` UI/API routing | Frontend tests, parity tests under `tests/api/`, visual-QA and in-app Browser evidence |
+| FR-013 | AC-013.1–013.4 | supabase:supabase | `supabase/migrations/`, `src/api/` authentication/workspace modules, `frontend/` auth/workspace surfaces | Authentication, RLS, role-matrix, invitation, and cross-workspace integration tests |
+| FR-014 | AC-014.1–014.5 | qdrant-operations, rag-best-practices, supabase:supabase | `src/api/` tenant dependencies, `src/ingestion/`, `src/retrieve/`, `src/graph/`, `src/vector_store/` | Tenant-isolation, bounded-admission, cancellation, and clean-start integration tests |
+| FR-015 | AC-015.1–015.4 | react-shadcn-ui-contract, langgraph-patterns | `src/api/` chatbot modules, `supabase/migrations/`, `frontend/` chatbot surfaces, `src/graph/` | Chatbot lifecycle, role, tenant-scope, streaming, and Browser journey tests |
+| FR-016 | AC-016.1–016.5 | react-shadcn-ui-contract, omo:visual-qa | `widget/`, `src/api/` public-widget modules, `supabase/migrations/`, host-page fixtures | Origin/key/rate-limit API tests, Shadow-DOM component tests, and in-app Browser host-page evidence |
+| FR-017 | AC-017.1–017.5 | stripe:stripe-best-practices, supabase:supabase | `src/api/` billing modules, `supabase/migrations/`, `frontend/` pricing/billing surfaces | Stripe signature/replay/order fixtures, entitlement tests, role tests, and test-mode Browser journey |
+| FR-018 | AC-018.1–018.4 | design-system-style-intelligence, frontend-design-director, react-shadcn-ui-contract, omo:visual-qa | `frontend/` public routes/components/locales, shared plan-catalog API | Content/link, catalog-consistency, locale, accessibility, responsive, visual-QA, and Browser tests |
+| FR-019 | AC-019.1–019.5 | — | `docker-compose.yml`, service Dockerfiles, `.env.example`, health endpoints, deployment documentation | Compose config/build/health/restart/persistence checks and primary in-app Browser journey |
+| FR-020 | AC-020.1–020.4 | omo:visual-qa, browser:control-in-app-browser | `docs/demo/`, verification matrix, approved evidence directories | Full local customer journey and FR-012–FR-019 evidence audit |
 
 ---
 
-## Global File Map
+## Global File Map (Stage 1 Current Checkout)
 
 ```
 src/

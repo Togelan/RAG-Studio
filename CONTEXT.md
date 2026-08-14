@@ -2,11 +2,58 @@
 
 ## Product boundary
 
-RAG-Studio is a single-container, local-first personal RAG application. It is
-not a SaaS or multi-tenant platform. Qdrant runs in embedded/local mode with
-persistent storage; dense embeddings, BM25 embeddings, and FlashRank
-reranking run locally. Only the configured answer-generation provider is an
-external service.
+RAG-Studio currently runs as a single-container, local-first personal RAG
+application. The approved product target is a locally runnable, hosting-ready
+multi-tenant SaaS: React/TypeScript/Tailwind/shadcn frontend, FastAPI BFF and
+RAG backend, Supabase-managed identity and organization data, Stripe test-mode
+billing, and an embeddable Shadow-DOM widget. The legacy Jinja UI remains only
+until its approved replacement is implemented.
+
+The first delivery must run locally on the developer's computer while keeping
+configuration environment-driven and deployable later. Do not automatically
+migrate existing local documents, vectors, settings, or API keys; the SaaS
+starts with empty workspaces and explicit user-controlled imports.
+
+## SaaS terminology and boundaries
+
+- **Workspace**: one company tenant. It owns a separate Qdrant collection,
+  documents, chatbots, public widget credentials, and billing entitlement.
+- **Membership**: a Supabase-backed association between a user and workspace
+  with exactly one launch role: `owner`, `admin`, or `member`.
+- **Owner**: manages billing, deletion, ownership transfer, and memberships.
+  **Admin**: manages sources, chatbot/widget settings, and invitations.
+  **Member**: may use and test chatbots but may not upload, delete, or
+  re-index company knowledge.
+- **FastAPI BFF**: the sole trusted API boundary for the SaaS frontend and
+  widget. It validates identity, membership, role, entitlement, limits,
+  widget origin, and workspace-to-collection mapping before any privileged
+  operation.
+- **Public widget key**: a non-secret identifier for one workspace/chatbot.
+  FastAPI enforces its approved-origin allowlist, rate limits, and only then
+  resolves the workspace collection. `localhost` is permitted only in
+  development.
+- **UI workflow**: every UI task follows
+  `design-system-style-intelligence → frontend-design-director →
+  react-shadcn-ui-contract → omo:visual-qa`.
+- **Delivery sequence**: Stage 1 is the completed chunking-strategy baseline;
+  Stage 2 migrates the existing working UI to React without inventing future
+  SaaS behavior; Stage 3 adds the capabilities required by `migration.md`.
+  Every planned task must cite its owning FR and any existing FRs it modifies.
+- **UI reference location**: user-provided reference images belong under
+  `docs/design/references/saas-ui/` and are recorded in `DESIGN.md` before UI
+  implementation.
+- **Approved visual direction**: `DESIGN.md` defines the dark-first knowledge
+  workspace system: top navigation, neutral navy surfaces, restrained gold for
+  primary emphasis, blue-violet only for AI/interactive states, rare
+  marketing-only serif emphasis, and functional motion. The legacy
+  orange/purple design is removed only after verified React parity preserves a
+  rollback path.
+- **Browser completion gate**: every implementation must be exercised through
+  the running web application with the in-app `@Browser` after automated
+  checks pass. Backend-only changes use the closest affected web journey that
+  consumes the changed behavior. Completion evidence records the URL,
+  scenario, observed result, viewport where relevant, and screenshots for
+  visual changes.
 
 ## Chunking terminology
 
