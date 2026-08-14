@@ -114,6 +114,33 @@ docker compose build
 Run targeted tests first; run the full suite and the applicable quality checks
 before handoff. Preserve the existing tests, scripts, and Docker workflow.
 
+## Docker runtime safety
+
+Work with Docker carefully and sequentially:
+
+1. Do not run multiple `docker compose build` or `docker compose up` commands in parallel.
+2. Before any Docker action, inspect the engine and existing containers:
+   ```powershell
+   & "C:\Users\Admin\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe" version
+   & "C:\Users\Admin\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe" ps -a
+   ```
+3. Do not restart or terminate Docker Desktop automatically.
+4. Do not use `docker system prune`, `docker system prune -a`, `docker volume prune`, Clean/Purge Data, or remove images/volumes without explicit user confirmation.
+5. Do not rebuild an existing suitable image when the `Dockerfile` and dependencies are unchanged.
+6. Limit Compose concurrency to one operation:
+   ```powershell
+   $env:COMPOSE_PARALLEL_LIMIT = "1"
+   ```
+7. Use the full Docker CLI path:
+   ```powershell
+   $docker = "C:\Users\Admin\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe"
+   ```
+8. Run `docker compose config` first and inspect the resolved configuration before starting services.
+9. Start containers in detached mode, then verify both `docker ps` and `docker stats --no-stream`.
+10. If Docker responds slowly, a build stalls, or memory usage rises sharply, stop without issuing another Docker command and report the observed state.
+11. Use Browser for application checks only after the target container is confirmed `Up`.
+12. Do not run commands with unbounded waits or automatically repeat the same command.
+
 ## Safety and coexistence
 
 - LazyCodex is a Codex-harness workflow only; never add it to
