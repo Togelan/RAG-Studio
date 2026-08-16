@@ -12,6 +12,7 @@ from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -143,6 +144,44 @@ class TestSettingsAPI:
         payload = response.json()
         assert "could not be saved" in payload["detail"]
         assert "sk-valid-test-key" not in payload["detail"]
+
+    def test_validate_key_network_error_is_sanitized(
+        self, client: TestClient, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        hostile_error = (
+            "GET https://provider.example/v1/models?token=sk-hostile-token "
+            "failed at /workspace/secrets/settings.json"
+        )
+        request = httpx.Request(
+            "GET", "https://provider.example/v1/models?token=sk-hostile-token"
+        )
+        request_error = httpx.RequestError(hostile_error, request=request)
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.get = AsyncMock(side_effect=request_error)
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            caplog.at_level("WARNING", logger="src.api.routes.settings"),
+        ):
+            response = client.post(
+                "/api/settings/validate-key",
+                json={"provider": "openai", "api_key": "sk-request-key"},
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload == {
+            "valid": False,
+            "provider": "openai",
+            "error": "Network error validating key. Check your network connection.",
+        }
+        assert hostile_error not in response.text
+        assert hostile_error not in caplog.text
+        assert "sk-hostile-token" not in caplog.text
+        assert "/workspace/secrets/settings.json" not in caplog.text
 
     def test_validate_key_ollama_skips(self, client: TestClient) -> None:
         """POST /api/settings/validate-key for Ollama always returns valid=true."""

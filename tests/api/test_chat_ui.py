@@ -1,6 +1,6 @@
 """Unit tests for FR-006: Web UI — Chat Page.
 
-Covers all Acceptance Criteria:
+Covers all Acceptance Criteria through the explicit legacy rollback surface:
 - AC-006.1: Session Sidebar
 - AC-006.2: Chat Message Streaming (SSE)
 - AC-006.3: Source Citations
@@ -252,7 +252,7 @@ class TestSessionManagement:
 
         AC-006.1: Sidebar rendered in chat page HTML.
         """
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         assert "chat-sidebar" in resp.text
         assert "session-list" in resp.text
@@ -314,7 +314,7 @@ class TestMessageStreaming:
 
         AC-006.2: Chat page has main area + input.
         """
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         html = resp.text
 
@@ -465,7 +465,7 @@ class TestChatControls:
 
         AC-006.5: Clear (🗑️) and Regenerate (🔄) buttons exist.
         """
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         html = resp.text
 
@@ -571,7 +571,7 @@ class TestInputSanitization:
 
         AC-006.8: No raw HTML/JS from user input ever executed.
         """
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         html = resp.text
 
@@ -617,7 +617,7 @@ class TestChatIntegration:
 
     def test_chat_page_has_correct_title(self, client: TestClient) -> None:
         """GET /chat page has RAG Studio — Chat title."""
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         html = resp.text
         assert "RAG Studio" in html
@@ -634,7 +634,7 @@ class TestContentTypes:
 
     def test_chat_page_returns_html(self, client: TestClient) -> None:
         """GET /chat returns text/html."""
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         ct = resp.headers.get("content-type", "")
         assert "text/html" in ct

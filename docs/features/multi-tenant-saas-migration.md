@@ -43,9 +43,11 @@ on approved websites.
 
 ## Delivery stages and FR traceability
 
-The current `system_spec.md` ends at `FR-011`. Before LazyCodex planning, the
-BA must add the proposed `FR-012` through `FR-020` below, each with at least two
+The current `system_spec.md` defines `FR-001` through `FR-020`, each with
 independently testable Gherkin acceptance criteria and traceability entries.
+`FR-012` is the approved authority for the Stage 2 React migration and its
+existing-function parity boundary; `FR-013` through `FR-020` remain Stage 3
+requirements and must not be implemented implicitly during Stage 2.
 Every plan task must name one owning FR and list every existing FR it modifies.
 Task IDs are not substitutes for FR numbers.
 

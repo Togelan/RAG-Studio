@@ -22,6 +22,16 @@ __pycache__/
 dist/
 build/
 
+# Frontend build inputs are copied by the Node builder, but local generated
+# artifacts and test tooling must not enter the Docker context.
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/*.tsbuildinfo
+frontend/.react-doctor-report.json
+
 # Tests & quality reports
 tests/
 bandit_report.json

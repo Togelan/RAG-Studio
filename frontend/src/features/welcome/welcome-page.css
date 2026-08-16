@@ -1,0 +1,105 @@
+.rs-welcome {
+  display: grid;
+  gap: var(--rs-space-24);
+  margin-top: var(--rs-space-20);
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.rs-welcome__hero {
+  display: grid;
+  align-content: center;
+  gap: var(--rs-space-24);
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: var(--rs-space-24);
+  border: var(--rs-border-width) solid var(--rs-border);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-surface);
+}
+
+.rs-welcome__subtitle {
+  max-width: var(--rs-layout-reading);
+  margin: 0;
+  color: var(--rs-text-muted);
+  font-size: var(--rs-font-title);
+  line-height: var(--rs-line-height-body);
+  overflow-wrap: anywhere;
+}
+
+.rs-welcome__cta {
+  justify-self: start;
+  text-decoration: none;
+}
+
+.rs-welcome__tutorial {
+  display: grid;
+  min-width: 0;
+  min-height: calc(var(--rs-space-92) * 2);
+  width: 100%;
+  max-width: 100%;
+  align-content: center;
+  gap: var(--rs-space-16);
+  border: var(--rs-border-width) dashed var(--rs-border-strong);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-surface-raised);
+  padding: var(--rs-space-24);
+}
+
+.rs-welcome__tutorial-icon {
+  display: inline-flex;
+  width: var(--rs-space-48);
+  height: var(--rs-space-48);
+  align-items: center;
+  justify-content: center;
+  border: var(--rs-border-width) solid var(--rs-border-strong);
+  border-radius: 50%;
+  color: var(--rs-ai);
+}
+
+.rs-welcome__tutorial-copy {
+  min-width: 0;
+}
+
+.rs-welcome__tutorial-label {
+  margin: 0 0 var(--rs-space-4);
+  color: var(--rs-gold);
+  font-size: var(--rs-font-xs);
+  font-weight: var(--rs-font-weight-emphasis);
+  letter-spacing: var(--rs-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.rs-welcome__tutorial h2 {
+  margin: 0;
+  color: var(--rs-text);
+  font-size: var(--rs-font-title);
+  line-height: var(--rs-line-height-card);
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 64rem) {
+  .rs-welcome {
+    grid-template-columns: minmax(0, 1.15fr) minmax(15rem, 0.85fr);
+    align-items: stretch;
+  }
+
+  .rs-welcome__tutorial {
+    min-height: 100%;
+  }
+}
+
+@media (max-width: 47.999rem) {
+  .rs-shell__main:has(.rs-welcome) .rs-page__header h1 {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-welcome__cta {
+    transition-duration: var(--rs-motion-reduced);
+  }
+}

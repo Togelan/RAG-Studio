@@ -14,6 +14,7 @@ document identity, and safe re-ingestion orchestration.
 | Strategy configuration | `chunking_models.py`, `chunking_settings.py` | Version and fingerprint persisted settings. |
 | Parsing and embeddings | `parser.py`, `embedder.py` | Preserve source metadata and cancellation. |
 | Chunk limits/segmentation | `chunk_limits.py`, `chunking_segmentation.py` | Keep size and overlap boundaries deterministic. |
+| File admission/storage | `document_admission.py` | Own path traversal and filename checks. |
 
 ## Conventions
 
@@ -23,8 +24,22 @@ document identity, and safe re-ingestion orchestration.
   text chunking strategies.
 - Replacement must publish the new complete document before stale data is
   removed, with rollback on failure or cancellation.
+- Strategy settings are global and nested under `chunking`; missing legacy
+  strategy metadata means `recursive` and migrates lazily.
+- Static/recursive/parent sizes are characters; sentence-window sizes are
+  sentence counts. `top_k` downstream counts final context units.
 
-## Safety
+## Anti-patterns
 
 - Validate ownership and traversal boundaries before reading stored files.
 - Bound chunk counts and request work; do not bypass the existing limits.
+- Do not clear an existing document/index before its replacement is complete.
+- Do not send CSV rows through text strategies or drop `csv_row` metadata.
+- Do not cache a failed model initialization or translate cancellation into a
+  generic model/ingestion failure.
+
+## Verification focus
+
+Run `pytest tests/ingestion tests/api/test_settings_reingest.py -v`; include
+locking, filename security, strategy migration, metadata, cancellation, and
+replacement-failure cases for affected flows.

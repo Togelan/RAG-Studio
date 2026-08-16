@@ -1,4 +1,19 @@
-# RAG-Studio — Single-stage Docker Build with pre-cached models
+# RAG-Studio — multi-stage build with a single Python runtime container
+FROM node:24.19.0-bookworm-slim AS frontend-builder
+
+WORKDIR /frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend/ ./
+# The frontend consumes the backend-owned translation bundles at build time.
+# Keep this builder-only copy narrow; the runtime still receives only dist/.
+COPY src/api/locales/ /src/api/locales/
+RUN npm run build
+
+# The runtime remains one Python application container; only built assets
+# cross this boundary, never Node/npm, frontend source, or QA tooling.
 FROM python:3.14-slim
 
 WORKDIR /app
@@ -18,10 +33,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
+# Install production Python dependencies only. Development and QA tools stay
+# in requirements.txt for host-side verification and never enter this image.
+COPY requirements-runtime.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements-runtime.txt
 
 # Pre-cache fastembed models — dense embeddings (384-dim, ONNX)
 ENV HOME=/home/ragstudio \
@@ -43,6 +59,8 @@ RUN python -c "from flashrank import Ranker; \
 # Copy application source code
 COPY src/ ./src/
 
+COPY --from=frontend-builder /frontend/dist ./frontend/dist
+
 # Set PYTHONPATH so IDE imports like `from src.api.xxx` resolve
 ENV PYTHONPATH=/app
 
@@ -57,6 +75,9 @@ RUN mkdir -p \
         /app/data/logs \
         /app/data/secrets && \
     chown -R ragstudio:ragstudio /app
+# Model downloads above run during the root-owned build phase. Transfer their
+# cache ownership before the runtime user transition so startup remains local.
+RUN chown -R ragstudio:ragstudio /home/ragstudio/.cache
 # Copy entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

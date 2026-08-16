@@ -29,12 +29,16 @@ services:
 
     # Environment variables
     env_file:
-      - .env
+      # Tests can substitute the checked-in safe template without reading a
+      # developer's credentials; local runtime behavior still defaults to .env.
+      - ${RAG_STUDIO_ENV_FILE:-.env}
 
     environment:
       - RAG_STUDIO_DATA_ROOT=/app/data
       - QDRANT_PATH=/app/data/qdrant_storage
       - RAG_STUDIO_LOGS_PATH=/app/data/logs
+      - RAG_STUDIO_UI_MODE=${RAG_STUDIO_UI_MODE:-react}
+      - RAG_STUDIO_REACT_DIST=/app/frontend/dist
 
     # Resource constraints (AC-008.7)
     # Minimum: 4 GB RAM, 2 CPUs

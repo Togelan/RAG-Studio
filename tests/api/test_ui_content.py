@@ -1,4 +1,4 @@
-"""Unit tests for Iteration 2: Welcome Tab, Settings Tab, and Layout Fix.
+"""Legacy rollback tests for Iteration 2 UI content and layout.
 
 Covers:
 - Sidebar exclusivity (chat only)
@@ -52,31 +52,31 @@ class TestSidebarExclusivity:
 
     def test_chat_page_has_sidebar(self, client: TestClient) -> None:
         """GET /chat → assert 'chat-sidebar' IS present."""
-        response = client.get("/chat")
+        response = client.get("/legacy/chat")
         assert response.status_code == 200
         assert "chat-sidebar" in response.text
 
     def test_welcome_page_no_sidebar(self, client: TestClient) -> None:
         """GET / → assert 'chat-sidebar' is NOT present on home page."""
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
         assert "chat-sidebar" not in response.text
 
     def test_settings_page_no_sidebar(self, client: TestClient) -> None:
         """GET /settings → assert 'chat-sidebar' is NOT present on settings page."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "chat-sidebar" not in response.text
 
     def test_chat_page_is_full_width(self, client: TestClient) -> None:
         """GET /chat → assert chat-full-width class present (no container wrapper)."""
-        response = client.get("/chat")
+        response = client.get("/legacy/chat")
         assert response.status_code == 200
         assert "chat-full-width" in response.text
 
     def test_chat_page_has_two_column_layout(self, client: TestClient) -> None:
         """GET /chat → assert chat-layout class for sidebar+main columns."""
-        response = client.get("/chat")
+        response = client.get("/legacy/chat")
         assert response.status_code == 200
         assert "chat-layout" in response.text
         assert "chat-sidebar" in response.text
@@ -85,15 +85,15 @@ class TestSidebarExclusivity:
     def test_sidebar_backdrop_only_on_chat(self, client: TestClient) -> None:
         """sidebar-backdrop is present on /chat but NOT on / and /settings."""
         # Chat page has backdrop
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         assert "sidebar-backdrop" in resp.text
         # Welcome page does not
-        resp = client.get("/")
+        resp = client.get("/legacy")
         assert resp.status_code == 200
         assert "sidebar-backdrop" not in resp.text
         # Settings page does not
-        resp = client.get("/settings")
+        resp = client.get("/legacy/settings")
         assert resp.status_code == 200
         assert "sidebar-backdrop" not in resp.text
 
@@ -106,7 +106,7 @@ class TestSidebarExclusivity:
 
     def test_welcome_page_has_container(self, client: TestClient) -> None:
         """GET / → assert container class wraps the home page content."""
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
         html = response.text
         assert "container" in html
@@ -114,7 +114,7 @@ class TestSidebarExclusivity:
 
     def test_settings_page_has_container(self, client: TestClient) -> None:
         """GET /settings → assert container class wraps the settings content."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         html = response.text
         assert "container" in html
@@ -131,7 +131,7 @@ class TestWelcomeContent:
 
     def test_video_placeholder_present(self, client: TestClient) -> None:
         """GET / → assert 'welcome-video-placeholder' is present."""
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
         html = response.text
         assert "welcome-video-placeholder" in html
@@ -139,7 +139,7 @@ class TestWelcomeContent:
 
     def test_video_placeholder_localized_ru(self, client: TestClient) -> None:
         """GET /?lang=ru → assert RU locale is active and i18n key is present on home page."""
-        response = client.get("/?lang=ru")
+        response = client.get("/legacy?lang=ru")
         assert response.status_code == 200
         html = response.text
         # Verify lang attribute is set to ru
@@ -160,7 +160,7 @@ class TestWelcomeContent:
 
     def test_counter_cards_present(self, client: TestClient) -> None:
         """GET / → response contains counters-row, counter-card, data-counter attrs."""
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
         html = response.text
         assert "counters-row" in html
@@ -170,7 +170,7 @@ class TestWelcomeContent:
 
     def test_get_started_button_present(self, client: TestClient) -> None:
         """GET / → response contains btn-get-started and welcome.get_started."""
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
         html = response.text
         assert "btn-get-started" in html
@@ -204,7 +204,7 @@ class TestWelcomeContent:
 
     def test_video_placeholder_still_present(self, client: TestClient) -> None:
         """GET / → video placeholder still exists (regression test)."""
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
         html = response.text
         assert "welcome-video-placeholder" in html
@@ -221,13 +221,13 @@ class TestSettingsContent:
 
     def test_provider_dropdown_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-provider' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings-provider" in response.text
 
     def test_api_key_input_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-api-key' with type=password."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         html = response.text
         assert "settings-api-key" in html
@@ -235,67 +235,67 @@ class TestSettingsContent:
 
     def test_model_selector_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-model' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings-model" in response.text
 
     def test_temperature_slider_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-temperature' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings-temperature" in response.text
 
     def test_max_tokens_dropdown_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-max-tokens' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings-max-tokens" in response.text
 
     def test_system_prompt_textarea_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-system-prompt' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings-system-prompt" in response.text
 
     def test_document_upload_zone_present(self, client: TestClient) -> None:
         """GET /settings → assert 'upload-dropzone' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "upload-dropzone" in response.text
 
     def test_browse_files_button_present(self, client: TestClient) -> None:
         """GET /settings → assert 'btn-browse-files' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "btn-browse-files" in response.text
 
     def test_document_table_present(self, client: TestClient) -> None:
         """GET /settings → assert 'doc-table' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "doc-table" in response.text
 
     def test_langsmith_card_present(self, client: TestClient) -> None:
         """GET /settings → assert 'langsmith-card' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "langsmith-card" in response.text
 
     def test_connect_langsmith_button_present(self, client: TestClient) -> None:
         """GET /settings → assert 'connect-langsmith-btn' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "connect-langsmith-btn" in response.text
 
     def test_two_column_layout_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-layout' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings-layout" in response.text
 
     def test_all_settings_controls_have_testids(self, client: TestClient) -> None:
         """GET /settings → verify data-testid attributes on all key elements."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         html = response.text
 
@@ -328,46 +328,46 @@ class TestSettingsContent:
 
     def test_save_settings_button_present(self, client: TestClient) -> None:
         """GET /settings → assert btn-save-settings with data-testid exists."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "btn-save-settings" in response.text
         assert 'data-testid="save-settings-btn"' in response.text
 
     def test_reset_prompt_button_present(self, client: TestClient) -> None:
         """GET /settings → assert btn-reset-prompt with data-testid exists."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "btn-reset-prompt" in response.text
         assert 'data-testid="reset-prompt-btn"' in response.text
 
     def test_langsmith_modal_present(self, client: TestClient) -> None:
         """GET /settings → assert langsmithModal with data-testid exists."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "langsmithModal" in response.text
         assert 'data-testid="langsmith-modal"' in response.text
 
     def test_top_k_dropdown_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-top-k' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings-top-k" in response.text
 
     def test_chunk_size_dropdown_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-chunk-size' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings-chunk-size" in response.text
 
     def test_chunk_overlap_dropdown_present(self, client: TestClient) -> None:
         """GET /settings → assert 'settings-chunk-overlap' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings-chunk-overlap" in response.text
 
     def test_retrieval_settings_row_present(self, client: TestClient) -> None:
         """GET /settings → assert 'retrieval-settings-row' in html."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "retrieval-settings-row" in response.text
 
@@ -379,7 +379,7 @@ class TestChunkSettingsColumn:
         self, client: TestClient
     ) -> None:
         """GET /settings → assert 'Chunk Settings' column header in HTML."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
         assert response.status_code == 200
         assert "settings_doc_col_chunk_settings" in response.text
         assert "Chunk Settings" in response.text
@@ -430,7 +430,7 @@ class TestChunkingStrategyControls:
         self, client: TestClient
     ) -> None:
         """GET /settings renders the strategy selector and all parameter panels."""
-        response = client.get("/settings")
+        response = client.get("/legacy/settings")
 
         assert response.status_code == 200
         assert 'id="settings-chunking-strategy"' in response.text

@@ -1,4 +1,4 @@
-"""Unit tests for FR-007: Web UI — Navigation, Layout & Responsive Design.
+"""Legacy rollback tests for FR-007 navigation and responsive layout.
 
 Covers all 4 Acceptance Criteria:
 - AC-007.1: Tab Navigation
@@ -56,7 +56,7 @@ class TestTabNavigation:
 
         AC-007.1: Three tabs visible — Home, Settings, Chat.
         """
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
 
         html = response.text
@@ -72,7 +72,7 @@ class TestTabNavigation:
 
         AC-007.1: Active tab is highlighted with accent underline.
         """
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
 
         html = response.text
@@ -83,9 +83,9 @@ class TestTabNavigation:
     def test_all_tab_pages_return_200_with_active_tab(self, client: TestClient) -> None:
         """Verify all 3 pages return 200 and each has correct active tab."""
         cases = [
-            ("/", "welcome", "Home"),
-            ("/settings", "settings", "Settings"),
-            ("/chat", "chat", "Chat"),
+            ("/legacy", "welcome", "Home"),
+            ("/legacy/settings", "settings", "Settings"),
+            ("/legacy/chat", "chat", "Chat"),
         ]
         for path, tab_id, expected_text in cases:
             resp = client.get(path)
@@ -110,7 +110,7 @@ class TestLanguageSwitcher:
 
         AC-007.2: Language toggle EN | RU visible.
         """
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
 
         html = response.text
@@ -167,7 +167,7 @@ class TestResponsiveDesign:
 
         AC-007.3: All text readable, no horizontal scroll.
         """
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
 
         html = response.text
@@ -180,7 +180,7 @@ class TestResponsiveDesign:
 
         AC-007.3: <768px mobile has bottom tab bar.
         """
-        response = client.get("/")
+        response = client.get("/legacy")
         assert response.status_code == 200
 
         html = response.text
@@ -189,7 +189,7 @@ class TestResponsiveDesign:
 
     def test_hamburger_and_overlay_render(self, client: TestClient) -> None:
         """Verify .hamburger and .mobile-nav-overlay exist for tablet layout."""
-        resp = client.get("/")
+        resp = client.get("/legacy")
         assert resp.status_code == 200
         html = resp.text
         assert "hamburger" in html
@@ -208,7 +208,7 @@ class TestResponsiveDesign:
 
     def test_container_class_present(self, client: TestClient) -> None:
         """Verify .container used for centered max-width layout."""
-        resp = client.get("/")
+        resp = client.get("/legacy")
         assert resp.status_code == 200
         assert "container" in resp.text
 
@@ -240,7 +240,7 @@ class TestGlobalHeader:
 
     def test_header_contains_logo_and_status(self, client: TestClient) -> None:
         """Verify 'RAG Studio' logo, .status-indicator, and .status-dot exist."""
-        resp = client.get("/")
+        resp = client.get("/legacy")
         assert resp.status_code == 200
         html = resp.text
         assert "RAG Studio" in html
@@ -249,7 +249,7 @@ class TestGlobalHeader:
 
     def test_header_element_order(self, client: TestClient) -> None:
         """Verify header DOM order: logo → nav tabs → lang switcher → status."""
-        resp = client.get("/")
+        resp = client.get("/legacy")
         assert resp.status_code == 200
         html = resp.text
         for token in ("header-logo", "nav-tab", "lang-switcher", "status-indicator"):
@@ -274,7 +274,7 @@ class TestGlobalHeader:
 
     def test_all_pages_have_header(self, client: TestClient) -> None:
         """Verify global-header, logo, and status on /, /settings, /chat."""
-        for path in ("/", "/settings", "/chat"):
+        for path in ("/legacy", "/legacy/settings", "/legacy/chat"):
             resp = client.get(path)
             assert resp.status_code == 200, f"{path} failed"
             html = resp.text
@@ -283,7 +283,7 @@ class TestGlobalHeader:
 
     def test_lang_param_sets_locale(self, client: TestClient) -> None:
         """Verify ?lang=ru sets data-locale='ru' in HTML."""
-        resp = client.get("/?lang=ru")
+        resp = client.get("/legacy?lang=ru")
         assert resp.status_code == 200
         assert 'data-locale="ru"' in resp.text or 'lang="ru"' in resp.text
 
@@ -298,13 +298,13 @@ class TestChatSidebar:
 
     def test_chat_page_has_sidebar_backdrop(self, client: TestClient) -> None:
         """GET /chat has sidebar-backdrop element for mobile overlay."""
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         assert "sidebar-backdrop" in resp.text
 
     def test_chat_page_sidebar_is_collapsible(self, client: TestClient) -> None:
         """GET /chat has sidebar-toggle button and collapsible sidebar class."""
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         html = resp.text
         assert "sidebarToggle" in html

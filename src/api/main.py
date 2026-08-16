@@ -23,11 +23,12 @@ from fastapi.staticfiles import StaticFiles
 
 from src.api.dependencies import log_audit
 from src.api.rate_limiter import RateLimitMiddleware
+from src.api.react_ui import load_ui_serving_configuration
 from src.api.routes.chat import router as chat_router
 from src.api.routes.chat import set_graph, shutdown_chat_jobs
 from src.api.routes.health import router as health_router
 from src.api.routes.settings import router as settings_router
-from src.api.routes.ui import router as ui_router
+from src.api.routes.ui import create_ui_router
 from src.graph import create_graph
 from src.graph.llm_provider import OpenAIProviderFactory
 from src.ingestion.router import router as ingestion_router
@@ -209,12 +210,14 @@ def create_app() -> FastAPI:
     Returns:
         Configured FastAPI application instance.
     """
+    ui_configuration = load_ui_serving_configuration()
     app = FastAPI(
         title="RAG-Studio",
         description="Local-first RAG tool — chat with your documents privately.",
         version="1.0.0",
         lifespan=lifespan,
     )
+    app.state.ui_configuration = ui_configuration
 
     # CORS middleware — allow local development
     # Apply per-IP sliding-window limits to API requests.
@@ -232,7 +235,7 @@ def create_app() -> FastAPI:
     app.include_router(ingestion_router)
     app.include_router(chat_router)
     app.include_router(settings_router)
-    app.include_router(ui_router)
+    app.include_router(create_ui_router(ui_configuration))
 
     # Mount static files (CSS, JS, images)
     static_dir = Path(__file__).resolve().parent / "static"

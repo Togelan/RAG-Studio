@@ -53,6 +53,10 @@ Use semantic CSS variables mapped to Tailwind and shadcn. Do not scatter raw col
 | `--rs-warning` | `#E3AE57` | Warning state with text/icon |
 | `--rs-danger` | `#F07878` | Error/destructive state with text/icon |
 | `--rs-focus` | `#B4B2FF` | Keyboard focus ring |
+| `--rs-layout-workspace` | `1280px` | FR-012 Chat workspace outer content width |
+| `--rs-layout-bottom-nav-reserve` | `76px` | Compact fixed navigation clearance |
+| `--rs-layout-loading-block` | `120px` | Minimum Settings loading-skeleton block height |
+| `--rs-layout-progress` | `200px` | Inline ingestion upload-progress width |
 
 All final text/color pairs must meet WCAG AA. Use surface contrast and 1px borders to separate persistent areas; reserve shadows for real overlays.
 
@@ -65,6 +69,8 @@ All final text/color pairs must meet WCAG AA. Use surface contrast and 1px borde
 - Spacing scale: `4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96` px.
 - Radius: 6px dense controls; 8px buttons/inputs; 10–12px cards/popovers; 14–16px dialogs/marketing panels. Avoid universal large-radius cards.
 - Content width: 1200–1440px; reading/forms: 640–760px; chat answer measure: about 68–76 characters.
+
+- FR-012 Chat workspace: use `--rs-layout-workspace` for the 1280px outer content width; keep the answer column constrained to the 68–76 character reading measure rather than stretching prose across the workspace.
 
 ## Layout and components
 

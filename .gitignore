@@ -16,6 +16,7 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .venv/
+venv/
 *.egg-info/
 *.egg
 dist/
@@ -72,5 +73,7 @@ docker-compose.override.yml
 short instruction of use.md
 blog-post-ru.md
 
-# OMO generated evidence (keep tracked historical records)
-.omo/evidence/*
+# Local OMO orchestration state, plans, and generated evidence
+.omo/
+
+sandbox/

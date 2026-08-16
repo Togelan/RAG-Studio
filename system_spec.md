@@ -10,6 +10,7 @@
 > - Added FR-012 for the Stage 2 React UI migration with existing-function parity.
 > - Added FR-013–FR-020 for Stage 3 authentication, tenant isolation, chatbot management, widget, billing, landing page, local/hosting readiness, and launch demonstration.
 > - Replaced the future UI constraint with React/TypeScript/Tailwind/shadcn while retaining Jinja only as a reversible legacy path during migration.
+> - Clarified FR-008: Stage 2 keeps one application runtime container while permitting a pinned Node builder stage and final Python runtime stage for React assets.
 > - Added mandatory in-app Browser confirmation for every implementation.
 >
 > **v2.0.0 Changelog (Audit against v1.0 codebase):**
@@ -336,6 +337,16 @@ data            per-workspace Qdrant collections
 ---
 
 ## FR-004: Web UI — Welcome Page
+
+> **Stage 2 visual boundary:** AC-004.1 through AC-004.3 describe the retained
+> legacy Jinja visual implementation and continue to apply to the legacy route
+> aliases during the reversible cutover. On React routes, FR-012 and
+> [`DESIGN.md`](DESIGN.md) supersede the orange/purple gradient, background
+> image, breathing-counter, and associated decorative-motion prescriptions.
+> React must still preserve this page's welcome purpose, localized content,
+> responsive access, the CTA's navigation to `/settings`, and the localized
+> tutorial placeholder; its visual treatment and non-essential motion follow
+> the approved React design system instead.
 
 ### User Story
 **As a** first-time RAG-Studio user,
@@ -671,7 +682,7 @@ data            per-workspace Qdrant collections
 
 ## FR-008: Deployment, Persistence & Security
 
-> **Stage status:** FR-008 records the implemented Stage 1 single-container baseline. For the approved SaaS target, FR-019 supersedes AC-008.1 and AC-008.4 only where a multi-service local Compose runtime is required; FR-008 persistence, security, resource, health, and redaction behavior remains a regression requirement.
+> **Stage status:** FR-008 records the implemented Stage 1 one-runtime-container baseline. FR-012 may use a pinned Node builder stage to produce React assets and a final Python runtime stage that serves them; that build pipeline does not introduce a second runtime container. For the approved SaaS target, FR-019 supersedes AC-008.1 and AC-008.4 only where a multi-service local Compose runtime is required; FR-008 persistence, security, resource, health, and redaction behavior remains a regression requirement.
 
 ### User Story
 **As a** RAG-Studio user,
@@ -680,11 +691,12 @@ data            per-workspace Qdrant collections
 
 ### Acceptance Criteria
 
-#### AC-008.1: Single Docker Container
+#### AC-008.1: One Application Runtime Container
 **Given** I have Docker installed
 **When** I run `docker compose up -d` (or `docker run -p 8000:8000 -v ./rag-data:/app/data rag-studio`)
 **Then** the application starts and is accessible at `http://localhost:8000`
-**And** all components (FastAPI, Qdrant, UI) run inside the same container
+**And** FastAPI, the embedded/local Qdrant boundary, and the served UI run in the same runtime container
+**And** a React build, when present under FR-012, is served as static assets by that Python runtime rather than by a separate Node runtime container
 **And** Compose maps `./rag-data` to `/app/data` without requiring a pre-created external volume
 **And** the Qdrant data directory is mapped to `./rag-data/qdrant_storage` on the host
 **And** encrypted settings are stored at `./rag-data/settings.enc.json`
@@ -710,7 +722,8 @@ data            per-workspace Qdrant collections
 #### AC-008.4: Dockerfile & Build
 **Given** the project source code
 **When** I run `docker build -t rag-studio .`
-**Then** the image builds successfully in a single-stage build with all dependencies
+**Then** the image builds successfully with a pinned Node builder stage for React assets, when FR-012 assets are present, and a final Python runtime stage with all runtime dependencies
+**And** only the final Python runtime stage is the application image started by Docker or Compose
 **And** fastembed models (paraphrase-multilingual-MiniLM-L12-v2, Qdrant/bm25) are pre-cached during build
 **And** FlashRank reranker (ms-marco-MultiBERT-L-12) is pre-cached during build
 **And** the image includes a HEALTHCHECK (30s interval, 10s timeout, 10s start period, 3 retries)

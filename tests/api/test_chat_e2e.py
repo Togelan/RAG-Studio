@@ -1,6 +1,6 @@
 """End-to-end tests for the Chat page — full message flow, citations, feedback, controls.
 
-Covers:
+Covers the API flow and the explicit legacy rollback surface:
 - Message bubble rendering and SSE streaming
 - Citation tooltips and badge rendering
 - Feedback (like/dislike) with JSONL persistence
@@ -143,7 +143,7 @@ class TestChatMessageBubbles:
         """Send a message, verify SSE stream works and chat page renders."""
         _stream_message(client, "What is RAG?")
 
-        resp = client.get("/chat")
+        resp = client.get("/legacy/chat")
         assert resp.status_code == 200
         html = resp.text
         # The chat page HTML should contain chat-messages area

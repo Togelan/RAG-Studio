@@ -1,0 +1,2 @@
+Stage 2 deterministic QA document.
+This bounded sample proves upload, progress, document, chunk, duplicate, re-ingestion, and deletion journeys.

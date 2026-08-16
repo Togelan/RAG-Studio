@@ -1,118 +1,116 @@
 # RAG-Studio Agent Guide
 
-## Purpose and architecture
+**Generated:** 2026-08-14 | **Commit:** `3f5e6e0` | **Branch:** `features-v2`
 
-RAG-Studio is a Python 3.14 local-first RAG application: FastAPI/Jinja2 UI in
-`src/api/`, LangGraph orchestration in `src/graph/`, ingestion in
-`src/ingestion/`, retrieval in `src/retrieve/`, and Qdrant access in
-`src/vector_store/`. Tests mirror these areas under `tests/`.
+## Overview
 
-Read `.agents/copilot-instructions.md` and the relevant source and tests before
-editing. That file remains the canonical project architecture, Definition of
-Ready/Done, security, and coding-convention reference. The existing specialist
-guidance lives in `.agents/skills/`, and the existing BA, architect, developer,
-and QA roles remain documented in `.agents/agents/`.
+Python 3.14 local-first RAG application: FastAPI/Jinja2 web surface,
+LangGraph orchestration, hybrid Qdrant retrieval, and safe document ingestion.
+The approved target is a staged React/FastAPI multi-tenant SaaS; the current
+local runtime and explicit user-controlled import boundary remain authoritative.
+Read `.agents/copilot-instructions.md` plus relevant source/tests before edits.
 
-For every UI task, use the mandatory project-local pipeline:
-`design-system-style-intelligence` → `frontend-design-director` →
-`react-shadcn-ui-contract` → `omo:visual-qa`. Use `ui-design` only for
-temporary legacy Jinja2 implementation mechanics; do not start UI code before
-the design stages are complete.
+## Structure
 
-**MUST USE ONLY THE ACTUAL CODE IN THE CURRENT CHECKOUT.** Do not inspect,
-modify, create, switch, or rely on alternate, stale, prunable, or deleted
-branches/worktrees—or cached session memory—as the source of truth unless the
-user explicitly requests it.
+```text
+src/api/           FastAPI wiring, routes, encrypted settings, legacy UI
+src/graph/         LangGraph topology, state, sessions, retries, providers
+src/ingestion/     Admission, parsing, chunking, embedding, re-ingestion
+src/retrieve/      Hybrid search, context expansion, reranking
+src/vector_store/  Domain contracts and Qdrant adapter/persistence
+src/generate/      Reserved generation boundary; currently a placeholder
+tests/             Mirrored unit/integration/E2E/JS coverage
+scripts/           Manual benchmarks, model download, disposable QA servers
+docs/              Accepted ADRs, feature designs, visual references
+```
 
-## Canonical Codex workflow
+## Where to look
 
-For work that needs implementation, follow **understand → plan with LazyCodex →
-implement → test → Browser confirmation → review → update Graphify → commit**
-in this order:
+| Task | Location | Notes |
+| --- | --- | --- |
+| Requirements/ACs | `system_spec.md` | BA-owned FR source of truth. |
+| Stable decisions | `CONTEXT.md`, `docs/adr/` | Ownership, terminology, rollback. |
+| Visual contract | `DESIGN.md` | Approved tokens, references, UI stages. |
+| App startup | `src/api/main.py` | Lifespan, routers, graph/Qdrant shutdown. |
+| Chat execution | `src/api/routes/chat.py`, `src/graph/` | SSE, sessions, graph streaming. |
+| Document lifecycle | `src/ingestion/`, `src/vector_store/` | Atomic replacement and metadata. |
+| Retrieval | `src/retrieve/` | Final context units, budgets, reranking. |
+| Persistent paths | `src/paths.py` | Environment overrides anchored to project. |
+| Tests | `tests/<domain>/` | Mirror source boundaries; root tests are cross-cutting. |
 
-1. Understand the actual current checkout; use `$init-deep` when the repository
-   shape or local guidance has changed.
-2. Plan with LazyCodex using `$ulw-plan "<feature or bug>"` to create a decision-complete plan. Do not
-   write product code during planning.
-3. Implement with `$start-work [plan-name]` to execute the approved plan in small, atomic,
-   reversible changes.
-4. Test with `$ulw-loop "Verify the implementation, run all relevant tests, and fix remaining issues"`
-   to gather verification evidence and resolve remaining issues.
-5. Confirm every implementation in the running web application with the
-   in-app `@Browser`. Exercise the affected user journey and record the URL,
-   scenario, observed result, viewport where relevant, and screenshots for
-   visual changes. Backend-only changes use the closest web flow that consumes
-   them; automated tests alone are not completion evidence.
-6. Review with `$review-work` for the post-implementation review.
-7. Update Graphify using the team's existing local workflow only when architecture
-   or code-graph output needs refreshing; do not replace it with LazyCodex.
-8. Commit only after review and relevant verification pass.
+## Code map
 
-Use `$remove-ai-slops` only for behavior-preserving cleanup after tests are
-green; it is not a substitute for implementation or review.
+| Symbol | Type | Location | CodeGraph refs | Role |
+| --- | --- | --- | ---: | --- |
+| `create_app` | function | `src/api/main.py:206` | 26 | FastAPI composition root. |
+| `create_graph` | async context | `src/graph/builder.py:250` | 10 | Compiled graph/checkpointer lifecycle. |
+| `build_rag_graph` | function | `src/graph/builder.py:156` | 8 | Seven-node StateGraph topology. |
+| `hybrid_search` | async function | `src/retrieve/orchestrator.py:124` | 16 | Search, expansion, reranking, fallback. |
+| `get_vector_store` | dependency | `src/api/dependencies.py:314` | 11 | Vendor-neutral storage boundary. |
+| `VectorRecord` | domain type | `src/vector_store/models.py` | 20 | Shared persisted/search result contract. |
 
-## Feature discussion gate
+## Current-checkout rules
 
-For non-trivial feature requests, use the project skill
-`.agents/skills/feature-discussion/SKILL.md` first. A request such as “I want
-to add ...” should begin with repository inspection and a one-question-at-a-
-time architecture discussion. After consensus, the skill records stable
-context in `CONTEXT.md`, important decisions in `docs/adr/`, and the approved
-design in `docs/features/<feature-slug>.md`, then stops for user approval.
+- Use only actual code in this checkout. Do not inspect/switch/create alternate,
+  stale, prunable, or deleted branches/worktrees unless explicitly requested.
+- Preserve unrelated dirty-worktree changes; never reset, discard, or overwrite them.
+- `.agents/copilot-instructions.md` is canonical for architecture, DoR/DoD,
+  security, typing, file limits, and NFR thresholds.
+- Production code stays under the six allowed `src/` domains; tests stay in `tests/`.
 
-The skill is not required for typo fixes, formatting, simple renames, or
-isolated one-line bug fixes. After the user approves the documents, the user
-manually invokes `$ulw-plan`; do not automatically invoke `$ulw-plan`,
-`$start-work`, `$ulw-loop`, or `$review-work` from the discussion skill.
+## Canonical implementation workflow
 
-## `$architect` single-prompt dispatch
+Use: **understand → `$ulw-plan` → `$start-work` → `$ulw-loop` → in-app
+`@Browser` → `$review-work` → Graphify when needed → commit**.
 
-When a user message starts with `$architect`, treat it as a request for the
-project architect workflow—not as a request to implement product code directly.
-This is the preferred front door for feature work in this repository.
+1. Plan before product edits; use small, atomic, reversible changes.
+2. Run targeted checks, then full applicable checks.
+3. Exercise the affected journey in the running app and record URL, scenario,
+   observed result, viewport, and screenshots for visual changes.
+4. Review before commit; never substitute LazyCodex for project roles/Graphify.
+5. Use `$remove-ai-slops` only for behavior-preserving cleanup after green tests.
 
-1. Read the requested FR in `system_spec.md`, this file, and
-   `.agents/copilot-instructions.md`. Return a Definition of Ready (DoR)
-   verdict against the existing checklist.
-2. If the FR is ready, create a bounded, file-scoped plan (use `$ulw-plan`
-   when the LazyCodex skill is available). The plan must name acceptance
-   criteria, affected files, tests, and verification commands.
-3. Create one implementation subtask with the developer responsibilities in
-   `.agents/agents/developer.md`. Give it only the files and acceptance
-   criteria required by the plan. In Codex, use a LazyCodex worker role when
-   available; otherwise describe the developer role explicitly in the task.
-4. After the implementation subtask finishes, create an independent
-   verification subtask using `.agents/agents/qa.md` and the LazyCodex QA role
-   when available. QA must inspect the actual diff and run relevant tests; it
-   must not rely only on the developer's report.
-5. Return: DoR verdict, bounded plan, implementation summary, test/quality
-   results, and blockers. Do not commit, merge, reset, discard, or overwrite
-   changes unless the user explicitly requests it.
+Non-trivial features start with `.agents/skills/feature-discussion/SKILL.md`.
+It records `CONTEXT.md`, an ADR, and `docs/features/<slug>.md`, then stops for
+user approval; the user manually invokes `$ulw-plan` afterward.
 
-If the FR is not ready, stop after the DoR verdict and list the exact missing
-requirements. Do not create implementation or QA subtasks. Keep subtasks
-non-overlapping and do not let parallel agents edit the same files.
+For `$architect`, gate the FR against DoR first. If ready, produce a file-scoped
+plan, one developer subtask, then independent QA against the actual diff. If not
+ready, stop with exact gaps. Never commit/discard unless explicitly requested.
 
-## Mandatory engineering decision evidence
+## Required decision evidence
 
-For every non-trivial implementation, the plan, developer handoff, and QA
-verdict must answer all of the following with measured or testable evidence:
+Every non-trivial plan, developer handoff, and QA verdict records:
 
-1. Why this solution fits the current architecture and requirement.
-2. How it behaves under the stated concurrency/load threshold, including the
-   bounded failure mode when capacity is exhausted.
-3. At least two considered alternatives, why they were rejected, and what
-   future condition would justify revisiting them.
-4. Why the change is safe: data preservation, secret/error redaction,
-   cancellation/rollback behavior, and the exact automated checks performed.
+1. Architecture/requirement fit.
+2. Measured behavior and bounded failure at the stated load threshold.
+3. Two alternatives, rejection reasons, and revisit conditions.
+4. Data preservation, redaction, cancellation/rollback, and exact checks run.
 
-Assertions such as "scalable", "safe", or "best" without a benchmark, limit,
-test, or explicit trade-off are not completion evidence.
+Unmeasured claims such as “scalable”, “safe”, or “best” are not evidence.
+
+## Conventions and anti-patterns
+
+- Full typing, `from __future__ import annotations`, public docstrings, async I/O.
+- Source ≤500 lines, tests ≤300, functions ≤50, classes ≤200; refactor exceptions.
+- Use `src.paths`, never CWD, for persistent paths.
+- Secrets only through environment/encrypted storage; update empty `.env.example`.
+- Never expose plaintext secrets, filesystem paths, input text, or raw provider,
+  SDK, transport, or model exceptions in logs/responses.
+- Qdrant document point IDs are deterministic UUID5; keep SDK shapes in adapters.
+- Preserve cancellation, bounded work, metadata/citations, and replacement rollback.
+- Do not add LazyCodex to runtime dependencies or delete/commit `graphify-out/`.
+
+## UI and documentation
+
+- Every UI task uses `design-system-style-intelligence` →
+  `frontend-design-director` → `react-shadcn-ui-contract` → `omo:visual-qa`.
+- `ui-design` is only for temporary legacy Jinja2 mechanics; no UI code precedes design.
+- Preserve React migration rollback until verified parity; do not invent SaaS behavior.
+- Feature tasks cite the owning FR and every modified FR. ADRs capture durable,
+  difficult-to-reverse decisions plus alternatives, consequences, and rollback.
 
 ## Verification
-
-Never claim completion without running the checks relevant to the change. The
-baseline repository checks are:
 
 ```powershell
 pytest tests/ -v
@@ -123,48 +121,12 @@ bandit -r src/
 docker compose build
 ```
 
-Run targeted tests first; run the full suite and the applicable quality checks
-before handoff. Preserve the existing tests, scripts, and Docker workflow.
+Run Docker sequentially only. Inspect the full-path Docker CLI `version` and
+`ps -a`, set `COMPOSE_PARALLEL_LIMIT=1`, run `docker compose config`, start
+detached, then verify `ps` and `stats --no-stream`. Never restart Docker Desktop,
+prune/remove data/images/volumes, rebuild an unchanged suitable image, repeat a
+stalled command, or use unbounded waits without explicit authority. Browser QA
+starts only after the target container is confirmed `Up`.
 
-## Docker runtime safety
-
-Work with Docker carefully and sequentially:
-
-1. Do not run multiple `docker compose build` or `docker compose up` commands in parallel.
-2. Before any Docker action, inspect the engine and existing containers:
-   ```powershell
-   & "C:\Users\Admin\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe" version
-   & "C:\Users\Admin\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe" ps -a
-   ```
-3. Do not restart or terminate Docker Desktop automatically.
-4. Do not use `docker system prune`, `docker system prune -a`, `docker volume prune`, Clean/Purge Data, or remove images/volumes without explicit user confirmation.
-5. Do not rebuild an existing suitable image when the `Dockerfile` and dependencies are unchanged.
-6. Limit Compose concurrency to one operation:
-   ```powershell
-   $env:COMPOSE_PARALLEL_LIMIT = "1"
-   ```
-7. Use the full Docker CLI path:
-   ```powershell
-   $docker = "C:\Users\Admin\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe"
-   ```
-8. Run `docker compose config` first and inspect the resolved configuration before starting services.
-9. Start containers in detached mode, then verify both `docker ps` and `docker stats --no-stream`.
-10. If Docker responds slowly, a build stalls, or memory usage rises sharply, stop without issuing another Docker command and report the observed state.
-11. Use Browser for application checks only after the target container is confirmed `Up`.
-12. Do not run commands with unbounded waits or automatically repeat the same command.
-
-## Safety and coexistence
-
-- LazyCodex is a Codex-harness workflow only; never add it to
-  `requirements.txt`, `pyproject.toml`, or application runtime images.
-- Graphify remains the project-specific graph-analysis workflow. Its local
-  output is `graphify-out/`, intentionally ignored by Git. Do not delete,
-  disable, or commit that output, and do not add duplicate hooks or agents.
-- Prefer existing patterns over new abstractions. Respect `src/`/`tests/`
-  boundaries, strict typing, public docstrings, and the project file-size
-  limits.
-- Do not modify `.env`, deployment credentials, production data, or unrelated
-  files. Ask before destructive operations or major architectural changes.
-- Preserve unrelated working-tree changes. Use the existing project roles and
-  skills when they add domain expertise; LazyCodex owns planning, execution,
-  verification, and review orchestration in Codex.
+Do not modify `.env`, credentials, production data, or unrelated files. Ask
+before destructive actions or major architecture changes.

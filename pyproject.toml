@@ -27,6 +27,9 @@ markers = [
     "e2e: marks end-to-end tests that use real Qdrant, embeddings, and graph execution",
 ]
 
+[tool.ruff]
+extend-exclude = [".debug-journal.md"]
+
 [tool.mypy]
 strict = true
 python_version = "3.14"

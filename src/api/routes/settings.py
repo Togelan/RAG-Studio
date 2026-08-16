@@ -281,12 +281,12 @@ async def validate_api_key(request: ValidateKeyRequest) -> ValidateKeyResponse:
             provider=provider,
             error="Validation timed out. Check your network connection.",
         )
-    except httpx.RequestError as e:
-        logger.warning("Network error validating key for %s: %s", provider, e)
+    except httpx.RequestError:
+        logger.warning("Network error validating key for provider: %s", provider)
         return ValidateKeyResponse(
             valid=False,
             provider=provider,
-            error=f"Network error: {e}",
+            error="Network error validating key. Check your network connection.",
         )
 
 
