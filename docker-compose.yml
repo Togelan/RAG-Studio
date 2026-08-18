@@ -39,6 +39,7 @@ services:
       - RAG_STUDIO_LOGS_PATH=/app/data/logs
       - RAG_STUDIO_UI_MODE=${RAG_STUDIO_UI_MODE:-react}
       - RAG_STUDIO_REACT_DIST=/app/frontend/dist
+      - RAG_STUDIO_RUNTIME_MODE=${RAG_STUDIO_RUNTIME_MODE:-local}
 
     # Resource constraints (AC-008.7)
     # Minimum: 4 GB RAM, 2 CPUs
@@ -58,3 +59,176 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  rag-studio-saas:
+    profiles: ["stage3"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rag-studio:latest
+    user: "0:0"
+    ports:
+      - "127.0.0.1:${RAG_STUDIO_SAAS_PORT:-8013}:8000"
+    volumes:
+      - stage3-saas-data:/app/data
+    environment:
+      RAG_STUDIO_DATA_ROOT: /app/data
+      QDRANT_PATH: /app/data/qdrant_storage
+      RAG_STUDIO_LOGS_PATH: /app/data/logs
+      RAG_STUDIO_UI_MODE: react
+      RAG_STUDIO_REACT_DIST: /app/frontend/dist
+      RAG_STUDIO_RUNTIME_MODE: saas
+      RAG_STUDIO_SUPABASE_URL: http://stage3-auth:9999
+      RAG_STUDIO_SUPABASE_JWT_ISSUER: ${STAGE3_SITE_URL:-http://127.0.0.1:8013}/auth/v1
+      RAG_STUDIO_SUPABASE_JWT_AUDIENCE: authenticated
+      RAG_STUDIO_SUPABASE_DATABASE_URL: postgresql://postgres:${STAGE3_POSTGRES_PASSWORD:-}@stage3-db:5432/postgres
+      RAG_STUDIO_SESSION_SIGNING_KEY: ${RAG_STUDIO_SESSION_SIGNING_KEY:-}
+      RAG_STUDIO_CORS_ORIGINS: ${STAGE3_SITE_URL:-http://127.0.0.1:8013}
+      RAG_STUDIO_INVITATION_SMTP_HOST: stage3-mail
+      RAG_STUDIO_INVITATION_SMTP_PORT: "1025"
+      RAG_STUDIO_INVITATION_SMTP_STARTTLS: "false"
+      RAG_STUDIO_INVITATION_SITE_URL: ${STAGE3_SITE_URL:-http://127.0.0.1:8013}
+      DEEPSEEK_BASE_URL: http://stage3-fake-deepseek:8080/v1
+      DEEPSEEK_API_KEY: stage3-local-no-auth
+    depends_on:
+      stage3-auth:
+        condition: service_healthy
+      stage3-db:
+        condition: service_healthy
+      stage3-fake-deepseek:
+        condition: service_started
+    mem_limit: 4g
+    cpus: "2"
+    restart: unless-stopped
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  stage3-db:
+    profiles: ["stage3"]
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${STAGE3_POSTGRES_PASSWORD:-}
+    volumes:
+      - stage3-postgres-data:/var/lib/postgresql/data
+    mem_limit: 1g
+    cpus: "0.5"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  stage3-db-bootstrap:
+    profiles: ["stage3"]
+    image: postgres:17.6-alpine
+    depends_on:
+      stage3-db:
+        condition: service_healthy
+    environment:
+      PGHOST: stage3-db
+      PGPORT: 5432
+      PGDATABASE: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${STAGE3_POSTGRES_PASSWORD:-}
+    volumes:
+      - ./docker/stage3/001-auth-schema.sql:/bootstrap/001-auth-schema.sql:ro
+      - ./supabase/migrations:/bootstrap/migrations:ro
+    command:
+      - /bin/sh
+      - -ec
+      - >-
+        psql --no-psqlrc --set ON_ERROR_STOP=1
+        --file /bootstrap/001-auth-schema.sql;
+        for migration in /bootstrap/migrations/*.sql; do
+          psql --no-psqlrc --set ON_ERROR_STOP=1 --file "$${migration}";
+        done
+    mem_limit: 128m
+    cpus: "0.1"
+    restart: "no"
+
+  stage3-auth:
+    profiles: ["stage3"]
+    image: supabase/gotrue:v2.189.0
+    depends_on:
+      stage3-db:
+        condition: service_healthy
+      stage3-db-bootstrap:
+        condition: service_completed_successfully
+      stage3-mail:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${STAGE3_SITE_URL:-http://127.0.0.1:8013}/auth/v1
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgresql://postgres:${STAGE3_POSTGRES_PASSWORD:-}@stage3-db:5432/postgres?sslmode=disable&search_path=auth
+      GOTRUE_DB_NAMESPACE: auth
+      GOTRUE_SITE_URL: ${STAGE3_SAAS_APP_URL:-http://127.0.0.1:8013/saas}
+      GOTRUE_URI_ALLOW_LIST: ${STAGE3_SAAS_APP_URL:-http://127.0.0.1:8013/saas}
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${STAGE3_GOTRUE_JWT_SECRET:-${STAGE3_JWT_SECRET:-}}
+      GOTRUE_JWT_ISSUER: ${STAGE3_SITE_URL:-http://127.0.0.1:8013}/auth/v1
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_SMTP_ADMIN_EMAIL: noreply@rag-studio.local
+      GOTRUE_SMTP_HOST: stage3-mail
+      GOTRUE_SMTP_PORT: 1025
+      GOTRUE_SMTP_USER: ""
+      GOTRUE_SMTP_PASS: ""
+      GOTRUE_SMTP_SENDER_NAME: RAG-Studio
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
+      GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: 0
+    mem_limit: 512m
+    cpus: "0.5"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  stage3-mail:
+    profiles: ["stage3"]
+    image: axllent/mailpit:v1.30.0
+    ports:
+      - "127.0.0.1:${STAGE3_MAILPIT_HTTP_PORT:-8025}:8025"
+    mem_limit: 256m
+    cpus: "0.25"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+
+  stage3-fake-deepseek:
+    profiles: ["stage3"]
+    image: python:3.14-slim
+    command: ["python", "/provider/fake_openai_provider.py"]
+    volumes:
+      - ./docker/stage3/fake_openai_provider.py:/provider/fake_openai_provider.py:ro
+    mem_limit: 128m
+    cpus: "0.1"
+    restart: unless-stopped
+
+volumes:
+  stage3-postgres-data:
+  stage3-saas-data:

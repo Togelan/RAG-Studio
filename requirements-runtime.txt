@@ -20,6 +20,7 @@ qdrant-client>=1.13.0,<2.0.0
 
 # Data Validation
 pydantic>=2.0.0
+asyncpg>=0.30.0
 
 # Encryption
 cryptography>=42.0.0

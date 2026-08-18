@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
+import asyncio  # noqa: ANYIO_OK - existing job manager is asyncio-native
 import logging
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import suppress
@@ -19,6 +19,10 @@ _BUFFER_ERROR_EVENT = (
     '"message":"Response exceeded the replay limit.","retryable":true}\n\n'
 )
 _BUFFER_DONE_EVENT = 'event: done\ndata: {"done":true,"completed":false}\n\n'
+_PRODUCER_ERROR_EVENT = (
+    'event: error\ndata: {"code":"response_failed",'
+    '"message":"Response could not be completed.","retryable":true}\n\n'
+)
 _TERMINAL_RESERVE_BYTES = 256
 
 
@@ -30,8 +34,14 @@ class ChatJobBufferFullError(RuntimeError):
     """Raised when replay data exceeds the job's configured memory bound."""
 
 
-@dataclass(slots=True)
+class ChatJobConfigurationError(ValueError):
+    """Raised when bounded job limits cannot support safe execution."""
+
+
+@dataclass(slots=True)  # noqa: MUTABLE_OK - owns live task and replay state
 class _ChatJob:
+    """Mutable state machine for one producer-owned replay stream."""
+
     session_id: str
     buffer_max_bytes: int
     events: list[str] = field(default_factory=list)
@@ -54,8 +64,15 @@ class _ChatJob:
 
     async def publish_buffer_error(self) -> None:
         """Publish a bounded, sanitized terminal outcome after overflow."""
+        await self._publish_terminal(_BUFFER_ERROR_EVENT)
+
+    async def publish_producer_error(self) -> None:
+        """Publish a stable terminal outcome without provider exception text."""
+        await self._publish_terminal(_PRODUCER_ERROR_EVENT)
+
+    async def _publish_terminal(self, error_event: str) -> None:
         async with self.changed:
-            for event in (_BUFFER_ERROR_EVENT, _BUFFER_DONE_EVENT):
+            for event in (error_event, _BUFFER_DONE_EVENT):
                 encoded_size = len(event.encode("utf-8"))
                 if self.buffered_bytes + encoded_size > self.buffer_max_bytes:
                     break
@@ -86,7 +103,7 @@ class ChatJobManager:
 
     def __init__(self, capacity: int) -> None:
         if capacity <= 0:
-            raise ValueError("Chat job capacity must be positive")
+            raise ChatJobConfigurationError("Chat job capacity must be positive")
         self._capacity = capacity
         self._jobs: dict[str, _ChatJob] = {}
         self._lock = asyncio.Lock()
@@ -100,7 +117,9 @@ class ChatJobManager:
     ) -> AsyncGenerator[str]:
         """Admit one producer and return its initial replaying subscription."""
         if buffer_max_bytes < _TERMINAL_RESERVE_BYTES:
-            raise ValueError("Chat job replay buffer must reserve terminal capacity")
+            raise ChatJobConfigurationError(
+                "Chat job replay buffer must reserve terminal capacity"
+            )
         async with self._lock:
             if session_id in self._jobs:
                 raise StreamSessionConflictError(session_id)
@@ -156,6 +175,13 @@ class ChatJobManager:
                 "Chat job replay buffer exhausted: session=%s", job.session_id
             )
             await job.publish_buffer_error()
+        except Exception as error:  # noqa: BLE001  # noqa: BROAD_EXCEPT_OK
+            logger.error(
+                "Chat job producer failed: session=%s type=%s",
+                job.session_id,
+                type(error).__name__,
+            )
+            await job.publish_producer_error()
         finally:
             await job.finish()
             async with self._lock:

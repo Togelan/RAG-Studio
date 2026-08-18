@@ -1,0 +1,497 @@
+.rs-saas-auth,
+.rs-saas-loading,
+.rs-saas-start,
+.rs-saas-shell {
+  min-block-size: 100dvh;
+  color: var(--rs-text);
+  background: var(--rs-canvas);
+}
+
+.rs-saas-loading,
+.rs-saas-start {
+  display: grid;
+  min-block-size: 100dvh;
+  place-items: center;
+  padding: 24px;
+  color: var(--rs-text);
+  background: var(--rs-canvas);
+}
+
+.rs-saas-loading__mark {
+  inline-size: 40px;
+  block-size: 40px;
+  border: 3px solid var(--rs-border);
+  border-block-start-color: var(--rs-ai);
+  border-radius: 50%;
+  animation: rs-saas-spin 800ms linear infinite;
+}
+
+.rs-saas-start__card {
+  inline-size: min(100%, 32rem);
+  border-color: var(--rs-border-strong);
+}
+
+.rs-saas-placeholder {
+  max-inline-size: 46rem;
+}
+
+.rs-saas-placeholder h1 {
+  margin: 12px 0;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+}
+
+.rs-saas-placeholder p {
+  color: var(--rs-text-muted);
+}
+
+@keyframes rs-saas-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.rs-saas-auth {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(min(26rem, 100%), 0.9fr);
+  gap: 48px;
+  align-items: center;
+  overflow: hidden;
+  padding: 64px max(24px, calc((100vw - 1200px) / 2));
+}
+
+.rs-saas-auth__atmosphere {
+  position: absolute;
+  inset: auto auto -30% -10%;
+  inline-size: min(52rem, 75vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0.16;
+  background: radial-gradient(circle, var(--rs-ai), transparent 68%);
+  pointer-events: none;
+}
+
+.rs-saas-auth__intro,
+.rs-saas-auth__card {
+  position: relative;
+  z-index: 1;
+}
+
+.rs-saas-auth__intro {
+  max-inline-size: 42rem;
+}
+
+.rs-saas-auth__intro h1 {
+  margin: 16px 0;
+  font-size: clamp(2.375rem, 6vw, 4.5rem);
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+}
+
+.rs-saas-auth__intro p {
+  max-inline-size: 52ch;
+  margin: 0;
+  color: var(--rs-text-muted);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+.rs-saas-eyebrow {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--rs-gold);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.rs-saas-auth__card {
+  inline-size: min(100%, 30rem);
+  justify-self: end;
+  border-color: var(--rs-border-strong);
+  background: linear-gradient(145deg, var(--rs-surface-raised), var(--rs-surface));
+}
+
+.rs-saas-auth__icon {
+  display: grid;
+  inline-size: 44px;
+  block-size: 44px;
+  place-items: center;
+  margin-block-end: 12px;
+  border: 1px solid var(--rs-border-strong);
+  border-radius: 10px;
+  color: var(--rs-ai);
+  background: var(--rs-surface-overlay);
+}
+
+.rs-saas-form,
+.rs-saas-field {
+  display: grid;
+}
+
+.rs-saas-form {
+  gap: 20px;
+}
+
+.rs-saas-field {
+  gap: 8px;
+}
+
+.rs-saas-field-error {
+  margin: 0;
+  color: var(--rs-danger);
+  font-size: 0.875rem;
+}
+
+.rs-saas-form__submit {
+  inline-size: 100%;
+  min-block-size: 44px;
+}
+
+.rs-saas-auth__alternate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-start: 20px;
+  color: var(--rs-text-muted);
+}
+
+.rs-saas-notice {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--rs-border);
+  border-radius: 8px;
+}
+
+.rs-saas-notice--error {
+  border-color: color-mix(in srgb, var(--rs-danger) 55%, var(--rs-border));
+  color: var(--rs-danger);
+}
+
+.rs-saas-notice--success {
+  border-color: color-mix(in srgb, var(--rs-success) 55%, var(--rs-border));
+  color: var(--rs-success);
+}
+
+.rs-saas-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-block-size: 100dvh;
+}
+
+.rs-saas-shell__bar {
+  display: grid;
+  grid-template-columns: auto minmax(14rem, 20rem) minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  min-block-size: 68px;
+  padding-inline: 24px;
+  border-block-end: 1px solid var(--rs-border);
+  background: color-mix(in srgb, var(--rs-surface) 94%, transparent);
+}
+
+.rs-saas-brand,
+.rs-saas-shell__nav a {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-block-size: 44px;
+  color: var(--rs-text);
+  text-decoration: none;
+}
+
+.rs-saas-brand {
+  color: var(--rs-gold);
+  font-weight: 750;
+}
+
+.rs-saas-workspace-select {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.rs-saas-shell__nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.rs-saas-shell__menu {
+  display: none;
+}
+
+.rs-saas-shell__drawer {
+  display: grid;
+  align-content: start;
+  gap: var(--rs-space-16);
+}
+
+.rs-saas-shell__drawer-nav {
+  display: grid;
+  gap: var(--rs-space-4);
+}
+
+.rs-saas-shell__drawer-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rs-space-8);
+  min-block-size: 44px;
+  padding-inline: var(--rs-space-12);
+  border-radius: var(--rs-radius-sm);
+  color: var(--rs-text);
+  text-decoration: none;
+}
+
+.rs-saas-shell__nav a {
+  padding-inline: 12px;
+  border-radius: 8px;
+  color: var(--rs-text-muted);
+}
+
+.rs-saas-shell__nav a:hover,
+.rs-saas-shell__nav a[aria-current="page"] {
+  color: var(--rs-text);
+  background: var(--rs-surface-raised);
+}
+
+.rs-saas-account {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.rs-saas-account__email {
+  max-inline-size: 14rem;
+  overflow: hidden;
+  color: var(--rs-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rs-saas-role {
+  padding: 4px 8px;
+  border: 1px solid var(--rs-border-strong);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.rs-saas-role--owner {
+  color: var(--rs-gold);
+}
+
+.rs-saas-role--admin {
+  color: var(--rs-ai);
+}
+
+.rs-saas-role--member {
+  color: var(--rs-text-muted);
+}
+
+.rs-saas-shell__body {
+  min-block-size: 0;
+  overflow: auto;
+  padding: 32px max(20px, calc((100vw - 1280px) / 2));
+}
+
+@media (max-width: 1040px) {
+  .rs-saas-shell__bar {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .rs-saas-shell__nav--desktop {
+    display: none;
+  }
+
+  .rs-saas-shell__menu {
+    display: inline-flex;
+  }
+
+  .rs-saas-account__email {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .rs-saas-auth {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    padding-block: 48px;
+  }
+
+  .rs-saas-auth__card {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 540px) {
+  .rs-saas-auth {
+    align-content: start;
+    padding: 40px 16px;
+  }
+
+  .rs-saas-auth__intro h1 {
+    font-size: 2.375rem;
+  }
+
+  .rs-saas-shell__bar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .rs-saas-brand span,
+  .rs-saas-role {
+    display: none;
+  }
+
+  .rs-saas-workspace-select {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .rs-saas-shell__body {
+    padding: 24px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-saas-loading__mark {
+    animation: rs-saas-fade 900ms ease-in-out infinite alternate;
+  }
+
+  .rs-saas-shell *,
+  .rs-saas-auth * {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
+  }
+}
+
+.rs-people {
+  display: grid;
+  gap: 24px;
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
+.rs-saas-workspace-management {
+  display: grid;
+  gap: 24px;
+}
+
+.rs-workspace-invitation__description,
+.rs-workspace-lifecycle__content > p,
+.rs-workspace-lifecycle__transfer > p {
+  color: var(--rs-text-muted);
+}
+
+.rs-workspace-lifecycle__content,
+.rs-workspace-lifecycle__transfer {
+  display: grid;
+  gap: 16px;
+}
+
+.rs-workspace-lifecycle__archive {
+  display: flex;
+  justify-content: flex-start;
+  padding-block-start: 8px;
+  border-block-start: 1px solid var(--rs-border);
+}
+
+.rs-people__heading h1 {
+  margin: 6px 0;
+}
+
+.rs-people__heading p,
+.rs-people__record span,
+.rs-people__empty {
+  color: var(--rs-text-muted);
+}
+
+.rs-people__grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(320px, 1.2fr);
+}
+
+.rs-people__records {
+  display: grid;
+  gap: 10px;
+}
+
+.rs-people__record {
+  align-items: center;
+  border: 1px solid var(--rs-border);
+  border-radius: var(--rs-radius-sm);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 12px;
+}
+
+.rs-people__record div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rs-people__record strong {
+  overflow-wrap: anywhere;
+}
+
+.rs-saas-permission {
+  background: color-mix(in srgb, var(--rs-accent) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rs-accent) 28%, var(--rs-border));
+  border-radius: var(--rs-radius-sm);
+  color: var(--rs-text-muted);
+  margin: 0;
+  padding: 14px 16px;
+}
+
+@media (max-width: 760px) {
+  .rs-people__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rs-people__record {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+.rs-saas-editor {
+  max-height: min(88vh, 820px);
+  max-width: 760px;
+  overflow-y: auto;
+}
+
+.rs-saas-editor .rs-saas-form {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.rs-saas-editor .rs-textarea {
+  min-height: 120px;
+}
+
+@media (max-width: 640px) {
+  .rs-saas-editor .rs-saas-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes rs-saas-fade {
+  to {
+    opacity: 0.45;
+  }
+}

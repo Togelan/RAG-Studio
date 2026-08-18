@@ -116,6 +116,130 @@ Motion tokens: press 80ms; fast 120ms; controls 160ms; overlays 180–220ms; dia
 - Limit WOFF2 font files and weights, lazy-load non-critical UI, and keep the widget bundle stricter than the app bundle.
 - Backdrop blur is permitted only for a small isolated marketing or floating layer after performance verification, with an opaque fallback.
 
+## Stage 3 authenticated workspace journeys (FR-013 through FR-015)
+
+### Product job, people, and visual thesis
+
+The primary job is to let a company user enter one trusted workspace, understand
+their effective role, and move a chatbot from configuration to a cited test
+answer without losing tenant context. Owners need unmistakable control over
+membership, transfer, and archive; admins need efficient invitation and chatbot
+management; members need a calm, permission-honest test surface with no dead or
+misleading controls.
+
+The Stage 3 application stays operational and evidence-first. It extends the
+compact workspace selector and quiet status-panel grammar from `dashboard.png`,
+the grouped form and preview hierarchy from `settings.png`, and the citation-chip
+anatomy from `embed chat.png`. It does not copy their invented analytics, widget
+controls, avatars, or brand content. The signature moment is functional: when a
+workspace changes, the contextual shell and dependent content settle together
+after the server confirms the selection, so the active tenant is always visually
+and behaviorally aligned.
+
+### Information hierarchy and screen inventory
+
+1. **Authentication (`/saas/sign-in`, `/saas/sign-up`)**: product identity,
+   recoverable credential form, submit state, field validation, sanitized service
+   failure, and confirmation-required outcome. Authentication cookies and CSRF
+   mechanics remain below the component boundary; no token or secret is rendered
+   or stored by application state.
+2. **Workspace start (`/saas`)**: current workspace and role first, then the
+   chatbot list and its primary allowed action. With no memberships, workspace
+   creation is the sole primary task. A lost, revoked, or archived selection
+   clears dependent content and returns to a recoverable workspace choice.
+3. **People and invitations (`/saas/workspaces/:workspaceId/people`)**: members
+   and invitations are separate, labelled regions. Owner-only membership and
+   transfer controls are separated from owner/admin invitation controls.
+   Invitation acceptance is a signed-in route with one visible token field that
+   can be populated from the local inbox link; the bearer value is never echoed
+   after submission.
+4. **Sources (`/saas/workspaces/:workspaceId/sources`)**: workspace-scoped source
+   library with upload, replacement by filename, document readiness metadata, and
+   confirmed removal. Owners and admins see upload and remove actions; members see
+   a plain permission explanation rather than inactive mutation controls. The
+   upload field accepts only supported document files, names the selected source,
+   and replaces its idle action with an explicit Uploading state. Re-uploading the
+   same filename explains that it atomically replaces only that workspace's source.
+5. **Chatbots (`/saas/workspaces/:workspaceId/chatbots`)**: enabled and disabled
+   chatbots form one scan-friendly list with localized name, provider/model,
+   lifecycle status, and one clear test action. Owner/admin management actions are
+   absent for members, not merely disabled.
+6. **Chatbot editor (`/saas/workspaces/:workspaceId/chatbots/new` and
+   `.../:chatbotId/edit`)**: localized names and instructions, provider/model,
+   immutable workspace-wide source scope, field errors, save state, and explicit
+   version-conflict recovery. Editing uses the grouped form hierarchy of
+   `settings.png`; no unsupported widget configuration appears.
+7. **Chatbot test (`/saas/workspaces/:workspaceId/chatbots/:chatbotId/test`)**:
+   session list, transcript, composer, stop/reattach affordance, cited sources,
+   and feedback. Disabled chatbots explain why a new test cannot start. Partial
+   output remains readable after a sanitized stream failure.
+
+### Responsive composition and scroll ownership
+
+- At `1440x900`, the authenticated shell keeps the top bar and workspace selector
+  persistent. Workspace lists use a narrow contextual rail only when it improves
+  scanning; the page body is the sole scroll owner and reading columns remain
+  bounded.
+- At `768x1024`, contextual rails become stacked sections or drawers. Two-column
+  forms collapse before labels or controls become cramped; confirmation dialogs
+  keep actions in predictable document order.
+- At `360x800`, the compact header exposes navigation and workspace selection as
+  labelled 44px controls. Lists become records, action clusters wrap, forms use
+  one column, citations open below the answer, and the composer reserves safe-area
+  clearance. No primary surface owns horizontal scrolling.
+- Shells use a bounded `auto minmax(0, 1fr)` grid when a fixed region surrounds a
+  scroll body. Intrinsic grids use `minmax(min(16rem, 100%), 1fr)` so long names,
+  URLs, UUIDs, and Russian copy cannot force overflow.
+
+### Reusable Stage 3 primitives and states
+
+- **AuthCard**: sign-in/sign-up mode, visible labels, password guidance,
+  submitting, validation, confirmation-required, expired-session, and service
+  error states.
+- **WorkspaceSwitcher**: loading, no memberships, selected, selection pending,
+  selection rejected, revoked/archived, and keyboard-open states. It never treats
+  a browser-provided workspace ID as authority.
+- **RoleBadge / PermissionNotice**: owner, admin, and member semantics pair text
+  with color. Permission denial identifies the unavailable task without exposing
+  policy internals or raw API detail.
+- **ResourceList / ResourceRecord**: loading skeleton, empty, populated, disabled,
+  stale, and contextual error variants for workspaces, invitations, members,
+  chatbots, and sessions. Stable identifiers key every record.
+- **SourceLibrary**: upload-ready, uploading, upload-failed, empty, populated,
+  replacing, and confirmed-delete states. File input remains labelled and visible;
+  source rows use filename, readiness metadata, and a textual action rather than
+  opaque icon-only controls.
+- **AsyncAction**: idle, pressed, pending, success, recoverable failure, disabled,
+  and conflict states. A pending label or progress cue replaces the idle label;
+  duplicate submission is prevented without hiding the action.
+- **ConfirmActionDialog**: explicit object name, consequence, cancel, and one
+  destructive action. Ownership transfer names the receiving member; workspace
+  archive and chatbot deletion never imply that knowledge is deleted.
+- **ChatbotDefinitionForm**: localized field groups, source-scope explanation,
+  invalid, dirty, submitting, saved, and version-conflict states. Conflict offers
+  reload-current before another write.
+- **TestChatSurface**: session loading/empty, ready, streaming, cancelling,
+  detached/reattaching, completed, partial-error, disabled-chatbot, citations,
+  and feedback-stored states. Token-level updates are not announced through a live
+  region.
+
+### Interaction, accessibility, and accepted debt
+
+- Interaction mechanics adapt beui.dev `button` state replacement and
+  `center-morph-modal` overlay hierarchy to the existing motion tokens. The
+  implementation uses CSS/Radix primitives rather than adding a motion runtime;
+  reduced motion removes transforms and keeps short opacity feedback.
+- Workspace changes, sign-out, revocation, and archive clear dependent UI only
+  after the BFF response establishes the new authority state. Cancel and reattach
+  remain interruptible, and route changes abort in-flight UI requests.
+- Every form error is associated with its field; dialogs restore focus; icon-only
+  buttons have accessible names; keyboard focus uses `--rs-focus`; mobile targets
+  are at least 44px. EN and RU copy share the same hierarchy and may wrap naturally
+  without truncating actions.
+- Accepted Task 10 debt: the local invitation inbox remains an external Mailpit
+  surface linked from the development UI; production email-provider UX is outside
+  FR-013. Widget/public-key controls and billing remain outside this stage.
+
 ## Stage boundaries and visual QA
 
 - **Stage 2 / FR-012:** build the React visual system and replace existing Welcome, Settings, and Chat behavior with parity. The Dashboard location needs its own concrete data and acceptance criteria before it becomes a working route; the reference dashboard does not authorize invented quality metrics.

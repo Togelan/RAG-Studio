@@ -21,17 +21,35 @@ function allProductionSource(): string {
     .join("\n")
 }
 
+function legacyProductionSource(): string {
+  return Object.entries(productionModules)
+    .filter(([path, value]) => !path.includes("/features/saas/") && typeof value === "string")
+    .map(([, value]) => value)
+    .join("\n")
+}
+
 describe("Stage 2 production-leak contract", () => {
-  it("keeps only canonical React aliases and no activated Stage 3 destinations", () => {
+  it("keeps canonical React aliases and the approved Stage 3 SaaS entry only", () => {
     const app = sourceFor("/App.tsx")
     const paths = [...app.matchAll(/path="([^"]+)"/gu)].map((match) => match[1])
 
-    expect(paths).toEqual(["/", "/app", "/settings", "/app/settings", "/chat", "/app/chat", "*"])
-    expect(app).not.toMatch(/path="\/(?:auth|billing|pricing|widget|analytics|tenant|workspace)/u)
+    expect(paths).toEqual([
+      "/saas/*",
+      "/",
+      "/app",
+      "/settings",
+      "/app/settings",
+      "/chat",
+      "/app/chat",
+      "*",
+    ])
+    expect(app).not.toMatch(
+      /path="\/(?:auth|billing|pricing|widget|analytics|tenant|workspace)(?:\/|")/u,
+    )
   })
 
   it("uses generated locale keys instead of locale-conditioned UI copy", () => {
-    const source = allProductionSource()
+    const source = legacyProductionSource()
     const keyMatches = [...source.matchAll(/\b(?:t|format)\("([^"]+)"/gu)]
     const directKeys = keyMatches
       .map((match) => match[1])

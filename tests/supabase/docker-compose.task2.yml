@@ -1,0 +1,26 @@
+services:
+  stage3-db:
+    volumes:
+      - stage3-postgres-data:/var/lib/postgresql/data
+      - ./supabase/migrations:/migrations:ro
+      - ./tests/supabase:/contract:ro
+
+  stage3-db-bootstrap:
+    volumes:
+      - ./docker/stage3/001-auth-schema.sql:/bootstrap/001-auth-schema.sql:ro
+      - ./supabase/migrations/20260816165319_stage3_tenant_schema.sql:/bootstrap/002-tenant-schema.sql:ro
+      - ./supabase/migrations/20260816170226_stage3_tenant_routines_rls.sql:/bootstrap/003-tenant-routines-rls.sql:ro
+      - ./supabase/migrations/20260816170824_stage3_tenant_rls_grants.sql:/bootstrap/004-tenant-rls-grants.sql:ro
+    command:
+      - psql
+      - --no-psqlrc
+      - --set
+      - ON_ERROR_STOP=1
+      - --file
+      - /bootstrap/001-auth-schema.sql
+      - --file
+      - /bootstrap/002-tenant-schema.sql
+      - --file
+      - /bootstrap/003-tenant-routines-rls.sql
+      - --file
+      - /bootstrap/004-tenant-rls-grants.sql

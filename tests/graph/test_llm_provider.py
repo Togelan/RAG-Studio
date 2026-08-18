@@ -10,6 +10,7 @@ from pydantic import SecretStr
 from src.graph.llm_provider import (
     LLMProviderConfig,
     OpenAIProviderFactory,
+    provider_base_url,
 )
 from src.graph.nodes import analyzer_node, generate_from_retrieval_node, validate_node
 from src.graph.state import RAGState
@@ -84,6 +85,19 @@ def test_chat_openai_adapter_forwards_typed_config() -> None:
         max_tokens=733,
         timeout=17.5,
     )
+
+
+def test_deepseek_uses_explicit_server_endpoint_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: the isolated Stage 3 provider endpoint is configured server-side.
+    monkeypatch.setenv("DEEPSEEK_BASE_URL", "http://stage3-fake-deepseek:8080/v1")
+
+    # When: the DeepSeek provider endpoint is resolved for graph execution.
+    endpoint = provider_base_url("deepseek")
+
+    # Then: the explicit local endpoint is used instead of the production API.
+    assert endpoint == "http://stage3-fake-deepseek:8080/v1"
 
 
 @pytest.mark.asyncio

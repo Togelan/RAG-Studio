@@ -4,6 +4,7 @@
 # Testing
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
+asyncpg-stubs>=0.30.0
 
 # Code Quality
 ruff>=0.5.0

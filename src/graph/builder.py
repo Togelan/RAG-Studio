@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
     from src.ingestion.embedding import Embedder
     from src.vector_store.contracts import VectorStore
+    from src.vector_store.tenant_store import TenantCacheScope, TenantRagStore
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,9 @@ def build_rag_graph(
     *,
     embedder: Embedder | None = None,
     vector_store: VectorStore | None = None,
+    tenant_store: TenantRagStore | None = None,
+    cache_scope: TenantCacheScope | None = None,
+    provider_api_key: str | None = None,
 ) -> StateGraph:
     """Build the complete RAG-Studio chat graph with 7 nodes.
 
@@ -181,28 +185,57 @@ def build_rag_graph(
     # in type stubs — known library limitation, safe to ignore.
     builder.add_node(  # pyright: ignore[reportUnknownMemberType]
         "analyzer",
-        partial(analyzer_node, provider_factory=provider_factory),
+        partial(
+            analyzer_node,
+            provider_factory=provider_factory,
+            provider_api_key=provider_api_key,
+        ),
     )
     builder.add_node(  # pyright: ignore[reportUnknownMemberType]
         "cache_check",
-        partial(cache_check_node, embedder=embedder, vector_store=vector_store),
+        partial(
+            cache_check_node,
+            embedder=embedder,
+            vector_store=vector_store,
+            tenant_store=tenant_store,
+            cache_scope=cache_scope,
+        ),
     )
     builder.add_node(  # pyright: ignore[reportUnknownMemberType]
         "retrieve",
-        partial(retrieve_node, embedder=embedder, vector_searcher=vector_store),
+        partial(
+            retrieve_node,
+            embedder=embedder,
+            vector_searcher=vector_store,
+            tenant_store=tenant_store,
+        ),
     )
     builder.add_node("generate_from_cache", generate_from_cache_node)  # pyright: ignore[reportUnknownMemberType]
     builder.add_node(  # pyright: ignore[reportUnknownMemberType]
         "generate_from_retrieval",
-        partial(generate_from_retrieval_node, provider_factory=provider_factory),
+        partial(
+            generate_from_retrieval_node,
+            provider_factory=provider_factory,
+            provider_api_key=provider_api_key,
+        ),
     )
     builder.add_node(  # pyright: ignore[reportUnknownMemberType]
         "validate",
-        partial(validate_node, provider_factory=provider_factory),
+        partial(
+            validate_node,
+            provider_factory=provider_factory,
+            provider_api_key=provider_api_key,
+        ),
     )
     builder.add_node(  # pyright: ignore[reportUnknownMemberType]
         "save_to_cache",
-        partial(save_to_cache_node, embedder=embedder, vector_store=vector_store),
+        partial(
+            save_to_cache_node,
+            embedder=embedder,
+            vector_store=vector_store,
+            tenant_store=tenant_store,
+            cache_scope=cache_scope,
+        ),
     )
 
     # Set entry point
@@ -253,6 +286,9 @@ async def create_graph(
     *,
     embedder: Embedder | None = None,
     vector_store: VectorStore | None = None,
+    tenant_store: TenantRagStore | None = None,
+    cache_scope: TenantCacheScope | None = None,
+    provider_api_key: str | None = None,
 ) -> AsyncIterator[Any]:
     """Create a compiled graph with AsyncSqliteSaver checkpointer.
 
@@ -601,6 +637,9 @@ async def create_graph(
                 provider_factory,
                 embedder=embedder,
                 vector_store=vector_store,
+                tenant_store=tenant_store,
+                cache_scope=cache_scope,
+                provider_api_key=provider_api_key,
             ).compile(
                 checkpointer=saver,
             )
@@ -617,6 +656,9 @@ async def create_graph(
             provider_factory,
             embedder=embedder,
             vector_store=vector_store,
+            tenant_store=tenant_store,
+            cache_scope=cache_scope,
+            provider_api_key=provider_api_key,
         ).compile(
             checkpointer=memory_saver,
         )
@@ -641,6 +683,7 @@ def _graph_inputs(
     session_id: str,
     user_api_key: str | None,
     *,
+    persist_user_api_key: bool = True,
     provider: str,
     model: str,
     temperature: float,
@@ -667,7 +710,6 @@ def _graph_inputs(
         "faithfulness_score": 0.0,
         "validation_passed": False,
         "session_id": session_id,
-        "user_api_key": user_api_key,
         "provider": provider,
         "model_name": model,
         "temperature": temperature,
@@ -675,6 +717,8 @@ def _graph_inputs(
         "system_prompt": system_prompt,
         "top_k": top_k,
     }
+    if persist_user_api_key:
+        initial_state["user_api_key"] = user_api_key
     return config, initial_state
 
 
@@ -795,6 +839,7 @@ async def stream_rag_graph(
     session_id: str,
     user_api_key: str | None = None,
     *,
+    persist_user_api_key: bool = True,
     compiled_graph: Any,
     provider: str = "openai",
     model: str = "gpt-4o-mini",
@@ -813,6 +858,7 @@ async def stream_rag_graph(
         query,
         session_id,
         user_api_key,
+        persist_user_api_key=persist_user_api_key,
         provider=provider,
         model=model,
         temperature=temperature,

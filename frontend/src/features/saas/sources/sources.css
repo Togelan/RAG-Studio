@@ -1,0 +1,37 @@
+.rs-sources {
+  display: grid;
+  gap: 20px;
+  margin: 0 auto;
+  max-inline-size: 980px;
+}
+
+.rs-sources__heading h1 {
+  margin: 6px 0;
+}
+
+.rs-sources__heading p,
+.rs-sources__record p {
+  color: var(--rs-text-muted);
+}
+
+.rs-sources__records {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+.rs-sources__record {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.rs-sources__record p {
+  margin: 0;
+}
+
+.rs-sources__confirmation {
+  max-inline-size: 36rem;
+}

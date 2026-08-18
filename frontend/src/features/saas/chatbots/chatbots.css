@@ -1,0 +1,42 @@
+.rs-chatbots {
+  display: grid;
+  gap: 22px;
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
+.rs-chatbots__heading {
+  align-items: end;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.rs-chatbots__heading h1 {
+  margin: 6px 0;
+}
+
+.rs-chatbots__heading p,
+.rs-chatbots .rs-card__content > p {
+  color: var(--rs-text-muted);
+}
+
+.rs-chatbots__grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+
+.rs-chatbots__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@media (max-width: 640px) {
+  .rs-chatbots__heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

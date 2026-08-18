@@ -76,4 +76,10 @@ blog-post-ru.md
 # Local OMO orchestration state, plans, and generated evidence
 .omo/
 
+# Local agent/debug caches and generated skill scratch
+.debug-journal.md
+.codegraph/
+.uv-cache-gate/
+.agents/skills/grill-with-docs/
+
 sandbox/

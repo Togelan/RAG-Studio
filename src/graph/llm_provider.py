@@ -84,7 +84,7 @@ class OpenAIProviderFactory:
 def provider_base_url(provider: str) -> str | None:
     match provider:
         case "deepseek":
-            return "https://api.deepseek.com/v1"
+            return os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
         case "anthropic":
             return "https://api.anthropic.com/v1"
         case "ollama":

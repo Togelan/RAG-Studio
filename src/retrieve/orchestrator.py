@@ -12,15 +12,98 @@ from __future__ import annotations
 
 import logging
 from threading import Lock
-from typing import Any
+from typing import Any, Protocol
 
 from src.paths import configured_path
 from src.retrieve.context_expansion import expand_context_units
 from src.vector_store.adapter import get_vector_store
 from src.vector_store.contracts import VectorSearcher
-from src.vector_store.models import DenseVector, SparseVector, VectorSearchQuery
+from src.vector_store.models import (
+    DenseVector,
+    SparseVector,
+    VectorSearchHit,
+    VectorSearchQuery,
+)
+from src.vector_store.tenant_store import TenantVectorSearch
 
 logger = logging.getLogger(__name__)
+
+
+class TenantVectorSearcher(Protocol):
+    """Search capability already bound to an authorized workspace."""
+
+    async def search_documents(
+        self, query: TenantVectorSearch
+    ) -> tuple[VectorSearchHit, ...]: ...
+
+
+async def tenant_hybrid_search(
+    query: str,
+    dense_vector: list[float],
+    sparse_indices: list[int],
+    sparse_values: list[float],
+    *,
+    tenant_searcher: TenantVectorSearcher,
+    top_k: int = 20,
+    use_reranker: bool = True,
+    context_character_budget: int = 24_000,
+) -> list[dict[str, Any]]:
+    """Retrieve only through a server-resolved tenant search capability."""
+    try:
+        raw_results = await tenant_searcher.search_documents(
+            TenantVectorSearch(
+                dense=DenseVector(tuple(dense_vector)),
+                sparse=SparseVector(tuple(sparse_indices), tuple(sparse_values)),
+                limit=top_k,
+            )
+        )
+    except Exception as error:  # noqa: BLE001 -- typed boundary maps to safe empty
+        logger.warning(
+            "tenant_retrieval_failed error_type=%s", type(error).__name__
+        )
+        return []
+
+    context_units = expand_context_units(
+        raw_results,
+        top_k=min(top_k, _FINAL_TOP_K),
+        character_budget=context_character_budget,
+    )
+    candidates = [
+        {
+            "id": unit.point_id,
+            "score": unit.score,
+            "text": unit.text,
+            "metadata": dict(unit.metadata),
+        }
+        for unit in context_units
+    ]
+    if not use_reranker or not candidates:
+        return candidates[:_FINAL_TOP_K]
+
+    reranker = _get_reranker()
+    if reranker is None:
+        return candidates[:_FINAL_TOP_K]
+    try:
+        from flashrank import RerankRequest
+
+        request = RerankRequest(
+            query=query, passages=[{"text": item["text"]} for item in candidates]
+        )
+        ranked = reranker.rerank(request)
+        by_text = {item["text"]: item for item in candidates}
+        results: list[dict[str, Any]] = []
+        for passage in ranked[:_FINAL_TOP_K]:
+            candidate = by_text.get(passage["text"])
+            if candidate is not None:
+                candidate["rerank_score"] = float(passage["score"])
+                results.append(candidate)
+        return results
+    except (MemoryError, RuntimeError, ValueError, TypeError) as error:
+        logger.warning(
+            "tenant_reranking_failed error_type=%s", type(error).__name__
+        )
+        return candidates[:_FINAL_TOP_K]
+
 
 # FlashRank model config — multilingual cross-encoder, locally cached
 _FLASHRANK_MODEL_NAME = "ms-marco-MultiBERT-L-12"

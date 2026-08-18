@@ -25,10 +25,12 @@ from src.vector_store.strategy_payloads import (
     schema_version,
     strategy,
 )
+from src.vector_store.workspace_collections import ResolvedWorkspaceCollection
 
 _MAX_DOCUMENT_POINTS: Final = 10_000
 EnsureCollection = Callable[[VectorCollection], Awaitable[None]]
 UpsertRecords = Callable[[str, Sequence[VectorRecord]], Awaitable[None]]
+TenantUpsertRecords = Callable[[Sequence[VectorRecord]], Awaitable[None]]
 
 
 async def replace_document(
@@ -41,33 +43,107 @@ async def replace_document(
     from src.ingestion.embedder import COLLECTION_NAME
 
     await ensure_collection(VectorCollection(COLLECTION_NAME, 384, sparse=True))
-    previous_points = await _snapshot_document_points(
-        client, COLLECTION_NAME, replacement.doc_id
+    return await _replace_in_collection(
+        client,
+        COLLECTION_NAME,
+        lambda records: upsert(COLLECTION_NAME, records),
+        replacement,
+        maintain_legacy_index=True,
     )
-    previous_index = await document_index.read_index_document(
-        client, replacement.doc_id
+
+
+async def replace_tenant_document(
+    resolved: ResolvedWorkspaceCollection,
+    upsert: TenantUpsertRecords,
+    replacement: DocumentReplacement,
+) -> int:
+    """Replace a document through an already authorized workspace capability."""
+    return await _replace_in_collection(
+        resolved.client,
+        resolved.name,
+        upsert,
+        replacement,
+        maintain_legacy_index=False,
+    )
+
+
+async def _replace_in_collection(
+    client: AsyncQdrantClient,
+    collection_name: str,
+    upsert: TenantUpsertRecords,
+    replacement: DocumentReplacement,
+    *,
+    maintain_legacy_index: bool,
+) -> int:
+    previous_points = await _snapshot_document_points(
+        client, collection_name, replacement.doc_id
+    )
+    previous_index = (
+        await document_index.read_index_document(client, replacement.doc_id)
+        if maintain_legacy_index
+        else None
     )
     metadata = _replacement_metadata(replacement)
-    records = _records_with_metadata(replacement, metadata)
+    records = _records_with_metadata(
+        replacement,
+        metadata,
+        record_type=None if maintain_legacy_index else "document_chunk",
+    )
     completed = False
     try:
-        await upsert(COLLECTION_NAME, records)
-        keep_ids = [record.point_id for record in records]
-        await client.delete(
-            collection_name=COLLECTION_NAME,
-            points_selector=qmodels.FilterSelector(
-                filter=qmodels.Filter(
-                    must=[
-                        qmodels.FieldCondition(
-                            key="doc_id",
-                            match=qmodels.MatchValue(value=replacement.doc_id),
-                        )
-                    ],
-                    must_not=[qmodels.HasIdCondition(has_id=keep_ids)],
-                )
-            ),
-            wait=True,
+        await _publish_replacement(
+            client,
+            collection_name,
+            upsert,
+            replacement,
+            records,
+            metadata,
+            maintain_legacy_index=maintain_legacy_index,
         )
+        completed = True
+    finally:
+        if not completed:
+            with anyio.CancelScope(shield=True):
+                await _restore_document_points(
+                    client, collection_name, replacement.doc_id, previous_points
+                )
+                if maintain_legacy_index:
+                    await document_index.restore_index_document(
+                        client, replacement.doc_id, previous_index
+                    )
+    return len(replacement.records)
+
+
+async def _publish_replacement(
+    client: AsyncQdrantClient,
+    collection_name: str,
+    upsert: TenantUpsertRecords,
+    replacement: DocumentReplacement,
+    records: tuple[VectorRecord, ...],
+    metadata: DocumentMetadata,
+    *,
+    maintain_legacy_index: bool,
+) -> None:
+    await upsert(records)
+    await client.delete(
+        collection_name=collection_name,
+        points_selector=qmodels.FilterSelector(
+            filter=qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="doc_id", match=qmodels.MatchValue(value=replacement.doc_id)
+                    )
+                ],
+                must_not=[
+                    qmodels.HasIdCondition(
+                        has_id=[record.point_id for record in records]
+                    )
+                ],
+            )
+        ),
+        wait=True,
+    )
+    if maintain_legacy_index:
         await document_index.index_document(
             client,
             replacement.doc_id,
@@ -78,17 +154,6 @@ async def replace_document(
             replacement.created_at,
             metadata=metadata,
         )
-        completed = True
-    finally:
-        if not completed:
-            with anyio.CancelScope(shield=True):
-                await _restore_document_points(
-                    client, COLLECTION_NAME, replacement.doc_id, previous_points
-                )
-                await document_index.restore_index_document(
-                    client, replacement.doc_id, previous_index
-                )
-    return len(replacement.records)
 
 
 async def _snapshot_document_points(
@@ -161,7 +226,10 @@ def _replacement_metadata(replacement: DocumentReplacement) -> DocumentMetadata:
 
 
 def _records_with_metadata(
-    replacement: DocumentReplacement, metadata: DocumentMetadata
+    replacement: DocumentReplacement,
+    metadata: DocumentMetadata,
+    *,
+    record_type: str | None,
 ) -> tuple[VectorRecord, ...]:
     records: list[VectorRecord] = []
     for record in replacement.records:
@@ -185,6 +253,8 @@ def _records_with_metadata(
             payload["chunking_fingerprint"] = metadata.chunking_fingerprint
         if metadata.chunking_settings:
             payload["chunking_settings"] = dict(metadata.chunking_settings)
+        if record_type is not None:
+            payload["record_type"] = record_type
         records.append(
             VectorRecord(
                 point_id=record.point_id,

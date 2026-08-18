@@ -190,7 +190,15 @@ def test_python_runtime_retains_operational_container_contract() -> None:
 
 
 def test_compose_and_template_default_to_react_with_bundled_distribution() -> None:
-    assert _compose_service_names() == ("rag-studio",)
+    assert _compose_service_names() == (
+        "rag-studio",
+        "rag-studio-saas",
+        "stage3-db",
+        "stage3-db-bootstrap",
+        "stage3-auth",
+        "stage3-mail",
+        "stage3-fake-ollama",
+    )
 
     environment = _compose_environment()
     assert "RAG_STUDIO_UI_MODE=${RAG_STUDIO_UI_MODE:-react}" in environment

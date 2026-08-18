@@ -1,0 +1,91 @@
+.rs-test-chat-dialog {
+  inline-size: min(var(--rs-layout-dialog), calc(100vw - var(--rs-space-32)));
+  min-inline-size: min(var(--rs-layout-dialog), calc(100vw - var(--rs-space-32)));
+  max-height: min(88vh, 820px);
+  overflow-y: auto;
+}
+
+.rs-test-chat {
+  display: grid;
+  gap: 16px;
+  min-inline-size: 0;
+}
+
+.rs-test-chat__sessions,
+.rs-test-chat__feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rs-test-chat button {
+  min-height: 44px;
+}
+
+.rs-test-chat form {
+  display: grid;
+  gap: 10px;
+}
+
+.rs-test-chat textarea {
+  min-height: 120px;
+  resize: vertical;
+  width: 100%;
+}
+
+.rs-test-chat article {
+  background: var(--rs-surface-soft);
+  border-radius: var(--rs-radius-sm);
+  padding: 16px;
+}
+
+.rs-test-chat__citations {
+  display: grid;
+  gap: var(--rs-space-8);
+  margin-block: var(--rs-space-16) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rs-test-chat__citations details {
+  border: 1px solid var(--rs-border);
+  border-radius: var(--rs-radius-sm);
+  background: var(--rs-surface-raised);
+}
+
+.rs-test-chat__citations summary {
+  min-block-size: 44px;
+  padding: var(--rs-space-12);
+  color: var(--rs-ai);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.rs-test-chat__citations dl {
+  display: grid;
+  gap: var(--rs-space-8);
+  margin: 0;
+  padding: 0 var(--rs-space-12) var(--rs-space-12);
+}
+
+.rs-test-chat__citations dl > div {
+  display: grid;
+  gap: var(--rs-space-4);
+}
+
+.rs-test-chat__citations dt {
+  color: var(--rs-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.rs-test-chat__citations dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .rs-test-chat-dialog {
+    padding: var(--rs-space-20) var(--rs-space-16);
+  }
+}

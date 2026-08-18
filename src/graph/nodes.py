@@ -17,7 +17,7 @@ import math
 import os
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.config import get_stream_writer
@@ -32,16 +32,75 @@ from src.graph.llm_provider import (
 from src.graph.state import RAGState
 from src.ingestion.embedder import get_embedder
 from src.ingestion.embedding import Embedder
-from src.retrieve.orchestrator import hybrid_search
+from src.retrieve.orchestrator import hybrid_search, tenant_hybrid_search
 from src.vector_store.adapter import get_vector_store
 from src.vector_store.contracts import VectorSearcher, VectorStore
 from src.vector_store.models import (
+    DenseVector,
     VectorCollection,
     VectorRecord,
     VectorSearchQuery,
 )
+from src.vector_store.tenant_store import (
+    SemanticCacheHit,
+    TenantCacheScope,
+    TenantRagStore,
+)
 
 logger = logging.getLogger(__name__)
+
+
+class TenantSemanticCache(Protocol):
+    """Semantic cache capability bound to one authorized workspace."""
+
+    async def lookup_cache(
+        self, scope: TenantCacheScope, dense: DenseVector
+    ) -> SemanticCacheHit | None: ...
+
+    async def save_cache(
+        self,
+        scope: TenantCacheScope,
+        query: str,
+        answer: str,
+        dense: DenseVector,
+    ) -> None: ...
+
+
+async def tenant_context_node(
+    query: str,
+    *,
+    tenant_store: TenantRagStore,
+    cache_scope: TenantCacheScope,
+    embedder: Embedder,
+    top_k: int = 5,
+) -> dict[str, Any]:
+    """Run cache lookup and retrieval through one authorized tenant binding."""
+    dense = embedder.embed_dense((query,))[0]
+    sparse = embedder.embed_sparse((query,))[0]
+    cache_hit = await tenant_store.lookup_cache(cache_scope, dense)
+    documents = await tenant_hybrid_search(
+        query,
+        list(dense.values),
+        list(sparse.indices),
+        list(sparse.values),
+        tenant_searcher=tenant_store,
+        top_k=top_k,
+        use_reranker=False,
+    )
+    if cache_hit is None and documents:
+        eligible_answer = documents[0].get("text")
+        if isinstance(eligible_answer, str) and eligible_answer:
+            await tenant_store.save_cache(
+                cache_scope,
+                query,
+                eligible_answer,
+                dense,
+            )
+    return {
+        "cached_answer": None if cache_hit is None else cache_hit.answer,
+        "retrieved_docs": documents,
+    }
+
 
 # ============================================================
 # Constants
@@ -108,9 +167,10 @@ def _llm_config(
     state: RAGState,
     *,
     temperature: float,
+    provider_api_key: str | None = None,
 ) -> LLMProviderConfig:
     provider = state.get("provider", "openai")
-    api_key = state.get("user_api_key")
+    api_key = provider_api_key or state.get("user_api_key")
     return LLMProviderConfig(
         provider=provider,
         base_url=provider_base_url(provider),
@@ -165,6 +225,7 @@ async def analyzer_node(
     state: RAGState,
     *,
     provider_factory: LLMProviderFactory = _DEFAULT_PROVIDER_FACTORY,
+    provider_api_key: str | None = None,
 ) -> dict[str, Any]:
     """Classify user intent: 'follow_up_question' or 'standalone_question'.
 
@@ -179,7 +240,9 @@ async def analyzer_node(
     Returns:
         Dict with 'query' and 'intent' keys to merge into state.
     """
-    llm = provider_factory(_llm_config(state, temperature=0.0))
+    llm = provider_factory(
+        _llm_config(state, temperature=0.0, provider_api_key=provider_api_key)
+    )
 
     system_prompt = (
         "You are an intent classifier. Analyze the user's latest message.\n"
@@ -207,7 +270,11 @@ async def analyzer_node(
             query = str(msg.content) if msg.content else ""
             break
 
-    logger.info("Analyzer: intent=%s, query=%.80s", intent, query)
+    logger.info(
+        "Analyzer: intent=%s, query_length=%d",
+        intent,
+        len(query),
+    )
 
     return {
         "query": query,
@@ -225,11 +292,28 @@ async def cache_check_node(
     *,
     vector_store: VectorStore | None = None,
     embedder: Embedder | None = None,
+    tenant_store: TenantSemanticCache | None = None,
+    cache_scope: TenantCacheScope | None = None,
 ) -> dict[str, Any]:
     """Return a semantic-cache hit through injected application capabilities."""
-    store = await ensure_cache_collection_exists(vector_store)
     selected_embedder = embedder or get_embedder()
     query_dense = selected_embedder.embed_dense((state["query"],))[0]
+
+    if (tenant_store is None) != (cache_scope is None):
+        return {"cache_hit": False, "cached_answer": None}
+    if tenant_store is not None and cache_scope is not None:
+        try:
+            hit = await tenant_store.lookup_cache(cache_scope, query_dense)
+        except Exception as error:  # noqa: BLE001 -- optional cache is a safe miss
+            logger.warning(
+                "tenant_cache_check_failed error_type=%s", type(error).__name__
+            )
+            return {"cache_hit": False, "cached_answer": None}
+        if hit is None:
+            return {"cache_hit": False, "cached_answer": None}
+        return {"cache_hit": True, "cached_answer": hit.answer}
+
+    store = await ensure_cache_collection_exists(vector_store)
 
     try:
         results = await store.search(
@@ -265,20 +349,31 @@ async def retrieve_node(
     *,
     embedder: Embedder | None = None,
     vector_searcher: VectorSearcher | None = None,
+    tenant_store: TenantRagStore | None = None,
 ) -> dict[str, Any]:
     """Perform hybrid search through injected embedding/vector capabilities."""
     query = state["query"]
     selected_embedder = embedder or get_embedder()
     dense_vector = selected_embedder.embed_dense((query,))[0]
     sparse_vector = selected_embedder.embed_sparse((query,))[0]
-    results = await hybrid_search(
-        query=query,
-        dense_vector=list(dense_vector.values),
-        sparse_indices=list(sparse_vector.indices),
-        sparse_values=list(sparse_vector.values),
-        top_k=state.get("top_k", 5),
-        vector_searcher=vector_searcher,
-    )
+    if tenant_store is not None:
+        results = await tenant_hybrid_search(
+            query,
+            list(dense_vector.values),
+            list(sparse_vector.indices),
+            list(sparse_vector.values),
+            tenant_searcher=tenant_store,
+            top_k=state.get("top_k", 5),
+        )
+    else:
+        results = await hybrid_search(
+            query=query,
+            dense_vector=list(dense_vector.values),
+            sparse_indices=list(sparse_vector.indices),
+            sparse_values=list(sparse_vector.values),
+            top_k=state.get("top_k", 5),
+            vector_searcher=vector_searcher,
+        )
     logger.info("Retrieve completed: result_count=%d", len(results))
     return {"retrieved_docs": results}
 
@@ -316,6 +411,7 @@ async def generate_from_retrieval_node(
     state: RAGState,
     *,
     provider_factory: LLMProviderFactory = _DEFAULT_PROVIDER_FACTORY,
+    provider_api_key: str | None = None,
 ) -> dict[str, Any]:
     """Generate the final answer using retrieved documents as context.
 
@@ -330,7 +426,11 @@ async def generate_from_retrieval_node(
     """
     llm_temperature = state.get("temperature", 0.3)
     configured_system_prompt = state.get("system_prompt", "").strip()
-    llm = provider_factory(_llm_config(state, temperature=llm_temperature))
+    llm = provider_factory(
+        _llm_config(
+            state, temperature=llm_temperature, provider_api_key=provider_api_key
+        )
+    )
 
     retrieved_docs: list[dict[str, Any]] = state["retrieved_docs"]
 
@@ -389,6 +489,7 @@ async def validate_node(
     state: RAGState,
     *,
     provider_factory: LLMProviderFactory = _DEFAULT_PROVIDER_FACTORY,
+    provider_api_key: str | None = None,
 ) -> dict[str, Any]:
     """Validate that the generated answer is faithful to the retrieved context.
 
@@ -413,7 +514,9 @@ async def validate_node(
         logger.info("Validate: no retrieved docs, score=0.0")
         return {"faithfulness_score": 0.0, "validation_passed": False}
 
-    llm = provider_factory(_llm_config(state, temperature=0.0))
+    llm = provider_factory(
+        _llm_config(state, temperature=0.0, provider_api_key=provider_api_key)
+    )
 
     # Build context for validation
     context = "\n\n".join(
@@ -468,6 +571,8 @@ async def save_to_cache_node(
     *,
     vector_store: VectorStore | None = None,
     embedder: Embedder | None = None,
+    tenant_store: TenantSemanticCache | None = None,
+    cache_scope: TenantCacheScope | None = None,
 ) -> dict[str, Any]:
     """Persist a validated answer through injected application capabilities."""
     if state["generated_from"] == "cache":
@@ -477,9 +582,20 @@ async def save_to_cache_node(
         logger.debug("Save to cache: skipped (validation not passed)")
         return {}
 
-    store = await ensure_cache_collection_exists(vector_store)
     selected_embedder = embedder or get_embedder()
     query_dense = selected_embedder.embed_dense((state["query"],))[0]
+    if (tenant_store is None) != (cache_scope is None):
+        return {}
+    if tenant_store is not None and cache_scope is not None:
+        await tenant_store.save_cache(
+            cache_scope,
+            state["query"],
+            str(state["final_answer"] or ""),
+            query_dense,
+        )
+        return {}
+
+    store = await ensure_cache_collection_exists(vector_store)
     point_id = str(uuid.uuid5(CACHE_NAMESPACE, state["query"].strip().lower()))
     await store.upsert(
         CACHE_COLLECTION_NAME,

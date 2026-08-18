@@ -15,11 +15,19 @@ from src.vector_store.models import (
     VectorSearchHit,
     VectorSearchQuery,
 )
+from src.vector_store.tenant_store import (
+    TenantCacheScope,
+    TenantRagStore,
+    TenantVectorSearch,
+)
 
 __all__ = [
     "DenseVector",
     "QdrantVectorStore",
     "SparseVector",
+    "TenantCacheScope",
+    "TenantRagStore",
+    "TenantVectorSearch",
     "VectorRecord",
     "VectorSearchHit",
     "VectorSearchQuery",

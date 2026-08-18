@@ -193,11 +193,93 @@ class QdrantListingPaginator:
         ordered = tuple(sorted(points, key=_chunk_key))
         return self._start("chunks", doc_id, _SORT_CHUNKS, ordered, truncated, scanned)
 
+    async def scoped_documents(
+        self,
+        client: AsyncQdrantClient,
+        collection_name: str,
+        cursor: str | None,
+    ) -> ListingPage:
+        """Return documents from one opaque collection-bound snapshot."""
+        scope = _scope_fingerprint(collection_name)
+        if cursor is not None:
+            return self._continue(cursor, "documents", scope)
+        record_filter = qmodels.Filter(
+            must=[
+                qmodels.FieldCondition(
+                    key="record_type",
+                    match=qmodels.MatchValue(value="document_chunk"),
+                )
+            ]
+        )
+        points, truncated, scanned = await _scan_points(
+            client, collection_name, record_filter
+        )
+        documents: dict[str, ListedPoint] = {}
+        for point in points:
+            doc_id = str(point.payload.get("doc_id", ""))
+            if doc_id and doc_id not in documents:
+                documents[doc_id] = point
+        ordered = tuple(sorted(documents.values(), key=_document_key))
+        return self._start(
+            "documents", scope, _SORT_DOCUMENTS, ordered, truncated, scanned
+        )
+
+    async def scoped_chunks(
+        self,
+        client: AsyncQdrantClient,
+        collection_name: str,
+        doc_id: str,
+        cursor: str | None,
+    ) -> ListingPage:
+        """Return chunks from one opaque collection-bound snapshot."""
+        scope = f"{_scope_fingerprint(collection_name)}:{doc_id}"
+        if cursor is not None:
+            return self._continue(cursor, "chunks", scope)
+        record_filter = qmodels.Filter(
+            must=[
+                qmodels.FieldCondition(
+                    key="record_type",
+                    match=qmodels.MatchValue(value="document_chunk"),
+                ),
+                qmodels.FieldCondition(
+                    key="doc_id", match=qmodels.MatchValue(value=doc_id)
+                ),
+            ]
+        )
+        points, truncated, scanned = await _scan_points(
+            client, collection_name, record_filter
+        )
+        ordered = tuple(sorted(points, key=_chunk_key))
+        return self._start("chunks", scope, _SORT_CHUNKS, ordered, truncated, scanned)
+
     def invalidate_document(self, doc_id: str) -> None:
         """Mark a deleted document absent in all active snapshots."""
         with self._lock:
             for snapshot in self._snapshots.values():
                 snapshot.deleted_document_ids.add(doc_id)
+
+    def invalidate_scoped_document(self, collection_name: str, doc_id: str) -> None:
+        """Hide one deletion only from snapshots bound to the same collection."""
+        scope = _scope_fingerprint(collection_name)
+        with self._lock:
+            for snapshot in self._snapshots.values():
+                if snapshot.filter_value == scope or snapshot.filter_value.startswith(
+                    f"{scope}:"
+                ):
+                    snapshot.deleted_document_ids.add(doc_id)
+
+    def clear_scope(self, collection_name: str) -> None:
+        """Invalidate snapshots for one collection without affecting other tenants."""
+        scope = _scope_fingerprint(collection_name)
+        with self._lock:
+            stale = [
+                snapshot_id
+                for snapshot_id, snapshot in self._snapshots.items()
+                if snapshot.filter_value == scope
+                or snapshot.filter_value.startswith(f"{scope}:")
+            ]
+            for snapshot_id in stale:
+                del self._snapshots[snapshot_id]
 
     def clear(self) -> None:
         """Invalidate all active snapshots after collection replacement."""
@@ -343,6 +425,10 @@ async def _scan_points(
             break
         offset = next_offset
     return tuple(points), response_exceeded_cap or next_offset is not None, len(points)
+
+
+def _scope_fingerprint(collection_name: str) -> str:
+    return hashlib.sha256(collection_name.encode()).hexdigest()
 
 
 def _payload(raw: dict[str, object]) -> dict[str, JsonValue]:
