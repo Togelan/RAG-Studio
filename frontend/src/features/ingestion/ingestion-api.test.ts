@@ -71,7 +71,7 @@ describe("ingestion API contract", () => {
       .mockResolvedValueOnce(jsonResponse({ status: "ok", message: "deleted", deleted_count: 1 }))
       .mockResolvedValueOnce(jsonResponse({ status: "ok", message: "cleared", deleted_count: 3 }))
     const api = createIngestionApi(
-      new ApiClient(fetch, httpClient({ delete: remove, get, post })),
+      new ApiClient(fetch, httpClient({ delete: remove, get, post }), () => "csrf-proof"),
       vi.fn(),
     )
     const signal = new AbortController().signal
@@ -89,15 +89,21 @@ describe("ingestion API contract", () => {
     )
     expect(get).toHaveBeenNthCalledWith(2, "/api/ingest/progress/job%2F1", { signal })
     expect(post).toHaveBeenCalledWith("/api/ingest/reingest", {
+      headers: { "X-CSRF-Token": "csrf-proof" },
       json: { doc_id: "doc-1", filename: "safe.txt" },
       retry: 0,
       signal,
     })
     expect(remove).toHaveBeenNthCalledWith(1, "/api/ingest/documents/doc%2F1", {
+      headers: { "X-CSRF-Token": "csrf-proof" },
       retry: 0,
       signal,
     })
-    expect(remove).toHaveBeenNthCalledWith(2, "/api/ingest/clear", { retry: 0, signal })
+    expect(remove).toHaveBeenNthCalledWith(2, "/api/ingest/clear", {
+      headers: { "X-CSRF-Token": "csrf-proof" },
+      retry: 0,
+      signal,
+    })
   })
 
   it.each(["default", "cancel", "rename", "replace"] as const)(

@@ -85,10 +85,11 @@ class PostgresWorkspaceStore:
                     raise WorkspaceOperationError(WorkspaceErrorCode.CONFLICT)
                 return Workspace(workspace_id, normalized_name, WorkspaceRole.OWNER)
             await connection.execute(
-                "INSERT INTO public.workspaces (id, name, created_by) VALUES ($1, $2, $3)",
+                "INSERT INTO public.workspaces (id, name, created_by, account_id) VALUES ($1, $2, $3, $4)",
                 workspace_id,
                 normalized_name,
                 command.user_id,
+                command.account_id,
             )
             await connection.execute(
                 """

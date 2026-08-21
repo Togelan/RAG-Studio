@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 
 
-def test_stage3_auth_accepts_explicit_and_legacy_jwt_secret_names() -> None:
+def test_stage3_auth_requires_the_explicit_jwt_secret_name() -> None:
     # Given: the checked-in Stage 3 Compose and environment template contracts.
     project_root = Path(__file__).parents[2]
     compose = yaml.safe_load(
@@ -16,8 +16,11 @@ def test_stage3_auth_accepts_explicit_and_legacy_jwt_secret_names() -> None:
     # When: the GoTrue JWT secret mapping is inspected.
     mapping = compose["services"]["stage3-auth"]["environment"]["GOTRUE_JWT_SECRET"]
 
-    # Then: the explicit name wins while the original name remains compatible.
-    assert mapping == "${STAGE3_GOTRUE_JWT_SECRET:-${STAGE3_JWT_SECRET:-}}"
+    # Then: Compose fails before Auth starts when the explicit secret is absent.
+    assert mapping == (
+        "${STAGE3_GOTRUE_JWT_SECRET:?Set STAGE3_GOTRUE_JWT_SECRET "
+        "in the operator env file}"
+    )
     assert "STAGE3_GOTRUE_JWT_SECRET=" in template.splitlines()
     assert "STAGE3_JWT_SECRET=" in template.splitlines()
 
@@ -43,9 +46,8 @@ def test_stage3_confirmation_returns_to_the_saas_entry_without_widening_cors() -
         auth_environment["GOTRUE_URI_ALLOW_LIST"]
         == "${STAGE3_SAAS_APP_URL:-http://127.0.0.1:8013/saas}"
     )
-    assert (
-        application_environment["RAG_STUDIO_CORS_ORIGINS"]
-        == "${STAGE3_SITE_URL:-http://127.0.0.1:8013}"
+    assert application_environment["RAG_STUDIO_CORS_ORIGINS"] == (
+        "${STAGE3_SITE_URL:?Set STAGE3_SITE_URL to the trusted public origin}"
     )
     assert "STAGE3_SAAS_APP_URL=http://127.0.0.1:8013/saas" in template.splitlines()
 

@@ -1,14 +1,17 @@
-import { Languages, Menu, PanelTop, Settings2, Sparkles } from "lucide-react"
+import { LogOut, Menu, PanelTop, Settings2, Sparkles, UserRound } from "lucide-react"
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 
 import { useLocaleContext } from "../../app/locale-provider"
-import { type HealthGateway, HealthStatus } from "../../features/health/health-status"
+import { getShellCopy } from "../../i18n/shell-copy"
 import { Button } from "../ui/button"
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "../ui/drawer"
+import { type ContextState, ContextStateNotice, ContextSwitcher } from "./context-switcher"
+import { LocaleMenu } from "./locale-menu"
 import "./app-shell.css"
 
 type ShellPage = "welcome" | "settings" | "chat"
+type ResolvedShellPage = ShellPage | "workspace" | "neutral"
 
 type NavigationItem = {
   readonly icon: typeof Sparkles
@@ -22,12 +25,6 @@ const navigationItems = [
   { icon: PanelTop, key: "nav_chat", page: "chat" },
 ] as const satisfies readonly NavigationItem[]
 
-const pageTitleKeys = {
-  chat: "chat_title",
-  settings: "settings_title",
-  welcome: "welcome_title",
-} as const
-
 function pagePath(page: ShellPage, pathname: string): string {
   const prefix = pathname === "/app" || pathname.startsWith("/app/") ? "/app" : ""
   switch (page) {
@@ -40,7 +37,18 @@ function pagePath(page: ShellPage, pathname: string): string {
   }
 }
 
-function NavigationLinks({ onNavigate }: { readonly onNavigate?: () => void }): React.JSX.Element {
+export type WorkspaceNavigationItem = {
+  readonly label: string
+  readonly to: string
+}
+
+function NavigationLinks({
+  onNavigate,
+  workspaceNavigation = [],
+}: {
+  readonly onNavigate?: (() => void) | undefined
+  readonly workspaceNavigation?: readonly WorkspaceNavigationItem[] | undefined
+}): React.JSX.Element {
   const { pathname } = useLocation()
   const { t } = useLocaleContext()
   const activePage = pageFromPath(pathname)
@@ -62,16 +70,23 @@ function NavigationLinks({ onNavigate }: { readonly onNavigate?: () => void }): 
           </Link>
         )
       })}
-      <span aria-disabled="true" className="rs-shell__nav-link rs-shell__nav-link--disabled">
-        <PanelTop aria-hidden="true" size={18} />
-        <span>{t("nav_dashboard")}</span>
-        <span className="rs-shell__coming-soon">{t("nav_coming_soon")}</span>
-      </span>
+      {workspaceNavigation.map((item) => (
+        <Link
+          aria-current={pathname === item.to ? "page" : undefined}
+          className={`rs-shell__nav-link${pathname === item.to ? " rs-shell__nav-link--active" : ""}`}
+          key={item.to}
+          onClick={onNavigate}
+          to={item.to}
+        >
+          <PanelTop aria-hidden="true" size={18} />
+          <span>{item.label}</span>
+        </Link>
+      ))}
     </>
   )
 }
 
-function pageFromPath(pathname: string): ShellPage {
+function pageFromPath(pathname: string): ResolvedShellPage {
   switch (pathname) {
     case "/":
     case "/app":
@@ -82,21 +97,36 @@ function pageFromPath(pathname: string): ShellPage {
     case "/chat":
     case "/app/chat":
       return "chat"
+    case "/app/invitations/accept":
+    case "/app/not-found":
+      return "neutral"
     default:
+      if (pathname.startsWith("/app/workspaces/")) return "workspace"
       return "welcome"
   }
 }
 
 export function AppShell({
   children,
-  healthGateway,
+  context,
+  pageTitle,
+  user,
+  workspaceNavigation,
 }: {
   readonly children: React.ReactNode
-  readonly healthGateway?: HealthGateway | undefined
+  readonly context?: ContextState | undefined
+  readonly pageTitle?: string | undefined
+  readonly user?:
+    | { readonly identity: string; readonly onSignOut: () => void | Promise<void> }
+    | undefined
+  readonly workspaceNavigation?: readonly WorkspaceNavigationItem[] | undefined
 }): React.JSX.Element {
   const { pathname } = useLocation()
   const { locale, setLocale, t } = useLocaleContext()
+  const shellCopy = getShellCopy(locale)
   const page = pageFromPath(pathname)
+  const shellPageTitle = pageTitle ?? (page === "welcome" ? t("welcome_title") : undefined)
+  const showPageHeader = shellPageTitle !== undefined
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
@@ -111,27 +141,36 @@ export function AppShell({
           <span>RAG-Studio</span>
         </Link>
         <nav aria-label={t("aria_main_nav")} className="rs-shell__desktop-nav">
-          <NavigationLinks />
+          <NavigationLinks workspaceNavigation={workspaceNavigation} />
         </nav>
         <div className="rs-shell__tools">
-          <HealthStatus gateway={healthGateway} />
-          <label className="rs-shell__locale" htmlFor="locale-select">
-            <Languages aria-hidden="true" size={16} />
-            <span className="rs-visually-hidden">{t("aria_lang_selector")}</span>
-            <select
-              aria-label={t("aria_lang_selector")}
-              id="locale-select"
-              onChange={(event) => void setLocale(event.target.value === "ru" ? "ru" : "en")}
-              value={locale}
-            >
-              <option aria-label={t("aria_english")} value="en">
-                EN
-              </option>
-              <option aria-label={t("aria_russian")} value="ru">
-                RU
-              </option>
-            </select>
-          </label>
+          <LocaleMenu
+            ariaLabel={t("aria_lang_selector")}
+            locale={locale}
+            onLocaleChange={setLocale}
+            optionLabels={{ en: t("aria_english"), ru: t("aria_russian") }}
+          />
+          {user !== undefined ? (
+            <details className="rs-shell__user-menu">
+              <summary aria-label={`${shellCopy.signedInAs} ${user.identity}`}>
+                <UserRound aria-hidden="true" size={18} />
+              </summary>
+              <div className="rs-shell__user-panel">
+                <p>{shellCopy.signedInAs}</p>
+                <strong>{user.identity}</strong>
+                {context?.accountName !== undefined ? (
+                  <>
+                    <p>{shellCopy.account}</p>
+                    <strong>{context.accountName}</strong>
+                  </>
+                ) : null}
+                <Button onClick={() => void user.onSignOut()} variant="secondary">
+                  <LogOut aria-hidden="true" size={16} />
+                  {shellCopy.signOut}
+                </Button>
+              </div>
+            </details>
+          ) : null}
           <Drawer onOpenChange={setMenuOpen} open={menuOpen}>
             <DrawerTrigger asChild>
               <Button
@@ -146,24 +185,44 @@ export function AppShell({
             <DrawerContent className="rs-shell__drawer">
               <DrawerTitle>{t("aria_mobile_nav")}</DrawerTitle>
               <nav aria-label={t("aria_mobile_nav")} className="rs-shell__drawer-nav">
-                <NavigationLinks onNavigate={() => setMenuOpen(false)} />
+                {context !== undefined ? (
+                  <div data-testid="shell-drawer-context">
+                    <ContextSwitcher
+                      context={context}
+                      idPrefix="shell-drawer-context"
+                      locale={locale}
+                    />
+                  </div>
+                ) : null}
+                <NavigationLinks
+                  onNavigate={() => setMenuOpen(false)}
+                  workspaceNavigation={workspaceNavigation}
+                />
               </nav>
             </DrawerContent>
           </Drawer>
         </div>
       </header>
       <main className="rs-shell__main">
-        <header className="rs-page__header">
-          <p className="rs-page__eyebrow">RAG-Studio</p>
-          <h1 id="page-title">{t(pageTitleKeys[page])}</h1>
-        </header>
-        <section className="rs-page" aria-labelledby="page-title">
-          {children}
+        {showPageHeader ? (
+          <header className="rs-page__header">
+            <p className="rs-page__eyebrow">RAG-Studio</p>
+            <h1 id="page-title">{shellPageTitle}</h1>
+          </header>
+        ) : null}
+        <section className="rs-page" aria-labelledby={showPageHeader ? "page-title" : undefined}>
+          {context === undefined || context.state === "ready" ? (
+            children
+          ) : (
+            <div className="rs-shell__context-recovery">
+              <ContextStateNotice context={context} locale={locale} />
+              {page === "welcome" ? (
+                <ContextSwitcher context={context} idPrefix="home-context" locale={locale} />
+              ) : null}
+            </div>
+          )}
         </section>
       </main>
-      <nav aria-label={t("aria_mobile_nav")} className="rs-shell__bottom-nav">
-        <NavigationLinks />
-      </nav>
     </div>
   )
 }

@@ -51,6 +51,12 @@ def _configure_saas(monkeypatch: pytest.MonkeyPatch, data_root: Path) -> None:
         "RAG_STUDIO_SUPABASE_DATABASE_URL", "postgresql://local.invalid/postgres"
     )
     monkeypatch.setenv("RAG_STUDIO_SESSION_SIGNING_KEY", "x" * 32)
+    monkeypatch.setenv(
+        "RAG_STUDIO_SESSION_ENCRYPTION_KEYS",
+        "test-v1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+    )
+    monkeypatch.setenv("QDRANT_URL", "http://127.0.0.1:6333")
+    monkeypatch.setenv("RAG_STUDIO_CORS_ORIGINS", "http://testserver")
     for name in (
         "QDRANT_PATH",
         "RAG_STUDIO_SETTINGS_PATH",
@@ -173,14 +179,14 @@ def test_saas_boot_and_rollback_leave_legacy_sentinels_unchanged(
         }
         import_attempt = client.post("/api/ingest/documents")
 
-    # Then: legacy routes remain available only as rollback while SaaS excludes data APIs.
+    # Then: rollback APIs exist but fail closed without a current BFF session.
     assert route_statuses == {"/": 200, "/app": 200, "/legacy": 200}
     assert forbidden_statuses == {
-        "/api/settings": 404,
-        "/api/chat/sessions": 404,
-        "/api/ingest/documents": 404,
+        "/api/settings": 401,
+        "/api/chat/sessions": 401,
+        "/api/ingest/documents": 401,
     }
-    assert import_attempt.status_code == 404
+    assert import_attempt.status_code == 403
     assert _manifest(legacy_root) == before
 
     # And: reverting the mode requires no data migration and retains legacy bytes.

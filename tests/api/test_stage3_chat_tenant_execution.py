@@ -41,7 +41,7 @@ class _AuthResolver:
             "server-access",
             "server-refresh",
             2_000_000_000.0,
-            self.workspace_id,
+            active_workspace_id=self.workspace_id,
         )
         return AuthContext(
             session,

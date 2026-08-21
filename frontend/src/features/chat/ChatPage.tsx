@@ -109,7 +109,7 @@ export function ChatPage({
   }
 
   return (
-    <section aria-labelledby="page-title" className="rs-chat">
+    <section aria-label={t("nav_chat")} className="rs-chat">
       <header className="rs-chat__header">
         <p className="rs-page__subtitle">{t("chat_subtitle")}</p>
         <Drawer onOpenChange={setSidebarOpen} open={sidebarOpen}>

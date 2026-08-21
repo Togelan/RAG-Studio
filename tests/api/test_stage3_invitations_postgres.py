@@ -56,11 +56,27 @@ def _service(database_url: str) -> tuple[PostgresWorkspaceService, _CapturingMai
     )
 
 
-async def _cleanup(database_url: str, workspace_ids: tuple[UUID, ...]) -> None:
+async def _create_account(database_url: str, account_id: UUID) -> None:
+    connection = await asyncpg.connect(database_url, timeout=5.0)
+    try:
+        await connection.execute(
+            "INSERT INTO public.accounts (id, label) VALUES ($1, 'Task 5 test')",
+            account_id,
+        )
+    finally:
+        await connection.close(timeout=5.0)
+
+
+async def _cleanup(
+    database_url: str, workspace_ids: tuple[UUID, ...], account_ids: tuple[UUID, ...]
+) -> None:
     connection = await asyncpg.connect(database_url, timeout=5.0)
     try:
         await connection.execute(
             "DELETE FROM public.workspaces WHERE id = ANY($1::uuid[])", workspace_ids
+        )
+        await connection.execute(
+            "DELETE FROM public.accounts WHERE id = ANY($1::uuid[])", account_ids
         )
     finally:
         await connection.close(timeout=5.0)
@@ -72,9 +88,13 @@ async def test_invitation_acceptance_is_concurrent_idempotent_and_hash_only() ->
     database_url = _database_url()
     service, mailer = _service(database_url)
     owner_id = uuid4()
+    owner_account_id = uuid4()
     admin_id = uuid4()
+    await _create_account(database_url, owner_account_id)
     workspace = await service.create_workspace(
-        WorkspaceCreation(owner_id, "Concurrent Invite", "workspace-concurrent")
+        WorkspaceCreation(
+            owner_id, owner_account_id, "Concurrent Invite", "workspace-concurrent"
+        )
     )
     actor = WorkspaceActor(workspace.id, owner_id)
     command = InvitationCreation(
@@ -132,7 +152,7 @@ async def test_invitation_acceptance_is_concurrent_idempotent_and_hash_only() ->
         assert len(invitation["token_hash"]) == 64
         assert mailer.messages[0].token == mailer.messages[1].token
     finally:
-        await _cleanup(database_url, (workspace.id,))
+        await _cleanup(database_url, (workspace.id,), (owner_account_id,))
 
 
 @pytest.mark.asyncio
@@ -141,8 +161,12 @@ async def test_revoked_and_expired_invitations_deny_without_membership() -> None
     database_url = _database_url()
     service, mailer = _service(database_url)
     owner_id = uuid4()
+    owner_account_id = uuid4()
+    await _create_account(database_url, owner_account_id)
     workspace = await service.create_workspace(
-        WorkspaceCreation(owner_id, "Invite Failures", "workspace-failures")
+        WorkspaceCreation(
+            owner_id, owner_account_id, "Invite Failures", "workspace-failures"
+        )
     )
     actor = WorkspaceActor(workspace.id, owner_id)
     revoked = await service.create_invitation(
@@ -212,4 +236,4 @@ async def test_revoked_and_expired_invitations_deny_without_membership() -> None
         assert status_value == InvitationStatus.EXPIRED.value
         assert membership_count == 0
     finally:
-        await _cleanup(database_url, (workspace.id,))
+        await _cleanup(database_url, (workspace.id,), (owner_account_id,))

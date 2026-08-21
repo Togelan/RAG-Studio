@@ -175,6 +175,13 @@ def create_ui_router(configuration: UiServingConfiguration) -> APIRouter:
         """Serve an explicit React preview route."""
         return _react_preview_response(configuration)
 
+    @ui_router.get("/saas", response_class=HTMLResponse)
+    @ui_router.get("/saas/{retired_path:path}", response_class=HTMLResponse)
+    async def serve_retired_saas_route(retired_path: str = "") -> Response:
+        """Serve retired SaaS document requests through the unified React router."""
+        del retired_path
+        return _react_preview_response(configuration)
+
     @ui_router.get("/legacy", response_class=HTMLResponse)
     async def serve_legacy_welcome(request: Request) -> HTMLResponse:
         """Serve the explicit legacy Home rollback alias."""

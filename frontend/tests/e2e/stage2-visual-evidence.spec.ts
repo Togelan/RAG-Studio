@@ -1,4 +1,5 @@
 import { expect, type Page, type TestInfo, test } from "@playwright/test"
+import { mockAuthenticatedGroup1Session } from "./group1-auth-fixture"
 import { attachBundleIdentity } from "./task18-identity"
 
 const viewports = [
@@ -40,8 +41,9 @@ async function expectExactViewport(
   ).resolves.toBe(true)
 }
 
-test.beforeEach(async ({ browser }, testInfo) => {
+test.beforeEach(async ({ browser, page }, testInfo) => {
   void browser
+  await mockAuthenticatedGroup1Session(page)
   await attachBundleIdentity(testInfo)
 })
 

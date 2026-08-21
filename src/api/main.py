@@ -8,7 +8,7 @@ Handles:
 
 from __future__ import annotations
 
-import asyncio
+import asyncio  # noqa: ANYIO_OK
 import logging
 import os
 from collections.abc import AsyncGenerator
@@ -17,59 +17,41 @@ from pathlib import Path
 from typing import Any, assert_never, cast
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from src.api.chat_stream import MAX_CONCURRENT_STREAMS
 from src.api.dependencies import log_audit
 from src.api.rate_limiter import RateLimitMiddleware
-from src.api.react_ui import load_ui_serving_configuration
+from src.api.react_ui import UiMode, load_ui_serving_configuration
 from src.api.routes.chat import router as chat_router
 from src.api.routes.chat import set_graph, shutdown_chat_jobs
 from src.api.routes.health import router as health_router
-from src.api.routes.saas_auth import create_saas_auth_router
-from src.api.routes.saas_auth_confirmation import (
-    SupabaseConfirmationVerifier,
-    create_saas_auth_confirmation_router,
-)
-from src.api.routes.saas_chat import create_saas_chat_router
-from src.api.routes.saas_chatbots import create_saas_chatbots_router
-from src.api.routes.saas_rag import create_saas_rag_router
-from src.api.routes.saas_tenant_health import create_saas_tenant_health_router
-from src.api.routes.saas_workspaces import create_saas_workspaces_router
 from src.api.routes.settings import router as settings_router
 from src.api.routes.ui import create_ui_router
 from src.api.saas_auth_context import BffAuthContextResolver
-from src.api.saas_chat_persistence import TenantChatStore
-from src.api.saas_chat_runtime import TenantChatRuntime
-from src.api.saas_chatbot_store import PostgresChatbotService
-from src.api.saas_collection_registry import PostgresWorkspaceCollectionRegistry
-from src.api.saas_identity import SupabaseAccessTokenVerifier, SupabaseIdentityProvider
+from src.api.saas_composition import mount_saas_routes
 from src.api.saas_runtime import (
     RuntimeMode,
-    SaasConfigurationError,
     create_saas_runtime_router,
     load_runtime_configuration,
 )
 from src.api.saas_security import SaasCsrfMiddleware
-from src.api.saas_sessions import BffSessionStore
-from src.api.saas_tenant_graph import PersistentTenantGraphRunner
-from src.api.saas_workspace_context import PostgresMembershipResolver
-from src.api.saas_workspaces import create_postgres_workspace_service
 from src.graph import create_graph
 from src.graph.llm_provider import OpenAIProviderFactory
-from src.ingestion.embedder import get_embedder
 from src.ingestion.router import router as ingestion_router
 from src.paths import data_path
 from src.vector_store.client import (
     close_qdrant_client,
-    get_qdrant_client,
     wait_for_qdrant_ready,
 )
-from src.vector_store.tenant_resolver import TrustedTenantRagResolver
 
 logger = logging.getLogger(__name__)
+
+
+class CorsConfigurationError(ValueError):
+    """Raised when the explicit browser-origin allowlist is malformed."""
+
 
 # Shutdown timeout (AC-008.9)
 _SHUTDOWN_TIMEOUT = 10  # seconds
@@ -86,6 +68,18 @@ _CORS_HEADERS = ("Content-Type", "X-API-Key", "X-CSRF-Token")
 
 # Track in-progress tasks for graceful shutdown
 _pending_tasks: set[asyncio.Task[Any]] = set()
+
+
+def _mount_authenticated_personal_lab_routes(
+    app: FastAPI, auth_context: BffAuthContextResolver
+) -> None:
+    async def require_session(request: Request) -> None:
+        await auth_context.resolve(request, require_workspace=False)
+
+    dependencies = (Depends(require_session),)
+    app.include_router(ingestion_router, dependencies=dependencies)
+    app.include_router(chat_router, dependencies=dependencies)
+    app.include_router(settings_router, dependencies=dependencies)
 
 
 def _cors_origins_from_environment() -> tuple[str, ...]:
@@ -106,11 +100,11 @@ def _cors_origins_from_environment() -> tuple[str, ...]:
     for origin in configured_origins.split(","):
         origin = origin.strip()
         if not origin:
-            raise ValueError(
+            raise CorsConfigurationError(
                 "RAG_STUDIO_CORS_ORIGINS must not contain empty origin entries."
             )
         if origin == "*":
-            raise ValueError(
+            raise CorsConfigurationError(
                 "RAG_STUDIO_CORS_ORIGINS must list explicit origins; "
                 "'*' is not allowed."
             )
@@ -118,11 +112,11 @@ def _cors_origins_from_environment() -> tuple[str, ...]:
         try:
             parsed = urlsplit(origin)
         except ValueError as exc:
-            raise ValueError(f"Invalid CORS origin {origin!r}.") from exc
+            raise CorsConfigurationError(f"Invalid CORS origin {origin!r}.") from exc
         try:
             _ = parsed.port  # Validates malformed port values.
         except ValueError as exc:
-            raise ValueError(
+            raise CorsConfigurationError(
                 f"Invalid CORS origin {origin!r}: port must be a valid number."
             ) from exc
         if (
@@ -135,7 +129,7 @@ def _cors_origins_from_environment() -> tuple[str, ...]:
             or parsed.query
             or parsed.fragment
         ):
-            raise ValueError(
+            raise CorsConfigurationError(
                 f"Invalid CORS origin {origin!r}: use a complete HTTP(S) origin "
                 "without a path."
             )
@@ -259,10 +253,22 @@ def create_app() -> FastAPI:
     )
     app.state.ui_configuration = ui_configuration
     app.state.runtime_configuration = runtime_configuration
+    csrf_protected_roots: tuple[str, ...] = ("/api/saas",)
+    if (
+        runtime_configuration.mode is RuntimeMode.SAAS
+        and ui_configuration.mode is UiMode.REACT
+    ):
+        csrf_protected_roots += ("/api/settings", "/api/ingest", "/api/chat")
 
     # CORS middleware — allow local development
     # Apply per-IP sliding-window limits to API requests.
-    app.add_middleware(SaasCsrfMiddleware)
+    app.add_middleware(
+        SaasCsrfMiddleware,
+        trusted_origins=tuple(
+            str(origin).rstrip("/") for origin in runtime_configuration.trusted_origins
+        ),
+        protected_roots=csrf_protected_roots,
+    )
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -274,112 +280,20 @@ def create_app() -> FastAPI:
 
     # Mount route modules
     app.include_router(health_router)
+    if (
+        runtime_configuration.mode is RuntimeMode.LOCAL
+        or ui_configuration.mode is UiMode.LEGACY
+    ):
+        app.include_router(ingestion_router)
+        app.include_router(chat_router)
+        app.include_router(settings_router)
     match runtime_configuration.mode:
         case RuntimeMode.LOCAL:
-            app.include_router(ingestion_router)
-            app.include_router(chat_router)
-            app.include_router(settings_router)
+            pass
         case RuntimeMode.SAAS:
-            supabase_url = runtime_configuration.supabase_url
-            jwt_issuer = runtime_configuration.jwt_issuer
-            jwt_audience = runtime_configuration.jwt_audience
-            database_url = runtime_configuration.database_url
-            session_signing_key = runtime_configuration.session_signing_key
-            if (
-                supabase_url is None
-                or jwt_issuer is None
-                or jwt_audience is None
-                or database_url is None
-                or session_signing_key is None
-            ):
-                raise SaasConfigurationError(
-                    "Validated SaaS identity configuration is unavailable."
-                )
-            identity_provider = SupabaseIdentityProvider(str(supabase_url))
-            session_store = BffSessionStore()
-            token_verifier = SupabaseAccessTokenVerifier(
-                provider=identity_provider,
-                issuer=str(jwt_issuer),
-                audience=jwt_audience,
-            )
-            membership_resolver = PostgresMembershipResolver(
-                database_url.get_secret_value()
-            )
-            auth_context_resolver = BffAuthContextResolver(
-                token_verifier, session_store, membership_resolver
-            )
-            collection_registry = PostgresWorkspaceCollectionRegistry(
-                database_url.get_secret_value()
-            )
-            tenant_chat_runtime = TenantChatRuntime(
-                store=TenantChatStore(data_path("tenant-chat", "chat.sqlite3")),
-                execution_signing_key=session_signing_key.get_secret_value().encode(),
-                capacity=MAX_CONCURRENT_STREAMS,
-            )
-            chatbot_service = PostgresChatbotService(database_url.get_secret_value())
-            app.state.saas_session_store = session_store
-            app.state.saas_collection_registry = collection_registry
-            app.state.saas_chat_runtime = tenant_chat_runtime
-            app.state.saas_chatbot_service = chatbot_service
-            tenant_graph_runner = PersistentTenantGraphRunner(
-                checkpoint_path=str(data_path("checkpoints", "checkpoints.db")),
-                provider_factory=OpenAIProviderFactory(),
-                embedder=get_embedder(),
-            )
-            app.include_router(
-                create_saas_auth_router(
-                    identity_provider=identity_provider,
-                    token_verifier=token_verifier,
-                    session_store=session_store,
-                    membership_resolver=membership_resolver,
-                )
-            )
-            app.include_router(
-                create_saas_auth_confirmation_router(
-                    completion_url="/saas",
-                    verifier=SupabaseConfirmationVerifier(str(supabase_url)),
-                )
-            )
-            app.include_router(
-                create_saas_workspaces_router(
-                    auth_context_resolver,
-                    create_postgres_workspace_service(
-                        database_url.get_secret_value(), session_signing_key
-                    ),
-                )
-            )
-            app.include_router(
-                create_saas_tenant_health_router(
-                    auth_context_resolver=auth_context_resolver,
-                    registry=collection_registry,
-                )
-            )
-            app.include_router(
-                create_saas_chatbots_router(auth_context_resolver, chatbot_service)
-            )
-            app.include_router(
-                create_saas_chat_router(
-                    auth_context_resolver,
-                    tenant_chat_runtime,
-                    chatbot_service,
-                    store_resolver=TrustedTenantRagResolver(
-                        collection_registry,
-                        get_qdrant_client,
-                    ),
-                    graph_runner=tenant_graph_runner,
-                )
-            )
-            app.include_router(
-                create_saas_rag_router(
-                    auth_context_resolver,
-                    TrustedTenantRagResolver(
-                        collection_registry,
-                        get_qdrant_client,
-                    ),
-                    get_embedder(),
-                    chatbot_service,
-                )
-            )
+            auth_context = mount_saas_routes(app, runtime_configuration)
+            if ui_configuration.mode is UiMode.REACT:
+                _mount_authenticated_personal_lab_routes(app, auth_context)
         case unreachable:
             assert_never(unreachable)
     app.include_router(create_ui_router(ui_configuration))

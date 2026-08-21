@@ -6,15 +6,13 @@
 #   docker compose down
 #   docker compose logs -f
 
-version: "3.9"
-
 services:
   rag-studio:
+    profiles: ["legacy"]
     build:
       context: .
       dockerfile: Dockerfile
-    image: rag-studio:latest
-    container_name: rag-studio
+    image: rag-studio:legacy-stage2
     # Start as root only long enough for the entrypoint to chown host bind
     # mounts, then it re-execs the application as ragstudio.
     user: "0:0"
@@ -37,7 +35,7 @@ services:
       - RAG_STUDIO_DATA_ROOT=/app/data
       - QDRANT_PATH=/app/data/qdrant_storage
       - RAG_STUDIO_LOGS_PATH=/app/data/logs
-      - RAG_STUDIO_UI_MODE=${RAG_STUDIO_UI_MODE:-react}
+      - RAG_STUDIO_UI_MODE=legacy
       - RAG_STUDIO_REACT_DIST=/app/frontend/dist
       - RAG_STUDIO_RUNTIME_MODE=${RAG_STUDIO_RUNTIME_MODE:-local}
 
@@ -65,15 +63,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: rag-studio:latest
+    image: rag-studio:group1-stage3
     user: "0:0"
     ports:
       - "127.0.0.1:${RAG_STUDIO_SAAS_PORT:-8013}:8000"
     volumes:
-      - stage3-saas-data:/app/data
+      - stage3-app-data:/app/data
     environment:
       RAG_STUDIO_DATA_ROOT: /app/data
-      QDRANT_PATH: /app/data/qdrant_storage
+      QDRANT_URL: http://stage3-qdrant:6333
       RAG_STUDIO_LOGS_PATH: /app/data/logs
       RAG_STUDIO_UI_MODE: react
       RAG_STUDIO_REACT_DIST: /app/frontend/dist
@@ -81,9 +79,11 @@ services:
       RAG_STUDIO_SUPABASE_URL: http://stage3-auth:9999
       RAG_STUDIO_SUPABASE_JWT_ISSUER: ${STAGE3_SITE_URL:-http://127.0.0.1:8013}/auth/v1
       RAG_STUDIO_SUPABASE_JWT_AUDIENCE: authenticated
-      RAG_STUDIO_SUPABASE_DATABASE_URL: postgresql://postgres:${STAGE3_POSTGRES_PASSWORD:-}@stage3-db:5432/postgres
-      RAG_STUDIO_SESSION_SIGNING_KEY: ${RAG_STUDIO_SESSION_SIGNING_KEY:-}
-      RAG_STUDIO_CORS_ORIGINS: ${STAGE3_SITE_URL:-http://127.0.0.1:8013}
+      RAG_STUDIO_SUPABASE_DATABASE_URL: postgresql://postgres:${STAGE3_POSTGRES_PASSWORD:?Set STAGE3_POSTGRES_PASSWORD in the operator env file}@stage3-db:5432/postgres
+      RAG_STUDIO_SESSION_SIGNING_KEY: ${RAG_STUDIO_SESSION_SIGNING_KEY:?Set RAG_STUDIO_SESSION_SIGNING_KEY in the operator env file}
+      RAG_STUDIO_SESSION_ENCRYPTION_KEYS: ${RAG_STUDIO_SESSION_ENCRYPTION_KEYS:?Set RAG_STUDIO_SESSION_ENCRYPTION_KEYS in the operator env file}
+      RAG_STUDIO_CORS_ORIGINS: ${STAGE3_SITE_URL:?Set STAGE3_SITE_URL to the trusted public origin}
+      RAG_STUDIO_COOKIE_SECURE: ${STAGE3_COOKIE_SECURE:-false}
       RAG_STUDIO_INVITATION_SMTP_HOST: stage3-mail
       RAG_STUDIO_INVITATION_SMTP_PORT: "1025"
       RAG_STUDIO_INVITATION_SMTP_STARTTLS: "false"
@@ -95,14 +95,16 @@ services:
         condition: service_healthy
       stage3-db:
         condition: service_healthy
+      stage3-qdrant:
+        condition: service_healthy
       stage3-fake-deepseek:
         condition: service_started
-    mem_limit: 4g
-    cpus: "2"
+    mem_limit: 2g
+    cpus: "0.85"
     restart: unless-stopped
     stop_grace_period: 15s
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/saas/runtime"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -114,11 +116,11 @@ services:
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${STAGE3_POSTGRES_PASSWORD:-}
+      POSTGRES_PASSWORD: ${STAGE3_POSTGRES_PASSWORD:?Set STAGE3_POSTGRES_PASSWORD in the operator env file}
     volumes:
       - stage3-postgres-data:/var/lib/postgresql/data
-    mem_limit: 1g
-    cpus: "0.5"
+    mem_limit: 768m
+    cpus: "0.35"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
@@ -137,7 +139,7 @@ services:
       PGPORT: 5432
       PGDATABASE: postgres
       PGUSER: postgres
-      PGPASSWORD: ${STAGE3_POSTGRES_PASSWORD:-}
+      PGPASSWORD: ${STAGE3_POSTGRES_PASSWORD:?Set STAGE3_POSTGRES_PASSWORD in the operator env file}
     volumes:
       - ./docker/stage3/001-auth-schema.sql:/bootstrap/001-auth-schema.sql:ro
       - ./supabase/migrations:/bootstrap/migrations:ro
@@ -151,7 +153,7 @@ services:
           psql --no-psqlrc --set ON_ERROR_STOP=1 --file "$${migration}";
         done
     mem_limit: 128m
-    cpus: "0.1"
+    cpus: "0.05"
     restart: "no"
 
   stage3-auth:
@@ -169,7 +171,7 @@ services:
       GOTRUE_API_PORT: 9999
       API_EXTERNAL_URL: ${STAGE3_SITE_URL:-http://127.0.0.1:8013}/auth/v1
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgresql://postgres:${STAGE3_POSTGRES_PASSWORD:-}@stage3-db:5432/postgres?sslmode=disable&search_path=auth
+      GOTRUE_DB_DATABASE_URL: postgresql://postgres:${STAGE3_POSTGRES_PASSWORD:?Set STAGE3_POSTGRES_PASSWORD in the operator env file}@stage3-db:5432/postgres?sslmode=disable&search_path=auth
       GOTRUE_DB_NAMESPACE: auth
       GOTRUE_SITE_URL: ${STAGE3_SAAS_APP_URL:-http://127.0.0.1:8013/saas}
       GOTRUE_URI_ALLOW_LIST: ${STAGE3_SAAS_APP_URL:-http://127.0.0.1:8013/saas}
@@ -178,7 +180,7 @@ services:
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_JWT_EXP: 3600
-      GOTRUE_JWT_SECRET: ${STAGE3_GOTRUE_JWT_SECRET:-${STAGE3_JWT_SECRET:-}}
+      GOTRUE_JWT_SECRET: ${STAGE3_GOTRUE_JWT_SECRET:?Set STAGE3_GOTRUE_JWT_SECRET in the operator env file}
       GOTRUE_JWT_ISSUER: ${STAGE3_SITE_URL:-http://127.0.0.1:8013}/auth/v1
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
       GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
@@ -196,8 +198,8 @@ services:
       GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
       GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
       GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: 0
-    mem_limit: 512m
-    cpus: "0.5"
+    mem_limit: 384m
+    cpus: "0.2"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
@@ -210,8 +212,8 @@ services:
     image: axllent/mailpit:v1.30.0
     ports:
       - "127.0.0.1:${STAGE3_MAILPIT_HTTP_PORT:-8025}:8025"
-    mem_limit: 256m
-    cpus: "0.25"
+    mem_limit: 128m
+    cpus: "0.1"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
@@ -227,8 +229,29 @@ services:
       - ./docker/stage3/fake_openai_provider.py:/provider/fake_openai_provider.py:ro
     mem_limit: 128m
     cpus: "0.1"
+    restart: "no"
+
+  stage3-qdrant:
+    profiles: ["stage3"]
+    image: qdrant/qdrant:v1.15.4
+    volumes:
+      - stage3-qdrant-data:/qdrant/storage
+    mem_limit: 512m
+    cpus: "0.3"
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 &&
+          printf "GET /healthz HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3 &&
+          head -n 1 <&3 | grep -q " 200 "'
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
 volumes:
   stage3-postgres-data:
-  stage3-saas-data:
+  stage3-qdrant-data:
+  stage3-app-data:

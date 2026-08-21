@@ -197,11 +197,12 @@ def test_compose_and_template_default_to_react_with_bundled_distribution() -> No
         "stage3-db-bootstrap",
         "stage3-auth",
         "stage3-mail",
-        "stage3-fake-ollama",
+        "stage3-fake-deepseek",
+        "stage3-qdrant",
     )
 
     environment = _compose_environment()
-    assert "RAG_STUDIO_UI_MODE=${RAG_STUDIO_UI_MODE:-react}" in environment
+    assert "RAG_STUDIO_UI_MODE=legacy" in environment
     assert "RAG_STUDIO_REACT_DIST=/app/frontend/dist" in environment
 
     environment_template = ENV_EXAMPLE_PATH.read_text(encoding="utf-8")

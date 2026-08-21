@@ -1,8 +1,8 @@
 import { z } from "zod"
 
 import { type ApiClient, apiClient } from "../../../api/client"
+import { browserCsrfToken, csrfHeadersForMutation } from "../../../api/csrf"
 import {
-  ApiContractError,
   apiErrorFromResponse,
   isAbortError,
   StreamCancelledError,
@@ -96,32 +96,6 @@ function sessionPath(workspaceId: string, chatbotId: string, sessionId: string):
   return `${chatbotPath(workspaceId, chatbotId)}/sessions/${encodeURIComponent(sessionId)}`
 }
 
-function csrfToken(): string | null {
-  if (typeof document === "undefined") return null
-  const prefix = "__Host-ragstudio-csrf="
-  const cookie = document.cookie
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(prefix))
-  return cookie === undefined ? null : decodeURIComponent(cookie.slice(prefix.length))
-}
-
-async function ensureCsrfToken(
-  fetchImplementation: typeof fetch,
-  signal: AbortSignal,
-): Promise<string> {
-  let token = csrfToken()
-  if (token !== null && token !== "") return token
-  const response = await fetchImplementation("/api/saas/auth/csrf", {
-    credentials: "same-origin",
-    signal,
-  })
-  if (!response.ok) throw apiErrorFromResponse(response)
-  token = csrfToken()
-  if (token === null || token === "") throw new ApiContractError()
-  return token
-}
-
 async function consumeStream(response: Response, options: StreamOptions): Promise<void> {
   if (!response.ok) throw apiErrorFromResponse(response)
   if (response.body === null) throw new StreamProtocolError()
@@ -191,16 +165,24 @@ export function createTestChatStreamGateway(
 ): TestChatStreamGateway {
   return {
     send: async (workspaceId, chatbotId, sessionId, input, options) => {
-      const token = await ensureCsrfToken(fetchImplementation, options.signal)
+      const path = `${sessionPath(workspaceId, chatbotId, sessionId)}/messages`
+      const csrfHeaders = await csrfHeadersForMutation(path, {
+        establish: () =>
+          fetchImplementation("/api/saas/auth/csrf", {
+            credentials: "same-origin",
+            signal: options.signal,
+          }),
+        readToken: browserCsrfToken,
+      })
       await openTestStream(
         fetchImplementation,
-        `${sessionPath(workspaceId, chatbotId, sessionId)}/messages`,
+        path,
         {
           body: JSON.stringify(input),
           headers: {
             Accept: "text/event-stream",
             "Content-Type": "application/json",
-            "X-CSRF-Token": token,
+            ...csrfHeaders,
           },
           method: "POST",
         },

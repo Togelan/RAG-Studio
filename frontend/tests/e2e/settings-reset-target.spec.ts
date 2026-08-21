@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { mockAuthenticatedGroup1Session } from "./group1-auth-fixture"
 
 const viewports = [
   { height: 1024, name: "tablet", width: 768 },
@@ -6,6 +7,10 @@ const viewports = [
 ] as const
 
 test.describe("Settings Reset to default target", () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuthenticatedGroup1Session(page)
+  })
+
   for (const viewport of viewports) {
     test(`is at least 44px at ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize({ height: viewport.height, width: viewport.width })

@@ -3,6 +3,7 @@ import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import AxeBuilder from "@axe-core/playwright"
 import { expect, type Page, test } from "@playwright/test"
+import { mockAuthenticatedGroup1Session } from "./group1-auth-fixture"
 import { attachBundleIdentity } from "./task18-identity"
 
 const viewports = [
@@ -29,8 +30,9 @@ test("writes Playwright artifacts outside frontend lint inputs", ({ browser }, t
   expect(existsSync(resolve(frontendRoot, ".omo"))).toBe(false)
 })
 
-test.beforeEach(async ({ browser }, testInfo) => {
+test.beforeEach(async ({ browser, page }, testInfo) => {
   void browser
+  await mockAuthenticatedGroup1Session(page)
   await attachBundleIdentity(testInfo)
 })
 
@@ -99,13 +101,7 @@ test.describe("Stage 2 responsive shell", () => {
         await expect(page.locator(".rs-shell")).toHaveClass(
           route.workspace ? /rs-shell--workspace/ : /^rs-shell$/,
         )
-        const disabledDashboard = page.locator(".rs-shell__nav-link--disabled")
-        await expect(disabledDashboard).toHaveCount(2)
-        await expect(
-          disabledDashboard.evaluateAll((elements) =>
-            elements.every((element) => !element.hasAttribute("href")),
-          ),
-        ).resolves.toBe(true)
+        await expect(page.locator(".rs-shell__nav-link--disabled")).toHaveCount(0)
         await expect(page.locator(".rs-health")).not.toBeEmpty()
         await assertNoOverflow(page)
 

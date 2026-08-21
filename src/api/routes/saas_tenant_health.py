@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Protocol, assert_never
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict
 
 from src.api.saas_auth_context import AuthContext
@@ -54,7 +54,9 @@ def create_saas_tenant_health_router(
     router = APIRouter(prefix="/api/saas/tenant-storage", tags=["saas-storage"])
 
     @router.get("/readiness", response_model=TenantStorageStatus)
-    async def tenant_storage_readiness(request: Request) -> TenantStorageStatus:
+    async def tenant_storage_readiness(
+        request: Request, response: Response
+    ) -> TenantStorageStatus:
         auth_context = await auth_context_resolver.resolve(
             request, require_workspace=True
         )
@@ -78,6 +80,7 @@ def create_saas_tenant_health_router(
                 public_state = TenantStoragePublicState.PROVISIONING
             case WorkspaceCollectionState.FAILED:
                 public_state = TenantStoragePublicState.DEGRADED
+                response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
             case WorkspaceCollectionState.ARCHIVED:
                 raise HTTPException(status_code=403, detail="Workspace is unavailable.")
             case unreachable:

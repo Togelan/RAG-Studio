@@ -116,6 +116,50 @@ describe("SaaS ApiClient boundary", () => {
     })
   })
 
+  it.each(["/api/settings", "/api/ingest/documents", "/api/chat/sessions"])(
+    "adds CSRF proof for protected Personal Lab mutations at %s",
+    async (path) => {
+      const requests: RecordedRequest[] = []
+      const client = new ApiClient(
+        fetch,
+        recordingHttp(() => new Response("{}", { status: 200 }), requests),
+        () => "csrf-proof",
+      )
+
+      await client.post(path, {}, z.object({}).strict())
+
+      expect(requests[0]?.options.headers).toEqual({ "X-CSRF-Token": "csrf-proof" })
+    },
+  )
+
+  it.each(["/api/settings", "/api/ingest/documents", "/api/chat/sessions"])(
+    "renews expired CSRF state before protected Personal Lab mutations at %s",
+    async (path) => {
+      // Given: a long-lived BFF session whose short-lived CSRF companion expired.
+      const requests: RecordedRequest[] = []
+      const token = vi.fn<() => string | null>()
+      token.mockReturnValueOnce(null).mockReturnValue("renewed-proof")
+      const client = new ApiClient(
+        fetch,
+        recordingHttp(
+          (input) =>
+            input === "/api/saas/auth/csrf"
+              ? new Response(null, { status: 204 })
+              : new Response("{}", { status: 200 }),
+          requests,
+        ),
+        token,
+      )
+
+      // When: Personal Lab performs its next protected mutation.
+      await client.post(path, {}, z.object({}).strict())
+
+      // Then: the BFF refreshes proof first and the mutation receives it.
+      expect(requests.map(({ input }) => input)).toEqual(["/api/saas/auth/csrf", path])
+      expect(requests[1]?.options.headers).toEqual({ "X-CSRF-Token": "renewed-proof" })
+    },
+  )
+
   it("supports PUT, DELETE bodies, and valid empty responses", async () => {
     // Given: SaaS endpoints that rotate workspace context and archive by version.
     const requests: RecordedRequest[] = []

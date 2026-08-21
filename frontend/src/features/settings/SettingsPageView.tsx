@@ -15,7 +15,6 @@ export function SettingsHero(): React.JSX.Element {
         <p className="rs-settings-hero__eyebrow">
           <Workflow aria-hidden="true" size={16} /> {t("settings_workspace_eyebrow")}
         </p>
-        <p className="rs-settings-hero__title">{t("settings_title")}</p>
         <p>{t("settings_subtitle")}</p>
       </div>
       <div

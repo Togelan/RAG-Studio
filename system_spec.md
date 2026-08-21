@@ -2,8 +2,14 @@
 
 > **Owner:** @ba (Business Analyst)
 > **Status:** APPROVED
-> **Version:** 3.0.0
-> **Last Updated:** 2026-08-14
+> **Version:** 3.1.0
+> **Last Updated:** 2026-08-19
+>
+> **v3.1.0 Changelog (Approved unified RAG-Studio product direction):**
+> - Added FR-021–FR-032 as the future unified-product completion stage, based on the approved end-state brief in `sandbox/end_migration/describe.md`.
+> - Established RAG-Studio as the sole user-facing product shell; “SaaS” remains an internal multi-tenant capability, not a separate application, navigation, or brand.
+> - Added explicit requirements for Account-level billing boundaries, Personal Lab, source bindings, Agents, secure Widget Bots, usage/audit, safe archival/deletion, and Legacy cutover.
+> - Preserved FR-001–FR-020 as accepted staged requirements. FR-021–FR-032 refine their eventual user-facing composition and do not claim earlier requirements are complete.
 >
 > **v3.0.0 Changelog (Approved staged SaaS migration):**
 > - FR-011 and its changes to FR-001/002/005/008/010 are the completed Stage 1 regression baseline.
@@ -26,7 +32,7 @@
 
 RAG-Studio currently runs as a **local-first Desktop tool** that lets ordinary users bring their own API key, upload documents, and chat with them through RAG. FR-001–FR-011 define this implemented baseline.
 
-The approved target is a **locally runnable, hosting-ready multi-tenant SaaS**. It retains FastAPI, LangGraph, and Qdrant, introduces a React/TypeScript/Tailwind/shadcn frontend, uses Supabase for authentication and organization data, uses Stripe test mode for billing, isolates each workspace in a separate Qdrant collection, and provides an embeddable Shadow-DOM chatbot widget. The complete customer flow must work locally before production hosting is provisioned.
+The approved target is one **locally runnable, hosting-ready RAG-Studio product** with multi-tenant capabilities. It retains FastAPI, LangGraph, and Qdrant, introduces a React/TypeScript/Tailwind/shadcn interface, uses Supabase for authentication and organization data, reserves Stripe test mode for a separately gated billing phase, isolates each workspace in a separate Qdrant collection, and provides an embeddable Shadow-DOM chatbot widget. The complete customer flow must work locally before production hosting is provisioned. There is no separate user-facing “SaaS” application after the unified cutover.
 
 **Target Audience:** company owners, administrators, and members who need a shared knowledge chatbot for internal testing and approved public websites. The legacy personal workflow remains intact until its staged replacement is verified.
 
@@ -63,7 +69,7 @@ The approved target is a **locally runnable, hosting-ready multi-tenant SaaS**. 
 The diagram above is the current Stage 1 runtime. The approved migration target is:
 
 ```text
-React SaaS frontend and Shadow-DOM widget
+Unified RAG-Studio React frontend and Shadow-DOM widget
                  |
                  v
              FastAPI BFF
@@ -1211,17 +1217,17 @@ data            per-workspace Qdrant collections
 
 ---
 
-## FR-017: Stripe Test-Mode Billing and Entitlements
+## FR-017: Stripe Test-Mode Billing and Account Entitlements
 
 ### User Story
-**As a** workspace owner,
+**As an** Account Owner,
 **I want** a safe self-service subscription flow with predictable plan limits,
 **So that** I can trial, select, change, and manage service without real charges during local customer validation.
 
 ### Acceptance Criteria
 
 #### AC-017.1: Trial and Three-Plan Catalog
-**Given** a new billable workspace is created
+**Given** a new billable Account is created
 **When** its billing record is initialized
 **Then** it receives a 14-day trial
 **And** exactly three launch plans are available from one versioned server-side catalog
@@ -1229,7 +1235,7 @@ data            per-workspace Qdrant collections
 **And** pricing and quota values are configurable without changing authorization code
 
 #### AC-017.2: Test-Mode Checkout and Portal
-**Given** I am the workspace owner and Stripe test-mode configuration is valid
+**Given** I am the Account Owner and Stripe test-mode configuration is valid
 **When** I start checkout, change a plan, or open the customer portal
 **Then** FastAPI creates the corresponding Stripe test-mode session
 **And** test cards create no real charge
@@ -1244,7 +1250,7 @@ data            per-workspace Qdrant collections
 **And** invalid signatures receive a sanitized error and perform no write
 
 #### AC-017.4: Server-Side Entitlement Enforcement
-**Given** a workspace exceeds an active-chatbot, indexed-storage, or monthly-widget-message limit
+**Given** an Account exceeds an active-chatbot, indexed-storage, or monthly-widget-message limit
 **When** a user or widget attempts the limited operation
 **Then** FastAPI blocks the operation before the resource is consumed
 **And** existing company data remains readable and is not deleted automatically
@@ -1252,19 +1258,19 @@ data            per-workspace Qdrant collections
 
 #### AC-017.5: Plan Change and Failure Behavior
 **Given** a subscription is upgraded, downgraded, cancelled, past due, or still awaiting a webhook
-**When** the workspace makes an entitled request
+**When** the Account makes an entitled request
 **Then** the last verified entitlement and documented grace behavior are applied deterministically
 **And** repeated or out-of-order events converge to the Stripe subscription state
 **And** Stripe secrets, webhook payload internals, and stack traces are not exposed to the browser
 
 ### Technical Notes
-- Expected change areas are billing routes/services under `src/api/`, Supabase billing/usage migrations, React pricing and billing surfaces under `frontend/`, webhook fixtures, and entitlement/integration tests.
+- Expected change areas are billing routes/services under `src/api/`, Supabase Account billing/usage migrations, React pricing and billing surfaces under `frontend/`, webhook fixtures, and entitlement/integration tests.
 - Stripe test mode is required for local validation. Webhooks, not success/cancel redirects, are authoritative.
-- Exact prices and quotas are selected in the FR-017 implementation plan and stored in a versioned plan catalog; the three dimensions above are fixed acceptance requirements.
+- FR-029 supplies the no-payment placeholder and local entitlement foundation first. Exact prices and quotas are selected in the FR-017 implementation plan and stored in a versioned plan catalog; the three dimensions above are fixed acceptance requirements.
 
 ---
 
-## FR-018: SaaS Landing Page, Pricing, and Conversion Flow
+## FR-018: RAG-Studio Landing Page, Pricing, and Conversion Flow
 
 ### User Story
 **As a** prospective customer,
@@ -1358,7 +1364,7 @@ data            per-workspace Qdrant collections
 
 ### User Story
 **As a** local customer evaluator,
-**I want** a reproducible demonstration of the completed SaaS journey,
+**I want** a reproducible demonstration of the completed RAG-Studio journey,
 **So that** I can confirm the migration works before approving server hosting.
 
 ### Acceptance Criteria
@@ -1394,6 +1400,621 @@ data            per-workspace Qdrant collections
 
 ---
 
+## Unified Product Completion Stage
+
+### Canonical product boundary
+
+FR-021 through FR-032 complete the agreed end state. They retain the proven
+local RAG mechanisms from FR-001 through FR-011 and reuse the authentication,
+tenant, and widget foundations from FR-013 through FR-020 where safe. They do
+not create a second application. After cutover, **RAG-Studio** is the only
+user-facing product name and shell; multi-tenant collaboration is an internal
+capability exposed as Accounts, Workspaces, Agents, Widget Bots, and Billing.
+
+The following decisions are authoritative for this stage:
+
+- a User can own one or more Accounts and can be an owner, admin, or member of
+  Workspaces in other Accounts;
+- Account owns subscription/entitlements and account-wide limits; Workspace
+  owns shared knowledge and operational resources;
+- Personal Lab is the authenticated user's private/local experiment context;
+- Workspace sources are indexed once in its tenant collection and Agents bind
+  only to selected sources;
+- an Agent controls RAG behavior; a Widget Bot is an independently configured
+  public channel that uses one Agent;
+- only Account Owners perform billing and irreversible account/workspace
+  operations; Workspace Admins operate permitted shared resources but do not
+  delete a Workspace; Members use allowed Agents only;
+- real Stripe checkout, live commercial prices, tax, and production legal
+  retention remain separately gated. The initial requirement is a truthful
+  Billing placeholder and server-side local entitlement model, not a fake
+  payment flow.
+
+All UI work in this stage modifies FR-012 and follows the mandatory visual
+pipeline plus in-app Browser evidence. Each implementation task must cite one
+primary FR below and every earlier FR it changes or regression-tests.
+
+---
+
+## FR-021: Unified RAG-Studio Shell and Design-System Cutover
+
+### User Story
+**As a** RAG-Studio user,
+**I want** one modern application shell for my personal and shared work,
+**So that** I never need to decide whether a capability belongs to a separate
+SaaS application or to RAG-Studio.
+
+### Acceptance Criteria
+
+#### AC-021.1: One Canonical User-Facing Product
+**Given** the authenticated React product is available
+**When** I navigate Home, Chat, Knowledge, Workspaces, Agents, Widget Bots,
+Settings, Usage, or Billing
+**Then** each destination renders inside one RAG-Studio shell with one top-level
+navigation model, design-token system, account controls, and responsive drawer
+behavior
+**And** no user-facing route, navigation item, title, or redirect presents a
+separate SaaS product or competing SaaS shell
+**And** a deep link to a retired SaaS route either maps to its canonical
+RAG-Studio route without losing authorized context or returns a sanitized,
+recoverable not-found outcome.
+
+#### AC-021.2: Context-Explicit Navigation and Permission-Honest UI
+**Given** I have access to Personal Lab and at least one Workspace
+**When** I select a context from the labelled context switcher
+**Then** the header visibly identifies `Personal Lab` or the active Workspace
+and my effective role before dependent data is shown
+**And** navigation, actions, empty states, and permission explanations match
+the server-confirmed role rather than merely hiding a route after it loads
+**And** a revoked, archived, or unavailable selection clears stale workspace
+and Agent state and does not display resources from the prior context.
+
+#### AC-021.3: Unified Design and Browser Evidence
+**Given** a unified RAG-Studio route is implemented
+**When** it is rendered at 360 px, 768 px, and 1440 px in English and Russian
+**Then** it uses `DESIGN.md` semantic tokens, accessible labels/focus behavior,
+functional motion, loading/empty/error/forbidden states, and no unintended
+horizontal overflow
+**And** the in-app Browser evidence records the active context, viewport,
+locale, route, visible result, and a screenshot for visual changes.
+
+### Technical Notes
+- Depends on FR-012 and reuses its React/Tailwind/shadcn primitives. Expected
+  change areas are `frontend/`, FastAPI UI/static routing, locale files, and
+  route-compatibility tests; exact modules belong to the implementation plan.
+- The approved dark-first SaaS visual language is transferred into RAG-Studio;
+  it is not deleted. Old Jinja styling remains only as a verified rollback
+  path until the cutover criteria in FR-032 pass.
+- Excludes invention of workspace resources, billing, or widget behavior before
+  the relevant owning FR. A navigation destination may not be rendered as a
+  fake working control.
+
+---
+
+## FR-022: Identity, Account Membership, and Secure Authentication Context
+
+### User Story
+**As a** user who may own an organization and collaborate in other
+organizations,
+**I want** one secure identity with clear Account and Workspace memberships,
+**So that** access and payment responsibility are never confused.
+
+### Acceptance Criteria
+
+#### AC-022.1: Multi-Account Identity and Membership Resolution
+**Given** a signed-in user owns Account A and has an active membership in a
+Workspace belonging to Account B
+**When** the user lists available contexts or switches Account/Workspace
+**Then** FastAPI resolves identity, Account, membership, effective role, and
+Workspace status from trusted server-side records
+**And** the user can use only Workspaces with an active membership while
+remaining unable to read Account B billing or ownership data unless they are
+its Account Owner
+**And** a client-provided account or workspace identifier alone never grants
+authority.
+
+#### AC-022.2: Authentication, Revocation, and Cross-Site Safety
+**Given** a protected RAG-Studio route or mutation is requested
+**When** the session is absent, expired, signed out, revoked, or has an invalid
+CSRF/request-authentication proof
+**Then** the BFF rejects it before protected data, Qdrant, or a provider call
+with a sanitized `401` or `403`
+**And** the UI clears sensitive active context and offers the appropriate
+sign-in or recoverable selection path
+**And** refresh, sign-out, invitation acceptance, and membership revocation
+leave no usable browser token, stale authorization cache, or partial mutation.
+
+### Technical Notes
+- Extends FR-013; Supabase Auth/Postgres/RLS remain the identity and relational
+  authority. FastAPI remains the sole trusted BFF; browser code must not use a
+  service-role credential or authorize itself from local state.
+- The Account model needs immutable IDs, an Account Owner relationship, and
+  Account-to-Workspace relation. A user may have memberships across Accounts.
+  Ownership transfer and account deletion are excluded until an explicit
+  product decision and owning FR are approved.
+- Expected concerns include session cookies, CSRF, JWKS/key rotation, stale
+  tab/revocation handling, invitation-token redaction, audit records, and
+  negative cross-account/RLS tests.
+
+---
+
+## FR-023: Personal Lab Parity and Explicit Promotion to Shared Work
+
+### User Story
+**As a** signed-in individual user,
+**I want** a private Personal Lab that retains the complete local RAG workflow,
+**So that** I can safely test documents and strategies before sharing a
+deliberate configuration with a Workspace.
+
+### Acceptance Criteria
+
+#### AC-023.1: Private Personal Lab RAG Parity
+**Given** I select `Personal Lab`
+**When** I upload a supported document, change existing RAG settings, and chat
+with it
+**Then** the full FR-001–FR-011 document, chunking, retrieval, citation,
+streaming, cancellation, feedback, and session behavior remains available in
+the unified React UI
+**And** its documents, settings, sessions, and provider-key boundary are
+private to my identity/local context and never appear in a shared Workspace
+without an explicit operation.
+
+#### AC-023.2: Explicit Agent Promotion Without Hidden Data Movement
+**Given** my Personal Lab contains an eligible configuration and selected
+source snapshot
+**When** I choose `Create agent from Personal Lab` and select a Workspace where
+I am an Owner or Admin
+**Then** the UI previews the configuration and selected data scope before
+confirmation
+**And** the resulting Workspace Agent records a new identity and copied
+configuration/source snapshot without copying provider secrets or creating a
+hidden live link to Personal Lab data
+**And** cancellation or failure preserves the Personal Lab and creates no
+partial shared Agent.
+
+### Technical Notes
+- Depends on FR-021 and modifies FR-004–FR-012. Personal Lab is not an
+  unlabelled default Workspace, an account billing resource, or an automatic
+  migration path for legacy documents, vectors, settings, sessions, or keys.
+- Implementation must state the persistence boundary explicitly: local/private
+  data may reuse current safe local persistence, while the shared copy requires
+  a user-confirmed ingest/import contract. Exact cross-device synchronization
+  is **TBD** and is not implied by this FR.
+- The UI must identify scope on every setting and source action. A future
+  personal sandbox capability copied from a shared Agent belongs to FR-026.
+
+---
+
+## FR-024: Workspace Lifecycle, Membership Roles, and Account-Level Limits
+
+### User Story
+**As an** Account Owner or Workspace collaborator,
+**I want** predictable Workspace lifecycle and role behavior,
+**So that** a department leader can share controlled RAG resources without
+asking every employee to purchase a subscription.
+
+### Acceptance Criteria
+
+#### AC-024.1: Role Matrix Enforced in UI and BFF
+**Given** an active Workspace has Owner, Admin, and Member users
+**When** each role attempts the same Workspace operation through the UI and
+direct API calls
+**Then** the Owner can manage billing placeholder visibility, membership,
+archive/restore, ownership operations where implemented, sources, Agents, and
+Widget Bots
+**And** the Admin can operate sources, Agents, Widget Bots, invitations, and
+operational usage but cannot delete/archive the Workspace, change billing, or
+transfer ownership
+**And** the Member can use only permitted enabled Agents and cannot mutate
+shared sources, Agent configuration, Widget Bots, membership, billing, or
+audit data; all denials are server-side `403` with no partial write.
+
+#### AC-024.2: Account-Wide Limit Decision and Workspace State
+**Given** an Account has a server-side entitlement record and a configured
+Workspace limit
+**When** its Owner creates, restores, or imports a Workspace
+**Then** the BFF counts active resources at the Account boundary before any
+tenant collection or relational record is provisioned
+**And** a limit denial returns a deterministic, localized explanation that
+identifies the owner action without deleting existing data
+**And** archived Workspaces are excluded from ordinary navigation and resource
+creation until restored, while their access is rejected consistently for stale
+tabs and API requests.
+
+### Technical Notes
+- Extends FR-013 and FR-017's existing role/entitlement foundations. Account
+  pays; invited employees require only identity and active membership. Numeric
+  Free/Team/Business quotas, prices, currencies, taxes, and overages are **TBD**
+  and must be stored in a versioned catalog rather than hard-coded.
+- The launch roles are exactly `owner`, `admin`, and `member`. `viewer`, custom
+  roles, SCIM, and SSO are explicit future scope.
+- Workspace lifecycle initially requires `active` and `archived`; pending
+  deletion/purge behavior is owned by FR-031. All membership and role changes
+  produce redacted audit events and invalidate applicable authorization caches.
+
+---
+
+## FR-025: Workspace Knowledge Library and Agent Source Bindings
+
+### User Story
+**As a** Workspace Owner or Admin,
+**I want** shared sources and explicit Agent-to-source bindings,
+**So that** several Agents can safely use different subsets of the same
+company knowledge without duplicating embeddings.
+
+### Acceptance Criteria
+
+#### AC-025.1: Source Lifecycle and Shared Indexing
+**Given** I am authorized to manage Workspace knowledge
+**When** I upload, replace, archive, re-index, or request deletion of a source
+**Then** its visible lifecycle is `queued`, `uploading`, `extracting`,
+`preparing`, `indexing`, `ready`, `failed`, `archived`, or deletion/purge state
+as applicable
+**And** a ready source is indexed once in only the active Workspace's tenant
+collection/namespace with source metadata sufficient for retrieval, citation,
+retry, and safe replacement
+**And** a failed replacement preserves the prior complete source index and a
+member cannot perform any source mutation through either UI or API.
+
+#### AC-025.2: Binding-Constrained Retrieval and Dependency Warnings
+**Given** two enabled Agents in one Workspace bind to different source sets
+**When** each Agent receives the same question
+**Then** retrieval, cache scope, citations, and generation use only that
+Agent's current approved source bindings and never fall back to all Workspace
+sources or a global legacy collection
+**And** a source deletion, archive, or re-index request lists affected Agents
+and Widget Bots and requires an explicit, auditable resolution before unsafe
+removal
+**And** adversarial tests across two Workspaces observe zero leaked source,
+embedding, citation, or cached answer content.
+
+### Technical Notes
+- Extends FR-001, FR-002, FR-010, FR-011, and FR-014. The default model is
+  `workspace collection + source_id metadata + agent_source_bindings`; it is
+  not a collection per Agent and does not duplicate a source for each binding.
+- Workspace defaults can set RAG policy. Agent-level changes to chunking or
+  embedding settings must tell the user whether a binding/source re-index is
+  required and must use safe replacement, cancellation, idempotency, and
+  bounded admission. Exact per-agent physical index design is selected only
+  after measured retrieval correctness and cost evidence.
+- Private Agent knowledge is explicitly excluded from the first unified
+  cutover; it requires a later policy, retention, and namespace FR.
+
+---
+
+## FR-026: Agent Configuration, Lifecycle, and Personal Sandboxes
+
+### User Story
+**As a** Workspace Owner or Admin,
+**I want** reusable Agents with complete RAG settings and safe lifecycle,
+**So that** each department can use a purpose-built assistant over approved
+knowledge while members cannot silently alter shared behavior.
+
+### Acceptance Criteria
+
+#### AC-026.1: Full Agent Configuration with Explicit Inheritance
+**Given** I am an Owner or Admin in an active Workspace
+**When** I create or edit an Agent
+**Then** I can set localized name, description, provider/model boundary,
+system instructions, temperature, max tokens, retrieval strategy, top-k/context
+budget, chunking override policy, reranking, source bindings, citation mode,
+locale, test policy, lifecycle state, and optimistic version
+**And** each inherited value identifies whether it comes from Personal default,
+Workspace default, or Agent override
+**And** validation, concurrent-edit conflict, or re-index-required conditions
+produce field-level/recoverable results without a partial Agent update.
+
+#### AC-026.2: Lifecycle, Member Use, and Isolated Sandbox Copy
+**Given** an enabled shared Agent is available to a Member
+**When** the Member uses it or chooses the allowed personal-sandbox action
+**Then** the Member can start a permitted shared chat but cannot change the
+source Agent, its bindings, or Workspace settings
+**And** a personal sandbox is a separately identified private copy/snapshot
+with no provider secret, production Widget, membership, or implicit access to
+future Workspace source changes
+**And** disabling or archiving a shared Agent blocks new shared and Widget
+sessions deterministically while preserving documents, prior sessions, and
+audit history.
+
+### Technical Notes
+- Evolves FR-015's `chatbot` terminology to the user-facing term `Agent`;
+  data migrations must preserve existing chatbot records or provide an explicit
+  reversible mapping. It does not permit silent deletion of related sources or
+  widgets.
+- Agent lifecycle is `draft/creating → enabled → disabled → archived`.
+  Version/ETag-style optimistic concurrency is mandatory for configuration
+  writes. The policy enabling Member sandbox copies is enabled by the agreed
+  product direction; plan-specific limits remain **TBD**.
+- Provider credentials remain server/private and must not enter LangGraph
+  checkpoints, browser state, audit events, or logs.
+
+---
+
+## FR-027: Unified Context-Scoped Chat and Session Continuity
+
+### User Story
+**As a** Personal Lab user or Workspace member,
+**I want** one Chat experience that clearly scopes every conversation,
+**So that** changing Workspace or Agent never mixes knowledge, history, or
+permissions.
+
+### Acceptance Criteria
+
+#### AC-027.1: Explicit Conversation Scope and Streaming Parity
+**Given** I open Chat in Personal Lab or an active Workspace
+**When** I select an allowed Agent and start a conversation
+**Then** the header identifies the context as `Agent · Workspace` or Personal
+Lab before a message is sent
+**And** the session records opaque account/workspace/agent/user/session scope,
+supports existing streaming, Stop/cancel, reconnect, citations, feedback,
+rename, and delete behavior, and never automatically combines history after an
+Agent or Workspace switch
+**And** a disabled Agent, revoked membership, archived Workspace, or expired
+session blocks new messages before RAG execution with a sanitized recoverable
+state.
+
+#### AC-027.2: Trusted RAG, Cache, and Checkpoint Isolation
+**Given** two users, Workspaces, or Agents submit identical prompts
+**When** retrieval, semantic cache, checkpoint persistence, or stream
+reattachment occurs
+**Then** every key and query is scoped by trusted context and current source
+bindings, not a client-supplied collection/session ID
+**And** provider credentials, raw provider exceptions, and unauthorised source
+content never appear in checkpoints, session APIs, browser state, or logs
+**And** cancellation/disconnect or retry leaves no partial assistant message,
+cross-context cache hit, or duplicate feedback/write.
+
+### Technical Notes
+- Depends on FR-022, FR-025, and FR-026; modifies FR-003 and FR-006. Existing
+  local sessions remain available through Personal Lab until an explicit,
+  user-controlled migration contract is approved.
+- Session IDs and checkpointer keys must be opaque and HMAC-scoped. Stream
+  reattach/cancel semantics must be bounded at the stated concurrency limit;
+  transition or route change aborts client work only after server authority
+  decides the result.
+- The single Chat route replaces separate local/chatbot-test user journeys;
+  it does not make one session shareable across users by default.
+
+---
+
+## FR-028: Widget Bot Lifecycle, Configuration, and Secure Public Runtime
+
+### User Story
+**As a** Workspace Owner or Admin,
+**I want** to publish a configured Agent as a safe, branded website widget,
+**So that** external visitors can use approved knowledge without receiving
+workspace credentials or internal data.
+
+### Acceptance Criteria
+
+#### AC-028.1: Versioned Widget Bot Configuration and Publishing
+**Given** I can manage Widgets in an active Workspace and the linked Agent is
+eligible
+**When** I create or edit a Widget Bot in `draft`
+**Then** General, Appearance, Behavior, Security, Install, and Analytics
+settings are separately labelled and linked to exactly one Agent
+**And** changes remain draft until `Publish changes` displays a configuration
+diff and publishes a new version to `preview`/`published` state
+**And** a disabled, archived, entitlement-blocked, or source-ineligible Agent
+cannot receive new public Widget sessions.
+
+#### AC-028.2: Public Runtime Safety and Channel Policies
+**Given** a published Widget appears on an approved host origin
+**When** an anonymous or signed identified visitor starts a conversation
+**Then** the BFF validates Widget status, exact origin allowlist, short-lived
+widget session proof, Agent availability, entitlement, message/session limit,
+and rate limits before any RAG call
+**And** the Shadow-DOM widget keeps its own styles, focus, mobile/reduced-motion
+behavior, compact/redacted public citations, and configured transcript policy
+without exposing provider keys, internal IDs, raw source metadata, or
+workspace data
+**And** an unapproved origin, disabled Widget, over-limit visitor, or malformed
+identity proof is rejected with a sanitized result and an auditable redacted
+event.
+
+### Technical Notes
+- Extends FR-016. One Agent may back several Widgets; each Widget owns its own
+  public ID, domains, branding, version, transcript/citation policy, and
+  limits. Public IDs are non-secret identifiers, never authorization tokens.
+- Baseline lifecycle is `draft → preview → published → disabled → archived`.
+  `postMessage` and CORS use exact origins, never wildcard targets. The browser
+  receives no Supabase service credential, Qdrant name, provider key, or
+  privileged workspace token.
+- Transcript retention has a recommended bounded 30-day default, but final
+  legal/privacy copy, visitor identity mode, and retention exceptions are
+  **TBD**. Real public production deployment remains gated by a separately
+  approved hosting/privacy release; host-page Browser fixtures are required.
+
+---
+
+## FR-029: Account Billing Placeholder and Local Entitlement Foundation
+
+### User Story
+**As an** Account Owner,
+**I want** a truthful Billing area and Account-level feature limits before
+payment integration is activated,
+**So that** workspaces, agents, members, and widgets have one predictable
+limit boundary without pretending Stripe is already live.
+
+### Acceptance Criteria
+
+#### AC-029.1: Owner-Only Billing Placeholder and Account Usage Context
+**Given** I am an Account Owner
+**When** I open Billing
+**Then** I can see the current local plan label, enabled capabilities, Account
+usage summary, and a clearly labelled `Billing integration coming soon` state
+when live Stripe is not enabled
+**And** Admins and Members cannot open or call owner-only billing operations
+**And** the interface does not render a non-functional Checkout, fake invoice,
+or claim that charges/subscriptions are active.
+
+#### AC-029.2: Local Entitlement Enforcement Without Payment Coupling
+**Given** an Account entitlement record declares a limit for workspaces,
+agents, members, widgets, storage, or messages
+**When** an authorized operation would exceed that limit
+**Then** the BFF denies it atomically before provisioning/consuming the
+resource and returns a localized, owner-directed resolution
+**And** existing data remains readable according to role and is not deleted or
+silently downgraded
+**And** the same entitlement decision applies independently of a forged UI
+state or direct API request.
+
+### Technical Notes
+- Depends on FR-022, FR-024, and FR-030. This is the prerequisite and truthful
+  UI boundary for FR-017, not a replacement for Stripe checkout, signed
+  webhooks, customer portal, invoices, tax, or final plans.
+- Entitlements must be an internal versioned data contract with account-level
+  counters and idempotent reservation/commit or equivalent concurrency-safe
+  behavior. Exact plan names, quotas, prices, currencies, trial duration, and
+  overage policy are **TBD**; they must not be guessed in UI/API code.
+- A later Stripe task may map verified Stripe events to the same entitlement
+  contract. Browser and API tests must distinguish placeholder state from real
+  payment capability.
+
+---
+
+## FR-030: Usage, Audit Events, and Operational Observability Foundation
+
+### User Story
+**As an** Account Owner or Workspace Admin,
+**I want** clear, redacted operational insight at the correct scope,
+**So that** I can understand consumption and failures without exposing private
+conversation content or billing authority to ordinary members.
+
+### Acceptance Criteria
+
+#### AC-030.1: Hierarchical Usage and Role Visibility
+**Given** an Account has activity across Workspaces, Agents, and Widget Bots
+**When** an Owner or Admin opens permitted Usage/observability views
+**Then** counters for messages, estimated tokens/provider use, documents,
+storage, ingestion jobs, widget sessions, latency, errors, cancellations, and
+rate-limit decisions are grouped by authorized Account/Workspace/Agent/Widget
+scope
+**And** an Owner can view account-wide totals and billing-relevant limits,
+an Admin can view permitted operational Workspace data but not billing/owner
+records, and a Member can view only their allowed activity/session state
+**And** missing data, delays, and aggregation windows are labelled rather than
+shown as fabricated live values.
+
+#### AC-030.2: Redacted Auditable State Changes
+**Given** an authenticated or public operation creates, changes, denies,
+archives, restores, or publishes a protected resource
+**When** its outcome is recorded
+**Then** a durable audit event captures actor/category, target, action, time,
+outcome, correlation ID, and redacted metadata sufficient for investigation
+**And** audit/metric data never stores provider keys, session tokens, full raw
+questions, complete document text, filesystem paths, Qdrant collection names,
+or raw provider/SDK exceptions
+**And** retry/replay does not create misleading duplicate usage or audit
+records.
+
+### Technical Notes
+- Depends on FR-022 through FR-029 and modifies FR-008 audit logging. Counters
+  must be bounded, tenant-scoped, and ready for later Stripe entitlements but
+  must not generate monetary charges.
+- LangSmith/RAGAS dashboards, alerts, retention exports, and external SIEM
+  integrations are future work. This FR provides an internal event/counter
+  contract and role-scoped UI only.
+- Measurement must name event time versus aggregation time and reconcile
+  counter updates safely after failed/cancelled operations.
+
+---
+
+## FR-031: Safe Archive, Deletion, Recovery, and Tenant Purge
+
+### User Story
+**As an** Account Owner,
+**I want** destructive lifecycle operations to be explicit and recoverable,
+**So that** a mistaken click cannot erase a department's RAG knowledge,
+widgets, or audit trail.
+
+### Acceptance Criteria
+
+#### AC-031.1: Archive and Restore Without Data Loss
+**Given** I am an Account Owner of an active Workspace
+**When** I confirm archive
+**Then** the BFF idempotently changes the Workspace to archived, blocks new
+chats, uploads, Agent mutations, and Widget traffic, removes it from ordinary
+selection, and records an audit event
+**And** documents, vectors, sessions, Agents, Widgets, usage, and recoverable
+metadata remain intact
+**And** only the Owner can restore the Workspace, after which authorized
+operations resume without cross-tenant data remapping.
+
+#### AC-031.2: Delayed Permanent Purge With Strong Confirmation
+**Given** an archived Workspace is eligible for deletion
+**When** the Owner requests permanent deletion
+**Then** recent authentication, exact Workspace-name confirmation, a visible
+resource impact summary, and a pending-deletion state are required before any
+purge job is scheduled
+**And** the Workspace remains restorable for the agreed recovery window, whose
+initial recommended default is 30 days but whose legal/contractual exceptions
+are **TBD**
+**And** after that window an idempotent, observable purge removes eligible raw
+files, vectors, Agents, Widget runtime data, and sessions while retaining only
+legally required billing/audit records under documented retention policy.
+
+### Technical Notes
+- Depends on FR-024 through FR-030. Agent disable/archive and Widget
+disable/archive must never implicitly delete shared sources; source deletion
+must show binding dependencies as required by FR-025.
+- Purge is asynchronous, retry-safe, cancellable before irreversible work,
+and reports bounded progress/errors without revealing internal storage paths.
+An implementation must document backup/recovery behavior before deleting data.
+- Account deletion, legal holds, retention exports, and automatic data purge
+for non-payment are excluded until an explicit policy and owner decision exist.
+
+---
+
+## FR-032: Legacy Migration, Unified Cutover, and End-to-End Evidence
+
+### User Story
+**As a** RAG-Studio operator and existing user,
+**I want** the new product to replace the legacy and separate SaaS presentation
+without losing validated behavior or data safety,
+**So that** the migration is reversible until the single product is proven.
+
+### Acceptance Criteria
+
+#### AC-032.1: Controlled Legacy-to-Unified Route Cutover
+**Given** a replacement RAG-Studio route has completed its owning FR's
+automated, authorization, and Browser acceptance checks
+**When** the cutover flag/route mapping is enabled
+**Then** legacy Home, Chat, Settings, and Documents functions map to unified
+RAG-Studio Home, Personal Lab/Settings, Chat, and Knowledge according to a
+published compatibility matrix
+**And** old SaaS-only user routes map to the corresponding unified RAG-Studio
+destination or show a recoverable result, with no competing public navigation
+model
+**And** rollback restores the prior route surface without deleting local data,
+workspace records, vectors, sessions, or entitlement/audit data.
+
+#### AC-032.2: Full End-State Verification Matrix
+**Given** FR-021 through FR-031 are implemented in their approved order
+**When** the final local RAG-Studio journey is verified
+**Then** evidence covers sign-in, Personal Lab, Account/Workspace switching,
+role denial, source lifecycle, Agent bindings, scoped Chat, Widget security,
+usage, billing-placeholder truthfulness, archive/restore, restart persistence,
+and responsive EN/RU UI at 360/768/1440 px
+**And** the verification matrix links each FR/NFR to automated checks, in-app
+Browser scenarios, observed results, screenshots where visual, rollback/data
+preservation evidence, and unresolved items
+**And** any real Stripe, production Widget hosting, advanced observability, or
+Enterprise feature excluded from this cutover remains explicitly marked open,
+not represented as completed.
+
+### Technical Notes
+- Depends on FR-021–FR-031 and modifies FR-012, FR-019, and FR-020. It is a
+  gated migration/cutover FR, not permission to remove legacy code first.
+- Expected work includes compatibility routing, feature/cutover flags,
+  migration/read-only contracts, a verification matrix, and rollback runbook.
+  Exact deletion timing for legacy routes is deferred until parity and
+  recovery evidence are accepted.
+- Full UI Browser QA is mandatory after each contributing UI task and again at
+  final cutover; a demo cannot substitute for the matrix or security tests.
+
+---
+
 ## Delivery Stage and FR Allocation
 
 | Stage | Owning FRs | Existing FRs Modified or Verified | Planning Boundary |
@@ -1401,6 +2022,7 @@ data            per-workspace Qdrant collections
 | Stage 1: completed chunking strategies | FR-011 | FR-001, FR-002, FR-005, FR-008, FR-010 | Completed regression baseline; verify but do not reimplement unless a regression is found. |
 | Stage 2: UI migration | FR-012 | FR-004, FR-005, FR-006, FR-007, FR-009; preserves all FR-001–FR-011 behavior | Wait for UI references and approved `DESIGN.md`; implement parity only. |
 | Stage 3: migration functionality | FR-013–FR-020 | Tenant-scopes or extends FR-001–FR-011 where stated by each acceptance criterion | Plan and implement as bounded FR-owned tasks after Stage 2 acceptance. |
+| Stage 4: unified RAG-Studio product cutover | FR-021–FR-032 | Reuses and refines FR-012–FR-020; modifies FR-001–FR-011 only where explicitly named | Build in dependency order: shell → identity/account → Personal Lab → Workspace/RBAC → Knowledge → Agents → Chat → Widgets → entitlement placeholder → usage/audit → archive/delete → verified cutover. Do not represent deferred Stripe/Enterprise scope as complete. |
 
 Every implementation task must name one primary owning FR, list each existing FR it modifies or regression-tests, and use only the acceptance criteria relevant to that bounded task. Passing an earlier FR does not imply a later-stage FR is implemented.
 
@@ -1450,6 +2072,15 @@ Every implementation task must name one primary owning FR, list each existing FR
 | NFR-022 | UX | First-time user can upload a document and ask a question in < 3 minutes | User journey timing |
 | NFR-032 | Manual QA | Every implementation is exercised in the running web application with the in-app Browser after automated checks | Evidence records URL, scenario, observed result, viewport where relevant, and screenshots for visual changes |
 | NFR-033 | Design consistency | Every UI task follows the approved reference-to-design-system pipeline and uses recorded tokens/components | `DESIGN.md` review, `omo:visual-qa`, component audit, and reference-fidelity screenshots |
+| NFR-034 | Identity isolation | Account, Workspace, role, and archived/revoked status are resolved server-side for every protected read, write, stream, and cache/checkpoint access | Multi-account/multi-workspace adversarial API, RLS, session, cache, and stale-tab tests with zero leaked records |
+| NFR-035 | Configuration safety | Setting inheritance is explicit and conflict-safe: Personal defaults → Workspace defaults → Agent overrides → Widget presentation; re-indexing changes require an explicit safe operation | UI/API inheritance, optimistic-version conflict, dependency-warning, cancellation, and no-partial-write tests |
+| NFR-036 | Knowledge isolation | Agent retrieval, citations, cache, and generation use only trusted Workspace context and active `agent_source_bindings` | Two-Agent/Two-Workspace retrieval, citation, cache, and repeat-query negative tests with zero off-binding content |
+| NFR-037 | Public widget security | Each public Widget request validates exact origin, status, short-lived session proof, rate/message limits, Agent availability, and entitlement before invoking RAG | Approved/rejected-origin, disabled/archived, expired-session, malformed identity, limit, Shadow-DOM, and no-secret-exposure tests |
+| NFR-038 | Data lifecycle safety | Archive is reversible; permanent Workspace purge requires recent authentication, exact-name confirmation, recovery window, idempotent asynchronous purge, and documented legal-retention exceptions | Archive/restore, stale-access, cancellation, retry, recovery-window, purge-progress, and retained-record tests |
+| NFR-039 | Audit and privacy | Usage/audit events are tenant-scoped, deduplicated, and redact provider keys, tokens, raw prompts, documents, filesystem paths, Qdrant names, and raw provider errors | Event-schema, replay/deduplication, role-visibility, log-redaction, and data-retention tests |
+| NFR-040 | UI context clarity | Every application screen visibly identifies its current Personal Lab or Workspace context and effective role before resource-specific actions are available | Browser tests at 360/768/1440 px and EN/RU for context switch, revoked/archived state, role change, and deep-link recovery |
+| NFR-041 | Migration rollback | Cutover never bulk-deletes legacy/local data or tenant records; every replacement route has a documented reversible route/flag mapping until accepted parity | Compatibility-matrix, rollback, restart, and data-preservation tests plus Browser evidence |
+| NFR-042 | Entitlement truthfulness | A billing placeholder never implies active payment; all visible limits match server-side entitlement decisions, and later Stripe events may update only that same contract | Placeholder/UI/API consistency, forged-request denial, counter race, and future webhook-contract tests |
 
 ---
 
@@ -1477,6 +2108,18 @@ Every implementation task must name one primary owning FR, list each existing FR
 | FR-018 | AC-018.1–018.4 | design-system-style-intelligence, frontend-design-director, react-shadcn-ui-contract, omo:visual-qa | `frontend/` public routes/components/locales, shared plan-catalog API | Content/link, catalog-consistency, locale, accessibility, responsive, visual-QA, and Browser tests |
 | FR-019 | AC-019.1–019.5 | — | `docker-compose.yml`, service Dockerfiles, `.env.example`, health endpoints, deployment documentation | Compose config/build/health/restart/persistence checks and primary in-app Browser journey |
 | FR-020 | AC-020.1–020.4 | omo:visual-qa, browser:control-in-app-browser | `docs/demo/`, verification matrix, approved evidence directories | Full local customer journey and FR-012–FR-019 evidence audit |
+| FR-021 | AC-021.1–021.3 | design-system-style-intelligence, frontend-design-director, react-shadcn-ui-contract, omo:visual-qa | `frontend/`, FastAPI UI/static routing, locales, `DESIGN.md` | Route-compatibility, context-state, responsive/accessibility, visual-QA, and Browser cutover tests |
+| FR-022 | AC-022.1–022.2 | supabase:supabase | Supabase migrations/RLS, `src/api/` auth/account dependencies and routes, `frontend/` auth/context surfaces | Multi-account membership, session/CSRF/revocation, RLS, invitation-redaction, and cross-account negative tests |
+| FR-023 | AC-023.1–023.2 | react-shadcn-ui-contract, qdrant-operations | `frontend/` Personal Lab routes, `src/api/` local/import boundary, `src/ingestion/`, `src/graph/` | Personal parity, explicit promotion preview/cancel, local/shared isolation, and Browser journey tests |
+| FR-024 | AC-024.1–024.2 | supabase:supabase, react-shadcn-ui-contract | Supabase Workspace/membership/entitlement schema, `src/api/` authorization/lifecycle routes, `frontend/` role-aware views | Role matrix, stale-tab/archive, limit reservation, invitation, RLS, and Browser permission-state tests |
+| FR-025 | AC-025.1–025.2 | qdrant-operations, rag-best-practices | `src/ingestion/`, `src/retrieve/`, `src/vector_store/`, `src/api/` source/binding modules, `frontend/` Knowledge | Source lifecycle/replacement, binding retrieval/cache/citation isolation, dependency warning, cancellation, and Browser tests |
+| FR-026 | AC-026.1–026.2 | langgraph-patterns, react-shadcn-ui-contract | Supabase Agent schema, `src/api/` Agent modules, `src/graph/`, `frontend/` Agent/settings surfaces | Agent validation/versioning/lifecycle, sandbox-copy, role, secret-redaction, and Browser tests |
+| FR-027 | AC-027.1–027.2 | langgraph-patterns, qdrant-operations | `src/api/routes/chat.py`, `src/graph/`, `src/retrieve/`, tenant/checkpoint modules, `frontend/` Chat | Scope/session/cache/checkpoint, streaming/cancel/reattach, role/revocation, redaction, and Browser tests |
+| FR-028 | AC-028.1–028.2 | react-shadcn-ui-contract, omo:visual-qa | `widget/`, Supabase Widget schema, `src/api/` public-widget modules, `frontend/` Widget settings, host fixtures | Widget version/publish, origin/session/rate-limit, citation/transcript policy, Shadow-DOM, and host-page Browser tests |
+| FR-029 | AC-029.1–029.2 | react-shadcn-ui-contract, supabase:supabase | Account entitlement schema/services, `src/api/` billing/limit modules, `frontend/` Billing/Usage surfaces | Placeholder truthfulness, role, atomic quota enforcement, forged-request, and Browser tests |
+| FR-030 | AC-030.1–030.2 | — | Audit/usage schemas, `src/api/` event/counter modules, `frontend/` Usage/observability views | Counter aggregation/replay, role visibility, redaction/retention, and Browser observability-state tests |
+| FR-031 | AC-031.1–031.2 | supabase:supabase, qdrant-operations | Workspace/resource lifecycle schema, purge/restore services, `src/vector_store/`, `src/ingestion/`, `frontend/` confirmations | Archive/restore, exact-name/recent-auth, grace/purge retry/cancel, isolation, and Browser confirmation tests |
+| FR-032 | AC-032.1–032.2 | omo:visual-qa, browser:control-in-app-browser | Route compatibility/cutover configuration, `docs/demo/`, verification matrix, migration runbook | Compatibility/rollback/restart, end-to-end role and widget scenarios, 360/768/1440 EN/RU Browser evidence |
 
 ---
 

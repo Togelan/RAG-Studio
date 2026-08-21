@@ -5,6 +5,7 @@ import {
   ChatStreamEventSchema,
 } from "../types/api"
 import { type ApiClient, apiClient } from "./client"
+import { browserCsrfToken, csrfHeadersForMutation } from "./csrf"
 import {
   apiErrorFromResponse,
   isAbortError,
@@ -188,12 +189,24 @@ export async function streamChat(request: ChatSendRequest, options: StreamOption
   if (!parsed.success) {
     throw new StreamProtocolError()
   }
+  const csrfHeaders = await csrfHeadersForMutation("/api/chat/send", {
+    establish: () =>
+      fetch("/api/saas/auth/csrf", {
+        credentials: "same-origin",
+        signal: options.signal,
+      }),
+    readToken: browserCsrfToken,
+  })
 
   await openStream(
     "/api/chat/send",
     {
       body: JSON.stringify(parsed.data),
-      headers: { Accept: "text/event-stream", "Content-Type": "application/json" },
+      headers: {
+        Accept: "text/event-stream",
+        "Content-Type": "application/json",
+        ...csrfHeaders,
+      },
       method: "POST",
     },
     options,

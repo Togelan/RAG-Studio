@@ -17,7 +17,7 @@ function responseFor(input: string): Response {
     return new Response('{"confirmation_required":false}', { status: 201 })
   }
   return new Response(
-    '{"user_id":"00000000-0000-4000-8000-000000000001","email":"owner@example.test","workspace":{"id":"00000000-0000-4000-8000-000000000010","role":"owner"}}',
+    '{"user_id":"00000000-0000-4000-8000-000000000001","email":"owner@example.test","accounts":[],"active_account_id":null,"workspace":{"id":"00000000-0000-4000-8000-000000000010","name":"Workspace","role":"owner"}}',
   )
 }
 

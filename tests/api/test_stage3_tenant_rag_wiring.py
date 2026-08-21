@@ -46,7 +46,7 @@ class SwitchingAuth:
             "provider-token",
             "refresh-token",
             2_000_000_000,
-            self.workspace_id,
+            active_workspace_id=self.workspace_id,
         )
         return AuthContext(
             session,

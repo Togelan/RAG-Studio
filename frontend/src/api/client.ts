@@ -1,6 +1,7 @@
 import ky, { HTTPError } from "ky"
 import type { z } from "zod"
 
+import { browserCsrfToken, csrfHeadersForMutation, requiresCsrfProof } from "./csrf"
 import { ApiContractError, apiErrorFromResponse } from "./errors"
 
 export type JsonRequestOptions = {
@@ -67,18 +68,6 @@ function signalOption(signal: AbortSignal | undefined): { readonly signal?: Abor
   return signal === undefined ? {} : { signal }
 }
 
-function browserCsrfToken(): string | null {
-  if (typeof document === "undefined") {
-    return null
-  }
-  const prefix = "__Host-ragstudio-csrf="
-  const cookie = document.cookie
-    .split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(prefix))
-  return cookie === undefined ? null : decodeURIComponent(cookie.slice(prefix.length))
-}
-
 function validateApiPath(path: string): void {
   if (!path.startsWith("/api/") || path.startsWith("//") || path.includes("://")) {
     throw new ApiContractError()
@@ -113,7 +102,7 @@ export class ApiClient {
     signal: AbortSignal | undefined,
   ): Promise<KyRequestOptions> {
     const payload = body instanceof FormData ? { body } : { json: body }
-    if (!path.startsWith("/api/saas/")) {
+    if (!requiresCsrfProof(path)) {
       return {
         ...(headers === undefined ? {} : { headers }),
         ...payload,
@@ -122,19 +111,14 @@ export class ApiClient {
       }
     }
 
-    let token = this.#csrfToken()
-    if (token === null || token === "") {
-      const response = await this.#http.get("/api/saas/auth/csrf", signalOption(signal))
-      if (!response.ok) {
-        throw apiErrorFromResponse(response)
-      }
-      token = this.#csrfToken()
-    }
-    if (token === null || token === "") {
-      throw new ApiContractError()
-    }
     return {
-      headers: { ...headers, "X-CSRF-Token": token },
+      headers: {
+        ...headers,
+        ...(await csrfHeadersForMutation(path, {
+          establish: () => this.#http.get("/api/saas/auth/csrf", signalOption(signal)),
+          readToken: this.#csrfToken,
+        })),
+      },
       ...payload,
       retry: 0,
       ...signalOption(signal),

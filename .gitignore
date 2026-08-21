@@ -82,4 +82,10 @@ blog-post-ru.md
 .uv-cache-gate/
 .agents/skills/grill-with-docs/
 
+# Disposable Group 1 test/runtime scratch (may contain generated data)
+.tmp-csrf/
+.tmp-csrf-independent/
+.tmp-csrf-gate-r2/
+.tmp-test/
+
 sandbox/

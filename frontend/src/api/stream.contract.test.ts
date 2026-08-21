@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { ChatCancelResponseSchema } from "../types/api"
 import type { KyHttpClient, KyRequestOptions } from "./client"
@@ -103,6 +103,28 @@ describe("SseFrameParser", () => {
 })
 
 describe("stream boundary", () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it("adds the double-submit CSRF proof when starting a protected chat stream", async () => {
+    // Given: the SaaS BFF has established its readable CSRF companion cookie.
+    vi.stubGlobal("document", { cookie: "__Host-ragstudio-csrf=chat-proof" })
+    const fetchSpy = vi.fn(() => Promise.resolve(streamResponse([])))
+    vi.stubGlobal("fetch", fetchSpy)
+    const controller = new AbortController()
+
+    // When: Personal Lab starts its primary POST stream.
+    await streamChat({ content: "question" }, { onEvent: vi.fn(), signal: controller.signal })
+
+    // Then: the protected endpoint receives the matching proof.
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/chat/send",
+      expect.objectContaining({
+        headers: expect.objectContaining({ "X-CSRF-Token": "chat-proof" }),
+        method: "POST",
+      }),
+    )
+  })
+
   it("decodes UTF-8 code points split across stream reads", async () => {
     const greeting = "\u041f\u0440\u0438\u0432\u0435\u0442"
     const payload = `event: token\ndata: {"token":"${greeting}"}\n\n`
@@ -196,6 +218,7 @@ describe("stream boundary", () => {
     const client = new ApiClient(
       fetch,
       staticKyClient(new Response('{"detail":"/private/provider/path"}', { status: 503 }), inputs),
+      () => "csrf-proof",
     )
 
     await expect(
@@ -211,6 +234,7 @@ describe("stream boundary", () => {
     const client = new ApiClient(
       fetch,
       staticKyClient(new Response('{"status":"stopped","session_id":"session-1"}'), inputs),
+      () => "csrf-proof",
     )
 
     await expect(
@@ -227,6 +251,7 @@ describe("stream boundary", () => {
     const client = new ApiClient(
       fetch,
       staticKyClient(new Response('{"status":"stopped","session_id":"session-1"}'), inputs),
+      () => "csrf-proof",
     )
 
     await expect(cancelChatStream("session-1", undefined, client)).resolves.toEqual({

@@ -37,7 +37,9 @@ class SupabaseConfirmationVerifier:
                 follow_redirects=False,
                 trust_env=False,
             ) as client:
-                response = await client.get(self._verify_url, params=httpx.QueryParams(query))
+                response = await client.get(
+                    self._verify_url, params=httpx.QueryParams(query)
+                )
         except httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError:
             raise ConfirmationUnavailableError from None
         if 300 <= response.status_code < 400:
@@ -56,12 +58,16 @@ def create_saas_auth_confirmation_router(
     @router.get("/auth/v1/verify", include_in_schema=False)
     async def confirm_email(request: Request) -> RedirectResponse:
         query = request.url.query
-        if not request.query_params.get("token") or not request.query_params.get("type"):
+        if not request.query_params.get("token") or not request.query_params.get(
+            "type"
+        ):
             raise HTTPException(status_code=400, detail="Confirmation link is invalid.")
         try:
             await verifier.verify(query)
         except ConfirmationRejectedError:
-            raise HTTPException(status_code=400, detail="Confirmation link is invalid.") from None
+            raise HTTPException(
+                status_code=400, detail="Confirmation link is invalid."
+            ) from None
         except ConfirmationUnavailableError:
             raise HTTPException(
                 status_code=503, detail="Identity service is unavailable."

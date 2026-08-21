@@ -29,18 +29,18 @@ function legacyProductionSource(): string {
 }
 
 describe("Stage 2 production-leak contract", () => {
-  it("keeps canonical React aliases and the approved Stage 3 SaaS entry only", () => {
+  it("keeps one canonical React product route and retired SaaS compatibility only", () => {
     const app = sourceFor("/App.tsx")
     const paths = [...app.matchAll(/path="([^"]+)"/gu)].map((match) => match[1])
 
     expect(paths).toEqual([
       "/saas/*",
       "/",
-      "/app",
+      "/sign-in",
+      "/sign-up",
+      "/app/*",
       "/settings",
-      "/app/settings",
       "/chat",
-      "/app/chat",
       "*",
     ])
     expect(app).not.toMatch(
@@ -84,6 +84,7 @@ describe("Stage 2 production-leak contract", () => {
 
     expect(source.match(/react-(?:grab|scan|doctor)/gu)).toEqual(["react-grab", "react-scan"])
     expect(instrumentation).toContain("if (!import.meta.env.DEV")
+    expect(instrumentation).toContain('VITE_ENABLE_REACT_DEVTOOLS !== "1"')
     expect(instrumentation).toContain('import("react-grab")')
     expect(instrumentation).toContain('import("react-scan")')
   })

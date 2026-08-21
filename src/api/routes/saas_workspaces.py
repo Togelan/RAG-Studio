@@ -29,6 +29,7 @@ from src.api.routes.saas_workspace_schemas import (
     workspace_response,
 )
 from src.api.saas_auth_context import BffAuthContextResolver
+from src.api.saas_auth_service import context_unavailable
 from src.api.saas_sessions import WorkspaceRole
 from src.api.saas_workspace_models import (
     InvitationAcceptance,
@@ -78,9 +79,17 @@ def create_saas_workspaces_router(
         idempotency_key: IdempotencyKey,
     ) -> WorkspaceResponse:
         context = await auth_context_resolver.resolve(request, require_workspace=False)
+        selected = context.selected
+        if selected is None or selected.account.owner_projection is None:
+            raise context_unavailable()
         workspace = await execute_workspace_operation(
             service.create_workspace(
-                WorkspaceCreation(context.claims.user_id, payload.name, idempotency_key)
+                WorkspaceCreation(
+                    context.claims.user_id,
+                    selected.account.id,
+                    payload.name,
+                    idempotency_key,
+                )
             )
         )
         return workspace_response(workspace)

@@ -1,10 +1,18 @@
 import { z } from "zod"
 
 import { type ApiClient, apiClient } from "../../../api/client"
+import { WorkspaceIdSchema } from "../../account/account-contracts"
+import {
+  AuthSessionSchema as CanonicalAuthSessionSchema,
+  type SignupOutcome,
+  SignupOutcomeSchema,
+} from "../../auth/auth-contracts"
+import { createAuthGateway as createCanonicalAuthGateway } from "../../auth/auth-gateway"
 import type { Credentials } from "../model"
 
 const WorkspaceContextSchema = z.object({
   id: z.string().uuid(),
+  name: z.string().min(1).max(120).nullable().optional(),
   role: z.enum(["owner", "admin", "member"]),
 })
 
@@ -14,30 +22,32 @@ export const AuthSessionSchema = z.object({
   workspace: WorkspaceContextSchema.nullable(),
 })
 
-export const SignupOutcomeSchema = z.object({
-  confirmation_required: z.boolean(),
-})
-
+export { SignupOutcomeSchema }
 export type AuthSession = z.infer<typeof AuthSessionSchema>
-export type SignupOutcome = z.infer<typeof SignupOutcomeSchema>
+export type { SignupOutcome }
 
-export interface AuthGateway {
-  getSession(): Promise<AuthSession>
-  refresh(): Promise<AuthSession>
-  selectWorkspace(workspaceId: string): Promise<AuthSession>
-  signIn(credentials: Credentials): Promise<AuthSession>
-  signOut(): Promise<void>
-  signUp(credentials: Credentials): Promise<SignupOutcome>
+export type AuthGateway = {
+  readonly getSession: () => Promise<AuthSession>
+  readonly refresh: () => Promise<AuthSession>
+  readonly selectWorkspace: (workspaceId: string) => Promise<AuthSession>
+  readonly signIn: (credentials: Credentials) => Promise<AuthSession>
+  readonly signOut: () => Promise<void>
+  readonly signUp: (credentials: Credentials) => Promise<SignupOutcome>
 }
 
 export function createAuthGateway(client: ApiClient = apiClient): AuthGateway {
+  const canonical = createCanonicalAuthGateway(client)
   return {
-    getSession: () => client.get("/api/saas/auth/session", AuthSessionSchema),
-    refresh: () => client.post("/api/saas/auth/refresh", {}, AuthSessionSchema),
+    getSession: canonical.getSession,
+    refresh: canonical.refresh,
     selectWorkspace: (workspaceId) =>
-      client.put("/api/saas/auth/workspace", { workspace_id: workspaceId }, AuthSessionSchema),
-    signIn: (credentials) => client.post("/api/saas/auth/signin", credentials, AuthSessionSchema),
-    signOut: () => client.post("/api/saas/auth/signout", {}, z.undefined()),
-    signUp: (credentials) => client.post("/api/saas/auth/signup", credentials, SignupOutcomeSchema),
+      client.put(
+        "/api/saas/auth/workspace",
+        { workspace_id: WorkspaceIdSchema.parse(workspaceId) },
+        CanonicalAuthSessionSchema,
+      ),
+    signIn: canonical.signIn,
+    signOut: canonical.signOut,
+    signUp: canonical.signUp,
   }
 }

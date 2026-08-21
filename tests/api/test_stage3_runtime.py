@@ -107,7 +107,6 @@ def test_saas_mode_rejects_malformed_url_without_echoing_input(
         "RAG_STUDIO_SUPABASE_DATABASE_URL", "postgresql://local.invalid/postgres"
     )
     monkeypatch.setenv("RAG_STUDIO_SESSION_SIGNING_KEY", "x" * 32)
-
     # When/Then: boundary parsing rejects it through the same sanitized error.
     with pytest.raises(ValueError) as error:
         create_app()
@@ -135,6 +134,13 @@ def test_saas_routes_are_gated_and_dependency_failure_is_sanitized(
         "RAG_STUDIO_SUPABASE_DATABASE_URL", "postgresql://local.invalid/postgres"
     )
     monkeypatch.setenv("RAG_STUDIO_SESSION_SIGNING_KEY", "x" * 32)
+    monkeypatch.setenv(
+        "RAG_STUDIO_SESSION_ENCRYPTION_KEYS",
+        "test-v1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+    )
+
+    monkeypatch.setenv("QDRANT_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("RAG_STUDIO_CORS_ORIGINS", "http://127.0.0.1:8013")
 
     # When: the SaaS UI and dependency status endpoints are requested.
     with (
@@ -162,9 +168,9 @@ def test_saas_routes_are_gated_and_dependency_failure_is_sanitized(
     assert saas_ui.status_code == 200
     assert 'data-stage2-route-contract="react"' in saas_ui.text
     assert readiness.status_code == 503
-    assert readiness.json() == {"detail": "SaaS identity service is unavailable."}
+    assert readiness.json() == {"detail": "SaaS runtime dependencies are unavailable."}
     assert "127.0.0.1" not in readiness.text
-    assert all(response.status_code == 404 for response in local_api)
+    assert all(response.status_code == 401 for response in local_api)
     assert legacy.status_code == 200
 
 

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel, Field
 from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.exceptions import ApiException
 
 from src.api.dependencies import get_qdrant_client
 
@@ -36,6 +37,7 @@ async def simple_health() -> SimpleHealthResponse:
 
 @router.get("/api/health", response_model=HealthResponse)
 async def health_check(
+    response: Response,
     client: AsyncQdrantClient = Depends(get_qdrant_client),  # noqa: B008 - FastAPI dependency injection
 ) -> HealthResponse:
     """Return application health status.
@@ -48,17 +50,15 @@ async def health_check(
     """
     qdrant_ok = False
     try:
-        # qdrant-client>=1.13 has health_check() at runtime, but the
-        # AsyncQdrantClient type stubs do not declare it (as of 1.13.x).
-        # Using getattr() or cast() would also suppress type checking
-        # without adding safety — the AttributeError fallback below
-        # handles the case where the method is genuinely absent.
-        qdrant_ok = await client.health_check()  # type: ignore[attr-defined]
-    except Exception:  # noqa: BLE001 - health endpoint must degrade for provider-specific failures
+        await client.get_collections()
+        qdrant_ok = True
+    except ApiException, OSError, RuntimeError:
         qdrant_ok = False
 
     qdrant_status = "ok" if qdrant_ok else "unavailable"
     overall_status = "ready" if qdrant_ok else "degraded"
+    if not qdrant_ok:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
     return HealthResponse(qdrant=qdrant_status, status=overall_status)
 
@@ -74,7 +74,7 @@ class StatusResponse(BaseModel):
 
 
 @router.get("/api/health/status", response_model=StatusResponse)
-async def health_status() -> StatusResponse:
+async def health_status(response: Response) -> StatusResponse:
     """Return lightweight status for UI status indicator polling.
 
     Used by the frontend status indicator (every 30s).
@@ -107,8 +107,10 @@ async def health_status() -> StatusResponse:
 
         client = await get_qdrant_client()
         qdrant_ok = await client.collection_exists("rag_studio_docs")
-    except Exception:  # noqa: BLE001 - status polling must degrade for provider-specific failures
+    except ApiException, OSError, RuntimeError:
         qdrant_ok = False
 
     overall = "ready" if qdrant_ok else "degraded"
+    if not qdrant_ok:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return StatusResponse(status=overall, api_key_configured=api_key_set)

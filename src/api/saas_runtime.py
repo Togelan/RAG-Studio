@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from pathlib import Path
 from typing import Final, assert_never
 
+import anyio
+import asyncpg
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
@@ -18,9 +21,12 @@ from pydantic import (
     Field,
     SecretStr,
     ValidationError,
+    field_validator,
 )
+from pydantic_core import PydanticCustomError
 
 from src.api.react_ui import UiServingConfiguration, react_document_response
+from src.api.saas_security import load_cookie_transport_policy
 from src.paths import project_root, resolve_project_path
 
 _RUNTIME_MODE_ENV: Final = "RAG_STUDIO_RUNTIME_MODE"
@@ -30,15 +36,15 @@ _SUPABASE_ISSUER_ENV: Final = "RAG_STUDIO_SUPABASE_JWT_ISSUER"
 _SUPABASE_AUDIENCE_ENV: Final = "RAG_STUDIO_SUPABASE_JWT_AUDIENCE"
 _SUPABASE_DATABASE_URL_ENV: Final = "RAG_STUDIO_SUPABASE_DATABASE_URL"
 _SESSION_KEY_ENV: Final = "RAG_STUDIO_SESSION_SIGNING_KEY"
+_QDRANT_URL_ENV: Final = "QDRANT_URL"
+_TRUSTED_ORIGINS_ENV: Final = "RAG_STUDIO_CORS_ORIGINS"
+_TRUSTED_ORIGIN_PATTERN: Final = re.compile(r"https?://[^/?#@]+/")
 _IDENTITY_TIMEOUT: Final = httpx.Timeout(2.0)
+_DATABASE_TIMEOUT_SECONDS: Final = 2.0
 _PERSISTENCE_OVERRIDE_ENVS: Final = (
     "QDRANT_PATH",
     "RAG_STUDIO_SETTINGS_PATH",
     "RAG_STUDIO_LOGS_PATH",
-)
-_MODEL_CACHE_OVERRIDE_ENVS: Final = (
-    "FASTEMBED_CACHE_PATH",
-    "FLASHRANK_CACHE_PATH",
 )
 
 
@@ -65,6 +71,19 @@ class _SaasEnvironment(BaseModel):
     jwt_audience: str = Field(min_length=1)
     database_url: SecretStr = Field(min_length=1)
     session_signing_key: SecretStr = Field(min_length=32)
+    qdrant_url: AnyHttpUrl
+    trusted_origins: tuple[AnyHttpUrl, ...] = Field(min_length=1)
+
+    @field_validator("trusted_origins")
+    @classmethod
+    def validate_trusted_origins(
+        cls, origins: tuple[AnyHttpUrl, ...]
+    ) -> tuple[AnyHttpUrl, ...]:
+        if any(
+            _TRUSTED_ORIGIN_PATTERN.fullmatch(str(origin)) is None for origin in origins
+        ):
+            raise PydanticCustomError("trusted_origin_shape", "invalid trusted origin")
+        return origins
 
 
 class RuntimeConfiguration(BaseModel):
@@ -78,6 +97,8 @@ class RuntimeConfiguration(BaseModel):
     jwt_audience: str | None = None
     database_url: SecretStr | None = None
     session_signing_key: SecretStr | None = None
+    qdrant_url: AnyHttpUrl | None = None
+    trusted_origins: tuple[AnyHttpUrl, ...] = ()
 
 
 class RuntimeStatus(BaseModel):
@@ -111,6 +132,7 @@ def load_runtime_configuration() -> RuntimeConfiguration:
 
 
 def _load_saas_configuration() -> RuntimeConfiguration:
+    configured_origins = os.getenv(_TRUSTED_ORIGINS_ENV)
     try:
         environment = _SaasEnvironment.model_validate(
             {
@@ -119,12 +141,21 @@ def _load_saas_configuration() -> RuntimeConfiguration:
                 "jwt_audience": os.getenv(_SUPABASE_AUDIENCE_ENV, "authenticated"),
                 "database_url": os.getenv(_SUPABASE_DATABASE_URL_ENV),
                 "session_signing_key": os.getenv(_SESSION_KEY_ENV),
+                "qdrant_url": os.getenv(_QDRANT_URL_ENV),
+                "trusted_origins": (
+                    tuple(item.strip() for item in configured_origins.split(","))
+                    if configured_origins is not None
+                    else None
+                ),
             }
         )
     except ValidationError:
         raise SaasConfigurationError(
             "SaaS runtime configuration is incomplete or invalid."
         ) from None
+    load_cookie_transport_policy(
+        tuple(str(item) for item in environment.trusted_origins)
+    )
     _validate_saas_persistence_boundary()
     return RuntimeConfiguration(
         mode=RuntimeMode.SAAS,
@@ -133,6 +164,8 @@ def _load_saas_configuration() -> RuntimeConfiguration:
         jwt_audience=environment.jwt_audience,
         database_url=environment.database_url,
         session_signing_key=environment.session_signing_key,
+        qdrant_url=environment.qdrant_url,
+        trusted_origins=environment.trusted_origins,
     )
 
 
@@ -154,7 +187,7 @@ def _validate_saas_persistence_boundary() -> None:
             raise SaasConfigurationError(
                 "SaaS persistent path overrides must remain inside its data root."
             )
-    for environment_variable in _MODEL_CACHE_OVERRIDE_ENVS:
+    for environment_variable in ("FASTEMBED_CACHE_PATH", "FLASHRANK_CACHE_PATH"):
         configured_path = os.getenv(environment_variable)
         if configured_path and _paths_overlap(
             resolve_project_path(configured_path), legacy_root
@@ -185,10 +218,59 @@ async def identity_service_ready(configuration: RuntimeConfiguration) -> bool:
     return response.status_code == 200
 
 
+async def qdrant_service_ready(configuration: RuntimeConfiguration) -> bool:
+    """Return whether the configured Qdrant service answers its health probe."""
+    endpoint = configuration.qdrant_url
+    if endpoint is None:
+        return False
+    try:
+        async with httpx.AsyncClient(
+            timeout=_IDENTITY_TIMEOUT,
+            follow_redirects=False,
+            trust_env=False,
+        ) as client:
+            response = await client.get(f"{str(endpoint).rstrip('/')}/healthz")
+    except httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError:
+        return False
+    return response.status_code == 200
+
+
+async def database_service_ready(configuration: RuntimeConfiguration) -> bool:
+    """Return whether the configured database answers a bounded query."""
+    database_url = configuration.database_url
+    if database_url is None:
+        return False
+    try:
+        connection = await asyncpg.connect(
+            dsn=database_url.get_secret_value(),
+            timeout=_DATABASE_TIMEOUT_SECONDS,
+            command_timeout=_DATABASE_TIMEOUT_SECONDS,
+        )
+        try:
+            result: int | None = await connection.fetchval(
+                "SELECT 1", timeout=_DATABASE_TIMEOUT_SECONDS
+            )
+            return result == 1
+        finally:
+            with anyio.move_on_after(_DATABASE_TIMEOUT_SECONDS, shield=True):
+                await connection.close(timeout=_DATABASE_TIMEOUT_SECONDS)
+    except asyncpg.PostgresError, OSError, TimeoutError:
+        return False
+
+
+async def saas_dependencies_ready(configuration: RuntimeConfiguration) -> bool:
+    """Return one sanitized readiness decision for all mandatory dependencies."""
+    return (
+        await identity_service_ready(configuration)
+        and await database_service_ready(configuration)
+        and await qdrant_service_ready(configuration)
+    )
+
+
 def create_saas_runtime_router(
     runtime: RuntimeConfiguration,
     ui_configuration: UiServingConfiguration,
-    readiness_probe: ReadinessProbe = identity_service_ready,
+    readiness_probe: ReadinessProbe = saas_dependencies_ready,
 ) -> APIRouter:
     """Create the gated SaaS UI and BFF readiness routes."""
     router = APIRouter(tags=["saas-runtime"])
@@ -208,7 +290,7 @@ def create_saas_runtime_router(
         if not await readiness_probe(runtime):
             raise HTTPException(
                 status_code=503,
-                detail="SaaS identity service is unavailable.",
+                detail="SaaS runtime dependencies are unavailable.",
             )
         return RuntimeStatus(mode=RuntimeMode.SAAS, status="ready")
 

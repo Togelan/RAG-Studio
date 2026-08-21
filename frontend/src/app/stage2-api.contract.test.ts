@@ -100,7 +100,7 @@ function recordingClient(records: RequestRecord[]): ApiClient {
     patch: request("patch"),
     post: request("post"),
   }
-  return new ApiClient(fetch, http)
+  return new ApiClient(fetch, http, () => "csrf-proof")
 }
 
 describe("Stage 2 frontend endpoint contract", () => {

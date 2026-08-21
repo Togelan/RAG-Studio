@@ -989,6 +989,35 @@
   // Settings Page — Save Settings Button
   // ============================================================
 
+  function legacyCsrfToken() {
+    var csrfCookieNames = ['__Host-ragstudio-csrf', 'ragstudio-development-csrf'];
+    var cookies = document.cookie.split(';');
+
+    for (var index = 0; index < cookies.length; index += 1) {
+      var cookie = cookies[index].trim();
+      for (var nameIndex = 0; nameIndex < csrfCookieNames.length; nameIndex += 1) {
+        var prefix = csrfCookieNames[nameIndex] + '=';
+        if (cookie.indexOf(prefix) === 0) {
+          return cookie.slice(prefix.length);
+        }
+      }
+    }
+
+    return '';
+  }
+
+  function legacyCsrfHeaders() {
+    var csrfToken = legacyCsrfToken();
+    if (csrfToken) {
+      return Promise.resolve({ 'X-CSRF-Token': csrfToken });
+    }
+
+    return fetch('/api/saas/auth/csrf').then(function (response) {
+      csrfToken = response.ok ? legacyCsrfToken() : '';
+      return csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+    });
+  }
+
   /**
    * Bind click handler to the Save Settings button.
    * POSTs settings to /api/settings, then validates API key if provided.
@@ -1046,10 +1075,14 @@
       }
 
       var savedSettings = null;
-      fetch('/api/settings', {
+      var csrfHeaders = null;
+      legacyCsrfHeaders().then(function (headers) {
+        csrfHeaders = headers;
+        return fetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeaders),
         body: JSON.stringify(settings)
+        });
       })
         .then(function (resp) {
           if (!resp.ok) {
@@ -1063,7 +1096,7 @@
           if (apiKeyInput && apiKeyInput.value.trim()) {
             return fetch('/api/settings/validate-key', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeaders),
               body: JSON.stringify({
                 provider: provider.value,
                 api_key: apiKeyInput.value.trim()

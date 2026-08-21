@@ -240,6 +240,117 @@ and behaviorally aligned.
   surface linked from the development UI; production email-provider UX is outside
   FR-013. Widget/public-key controls and billing remain outside this stage.
 
+## Group 1 unified RAG-Studio shell contract (FR-021)
+
+This section is the implementation contract for Group 1. It supersedes the
+separate user-facing SaaS shell without claiming that the current checkout has
+already performed that cutover. The governing route inventory and migration
+table live in `docs/features/unified-rag-studio-shell-auth.md`.
+
+### Public access boundary — approved 2026-08-20
+
+Authentication is a **public access surface**, not a reduced authenticated
+application. Before the BFF has confirmed a session, `/`, `/sign-in`, and
+`/sign-up` use a minimal `PublicAuthShell` with product identity, locale, a
+short factual product description, and the sign-in/sign-up form. The public
+surface must not render the application top navigation, connection status,
+page eyebrow/title, workspace switcher, account role, user menu, drawer, or
+any disabled-looking product destination. In particular, it must never show
+Home, Settings, or Chat as public or blocked routes: those labels imply access
+to product functionality the visitor cannot yet use.
+
+On wide public-auth viewports, the factual product label and description form a
+quiet left hero beside the credential panel. The panel is deliberately offset
+slightly to the right of the center line, creating a purposeful reading order
+without introducing a second navigation system or marketing claims. At tablet
+and mobile widths, the hero stacks above the form and the form remains the sole
+primary task.
+
+`/app` and all of its descendants are authenticated application routes. Only
+after a confirmed session may one `AppShell` render its product navigation,
+status, context controls, and page heading. An unauthenticated protected-route
+request is held as an in-memory, allow-listed internal return path; it contains
+no query, bearer, role, Account, or Workspace value, cannot point off-origin,
+and is cleared after the first successful recovery. The fallback target is
+`/app`.
+
+The public surface may include one quiet secondary `About RAG-Studio` text
+link when truthful content exists, but it is not an application tab or a
+second navigation system. A longer marketing/conversion journey, claims,
+pricing, and decorative effects remain owned by FR-018; Group 1 does not
+invent them. Public auth is task-first: one primary action, visible field
+labels, keyboard focus, sanitized recovery/confirmation errors, and no
+access-token or session detail in the DOM.
+
+### Canonical product and navigation — FR021-DESIGN-CANONICAL
+
+- `/app` is the one canonical authenticated RAG-Studio application. `/` is the
+  public access entry: it recovers a session and then renders either the
+  minimal public authentication state or `/app`; it never presents a competing
+  product brand or shell.
+- Exactly one `AppShell` owns the product identity, primary top navigation,
+  locale control, user menu, page heading, and mobile drawer. The desktop header
+  is one line: identity at the left, primary navigation centered, locale and an
+  icon-only profile control at the right. Workspace selection is not a persistent
+  header card; it is a labelled task surface on Home and remains available in the
+  mobile drawer.
+  The selected local navigation item is the sole location cue for Chat and
+  Settings: the shell does not repeat a `RAG-Studio` eyebrow or the active
+  tab's title above either surface. Feature content retains only meaningful
+  task copy and accessible region names. Home retains its welcome heading.
+  A former `/saas` route may only redirect or render its canonical destination;
+  it must never mount `SaasShell` beside or inside `AppShell`.
+- Navigation lists only destinations backed by the current Group 1 surface:
+  Home/Personal Lab entry, Chat, Settings, and the active Workspace’s available
+  Chatbots, Sources, and People destinations. Account context is a control, not
+  a second navigation bar. Knowledge, Agents, Widget Bots, Usage, and Billing
+  are omitted until their owning FR supplies a functional route and contract.
+- The active item has a text label, `aria-current`, and a non-colour cue. A
+  disabled-looking or “coming soon” item is not a substitute for a destination
+  and must not be rendered in the canonical shell.
+
+### Trusted context and role-honest states — FR021-DESIGN-ROLE-STATES
+
+- The labelled Home context surface identifies the server-confirmed Account and
+  exactly `Personal Lab` or the active Workspace, followed by a textual effective
+  role badge (`Owner`, `Admin`, or `Member`) where a Workspace is selected. The
+  same full selector is available in the mobile drawer. A Personal Lab does not
+  invent a Workspace role.
+- Context data is loading until the BFF confirms it. The old context’s child
+  content is cleared before the new context’s dependent content can render.
+  Browser-held IDs, cached roles, and hidden navigation state are presentation
+  hints only and never authority.
+- Owner actions are limited to real ownership and membership lifecycle tasks;
+  admin actions are limited to real invitations, sources, and chatbot
+  management; member views retain chatbot/test access but show a plain,
+  localized permission explanation for unavailable mutation work. Do not render
+  a dead action, a fake control, or a raw policy/API detail.
+- Required public-access outcomes are: initial/loading; unauthenticated sign-in
+  or sign-up; confirmation-required; and a sanitized recoverable auth error.
+  Required authenticated shell outcomes are: no-context/empty; selection-pending;
+  recoverable service error; forbidden; revoked/archived/unavailable selection;
+  and signed-out. Forbidden, revoked, and archived outcomes clear stale
+  workspace and agent content, retain only safe account/context-recovery UI,
+  and offer a real available-context selection or sign-in action.
+- The account/user menu contains only real session controls: labelled user
+  identity, sign out, and locale. It must not expose provider tokens, account
+  secrets, raw error text, or unimplemented profile/billing controls.
+
+### Responsive and localized composition — FR021-DESIGN-VIEWPORT-MATRIX
+
+| Viewport | EN and RU contract | Observable layout rule |
+| --- | --- | --- |
+| 360 px | Compact header; labelled menu and context controls are at least 44 px; one-column content and wrapped action groups | Drawer is the only off-canvas navigation, controls retain visible labels, and no primary surface horizontally scrolls |
+| 768 px | Header remains compact when the full top bar would collide; contextual content stacks before labels or role badges compress | Drawer focus is trapped while open and returns to its trigger on close; long Russian Account/Workspace names wrap without clipping actions |
+| 1440 px | One persistent top bar and bounded page body; context is reachable from Home | No duplicate rail, no second product nav, and reading/content widths follow the existing layout tokens |
+
+All EN/RU strings use the shared locale system; neither language may depend on
+fixed-width truncation for Account, Personal Lab, Workspace, or role labels.
+Keyboard focus uses `--rs-focus`, icon-only controls have accessible names, and
+all state changes honour reduced motion. The design remains dark-first and uses
+the existing semantic tokens, surface hierarchy, restrained gold emphasis, and
+blue-violet interactive state rather than a new SaaS brand.
+
 ## Stage boundaries and visual QA
 
 - **Stage 2 / FR-012:** build the React visual system and replace existing Welcome, Settings, and Chat behavior with parity. The Dashboard location needs its own concrete data and acceptance criteria before it becomes a working route; the reference dashboard does not authorize invented quality metrics.

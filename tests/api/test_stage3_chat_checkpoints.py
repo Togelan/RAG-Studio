@@ -86,7 +86,7 @@ def _auth_context(workspace_id: UUID, user_id: UUID) -> AuthContext:
         "server-only-access",
         "server-only-refresh",
         99_999_999_999.0,
-        workspace_id,
+        active_workspace_id=workspace_id,
     )
     return AuthContext(
         session,

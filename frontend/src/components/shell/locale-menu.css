@@ -1,0 +1,78 @@
+.rs-locale-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.rs-locale-menu__trigger {
+  display: inline-flex;
+  min-block-size: var(--rs-space-44);
+  align-items: center;
+  gap: var(--rs-space-6);
+  border: var(--rs-border-width) solid var(--rs-border);
+  border-radius: var(--rs-radius-control);
+  background: var(--rs-surface-raised);
+  color: var(--rs-text-muted);
+  cursor: pointer;
+  list-style: none;
+  padding: 0 var(--rs-space-8);
+}
+
+.rs-locale-menu__trigger:hover,
+.rs-locale-menu--open .rs-locale-menu__trigger {
+  border-color: var(--rs-border-strong);
+  color: var(--rs-text);
+}
+
+.rs-locale-menu__trigger:focus-visible,
+.rs-locale-menu__panel button:focus-visible {
+  outline: var(--rs-focus-width) solid var(--rs-focus);
+  outline-offset: var(--rs-space-2);
+}
+
+.rs-locale-menu__panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--rs-space-8));
+  right: 0;
+  display: grid;
+  min-inline-size: 9rem;
+  gap: var(--rs-space-2);
+  border: var(--rs-border-width) solid var(--rs-border-strong);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-surface-overlay);
+  padding: var(--rs-space-4);
+  box-shadow: var(--rs-space-0) var(--rs-space-20) var(--rs-space-60)
+    color-mix(in srgb, var(--rs-canvas) 42%, transparent);
+}
+
+.rs-locale-menu__panel button {
+  display: flex;
+  min-block-size: var(--rs-space-44);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rs-space-16);
+  border: 0;
+  border-radius: var(--rs-radius-control);
+  background: transparent;
+  color: var(--rs-text-muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 var(--rs-space-8);
+  text-align: start;
+}
+
+.rs-locale-menu__panel button:hover,
+.rs-locale-menu__panel button[aria-pressed="true"] {
+  background: var(--rs-surface-raised);
+  color: var(--rs-text);
+}
+
+.rs-locale-menu__panel button svg {
+  color: var(--rs-gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-locale-menu * {
+    transition-duration: var(--rs-motion-reduced);
+  }
+}

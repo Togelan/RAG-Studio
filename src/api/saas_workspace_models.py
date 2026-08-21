@@ -9,6 +9,9 @@ from typing import Protocol
 from uuid import UUID
 
 from src.api.saas_sessions import WorkspaceRole
+from src.api.saas_workspace_creation import WorkspaceCreation
+
+__all__ = ("WorkspaceCreation",)
 
 
 class InvitationRole(StrEnum):
@@ -35,11 +38,12 @@ class WorkspaceErrorCode(StrEnum):
     UNAVAILABLE = "unavailable"
 
 
-@dataclass(slots=True)
 class WorkspaceOperationError(Exception):
     """Workspace failure without tenant, provider, or database detail."""
 
-    code: WorkspaceErrorCode
+    def __init__(self, code: WorkspaceErrorCode) -> None:
+        super().__init__()
+        self.code = code
 
     def __str__(self) -> str:
         return f"workspace operation {self.code.value}"
@@ -51,15 +55,6 @@ class WorkspaceActor:
 
     workspace_id: UUID
     user_id: UUID
-
-
-@dataclass(frozen=True, slots=True)
-class WorkspaceCreation:
-    """Idempotent workspace creation command."""
-
-    user_id: UUID
-    name: str
-    idempotency_key: str
 
 
 @dataclass(frozen=True, slots=True)

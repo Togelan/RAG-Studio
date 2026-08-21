@@ -153,7 +153,7 @@ describe("ChatPage", () => {
     )
   })
 
-  it("uses the shell-owned page title without repeating a feature heading", () => {
+  it("uses the navigation label without repeating a page heading", () => {
     renderChat({
       cancel: vi.fn(async () => ({ session_id: SESSION.id, status: "stopped" as const })),
       reattach: vi.fn(async () => undefined),
@@ -164,7 +164,7 @@ describe("ChatPage", () => {
     expect(
       screen.queryByRole("heading", { name: enLocale.chat_feature_title }),
     ).not.toBeInTheDocument()
-    expect(document.querySelector(".rs-chat")).toHaveAttribute("aria-labelledby", "page-title")
+    expect(document.querySelector(".rs-chat")).toHaveAttribute("aria-label", enLocale.nav_chat)
   })
 
   it("localizes retry timing and session message-count metadata in Russian", async () => {

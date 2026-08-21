@@ -7,7 +7,7 @@ interface ReactGrabModule {
 }
 
 export async function enableDevelopmentInstrumentation(): Promise<void> {
-  if (!import.meta.env.DEV || import.meta.env.VITE_DISABLE_REACT_DEVTOOLS === "1") {
+  if (!import.meta.env.DEV || import.meta.env.VITE_ENABLE_REACT_DEVTOOLS !== "1") {
     return
   }
 

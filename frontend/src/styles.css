@@ -457,3 +457,23 @@ textarea:focus-visible,
     transition-duration: var(--rs-motion-reduced);
   }
 }
+
+.rs-route-recovery {
+  display: grid;
+  max-inline-size: var(--rs-layout-reading);
+  gap: var(--rs-space-12);
+  padding: var(--rs-space-24);
+  border: var(--rs-border-width) solid var(--rs-border);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-surface);
+  overflow-wrap: anywhere;
+}
+
+.rs-route-recovery h2,
+.rs-route-recovery p {
+  margin: 0;
+}
+
+.rs-route-recovery p {
+  color: var(--rs-text-muted);
+}
