@@ -61,7 +61,7 @@ describe("settings API contract", () => {
     const get = vi.fn(() => Promise.resolve(jsonResponse({ ...settings, api_key: "********" })))
     const post = vi.fn(() => Promise.resolve(jsonResponse({ ...settings, chunks_changed: false })))
     const http: KyHttpClient = { delete: vi.fn(), get, patch: vi.fn(), post }
-    const api = createSettingsApi(new ApiClient(fetch, http))
+    const api = createSettingsApi(new ApiClient(fetch, http, () => "csrf-proof"))
 
     const loaded = await api.load()
     await api.save(settings)
@@ -86,7 +86,7 @@ describe("settings API contract", () => {
       Promise.resolve(jsonResponse({ valid: true, provider: "deepseek", error: null })),
     )
     const http: KyHttpClient = { delete: vi.fn(), get, patch: vi.fn(), post }
-    const api = createSettingsApi(new ApiClient(fetch, http))
+    const api = createSettingsApi(new ApiClient(fetch, http, () => "csrf-proof"))
 
     await api.validateKey("deepseek", "secret-value")
     const result = await api.models("deepseek")

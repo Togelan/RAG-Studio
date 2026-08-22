@@ -45,6 +45,10 @@ function staticKyClient(response: Response, inputs: string[]): KyHttpClient {
   return { delete: request, get: request, patch: request, post: request }
 }
 
+function stubReadableCsrfCookie(): void {
+  vi.stubGlobal("document", { cookie: "__Host-ragstudio-csrf=chat-proof" })
+}
+
 describe("SseFrameParser", () => {
   it("parses fragmented UTF-8, CRLF, and multiline payloads while ignoring heartbeats", () => {
     const parser = new SseFrameParser()
@@ -126,6 +130,8 @@ describe("stream boundary", () => {
   })
 
   it("decodes UTF-8 code points split across stream reads", async () => {
+    // Given: the authenticated browser still has its readable CSRF companion cookie.
+    stubReadableCsrfCookie()
     const greeting = "\u041f\u0440\u0438\u0432\u0435\u0442"
     const payload = `event: token\ndata: {"token":"${greeting}"}\n\n`
     const fetchSpy = vi.fn(() => Promise.resolve(fragmentedStreamResponse(payload, [24, 25, 26])))
@@ -149,6 +155,8 @@ describe("stream boundary", () => {
   })
 
   it("uses one AbortSignal for POST streaming and emits only parsed public events", async () => {
+    // Given: the authenticated browser still has its readable CSRF companion cookie.
+    stubReadableCsrfCookie()
     const fetchSpy = vi.fn(() =>
       Promise.resolve(
         streamResponse([
@@ -178,6 +186,8 @@ describe("stream boundary", () => {
   })
 
   it("consumes the real replay-buffer overflow sequence as a terminal stream", async () => {
+    // Given: the authenticated browser still has its readable CSRF companion cookie.
+    stubReadableCsrfCookie()
     const fetchSpy = vi.fn(() =>
       Promise.resolve(
         streamResponse([
