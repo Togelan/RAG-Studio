@@ -20,7 +20,7 @@
   top: 0;
   display: grid;
   min-height: var(--rs-space-64);
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--rs-space-16);
   border-bottom: var(--rs-border-width) solid var(--rs-border);
@@ -55,6 +55,7 @@
 .rs-shell__desktop-nav {
   display: flex;
   min-width: 0;
+  max-width: 100%;
   justify-self: center;
   justify-content: center;
   gap: var(--rs-space-4);
@@ -350,6 +351,31 @@
   padding: 0 0 var(--rs-space-12);
 }
 
+.rs-shell__drawer-account {
+  display: grid;
+  gap: var(--rs-space-4);
+  margin-top: var(--rs-space-12);
+  border-top: var(--rs-border-width) solid var(--rs-border);
+  padding-top: var(--rs-space-12);
+}
+
+.rs-shell__drawer-account p,
+.rs-shell__drawer-account strong {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rs-shell__drawer-account p {
+  color: var(--rs-text-muted);
+  font-size: var(--rs-font-xs);
+}
+
+.rs-shell__drawer-sign-out {
+  width: 100%;
+  justify-content: flex-start;
+  margin-top: var(--rs-space-4);
+}
+
 .rs-shell__context-recovery {
   min-height: var(--rs-layout-loading-block);
   border: var(--rs-border-width) solid var(--rs-border);
@@ -362,7 +388,7 @@
   margin: 0;
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 64rem) {
   .rs-shell__header {
     min-height: var(--rs-space-60);
     grid-template-columns: minmax(0, 1fr) auto;

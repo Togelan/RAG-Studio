@@ -198,6 +198,23 @@ export function AppShell({
                   onNavigate={() => setMenuOpen(false)}
                   workspaceNavigation={workspaceNavigation}
                 />
+                {user !== undefined ? (
+                  <div className="rs-shell__drawer-account">
+                    <p>{shellCopy.signedInAs}</p>
+                    <strong>{user.identity}</strong>
+                    <Button
+                      className="rs-shell__drawer-sign-out"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        void user.onSignOut()
+                      }}
+                      variant="secondary"
+                    >
+                      <LogOut aria-hidden="true" size={16} />
+                      {shellCopy.signOut}
+                    </Button>
+                  </div>
+                ) : null}
               </nav>
             </DrawerContent>
           </Drawer>

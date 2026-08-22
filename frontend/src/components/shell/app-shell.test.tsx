@@ -272,6 +272,29 @@ describe("Stage 2 AppShell", () => {
     expect(trigger).toHaveFocus()
   })
 
+  it("exposes sign out in the opened compact navigation", async () => {
+    const user = userEvent.setup()
+    const onSignOut = vi.fn()
+    const runtime = createRuntime()
+    render(
+      <LocaleProvider runtime={runtime}>
+        <MemoryRouter initialEntries={["/app/chat"]}>
+          <AppShell user={{ identity: "person@example.test", onSignOut }}>
+            <p>Chat content</p>
+          </AppShell>
+        </MemoryRouter>
+      </LocaleProvider>,
+    )
+
+    await user.click(await screen.findByRole("button", { name: "en aria_toggle_menu" }))
+
+    const drawer = screen.getByRole("dialog", { name: "en aria_mobile_nav" })
+    const signOut = within(drawer).getByRole("button", { name: "Sign out" })
+    expect(signOut).toBeVisible()
+    await user.click(signOut)
+    expect(onSignOut).toHaveBeenCalledOnce()
+  })
+
   it("keeps a long signed-in identity accessible and available in the opened user menu", async () => {
     const identity = "stage2-parity@redacted.invalid"
     const user = userEvent.setup()
