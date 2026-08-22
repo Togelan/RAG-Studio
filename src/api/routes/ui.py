@@ -175,6 +175,13 @@ def create_ui_router(configuration: UiServingConfiguration) -> APIRouter:
         """Serve an explicit React preview route."""
         return _react_preview_response(configuration)
 
+    if configuration.mode is UiMode.REACT:
+
+        @ui_router.get("/app/{app_path:path}", response_class=HTMLResponse)
+        async def serve_react_app_fallback(app_path: str) -> Response:
+            del app_path
+            return react_document_response(configuration)
+
     @ui_router.get("/saas", response_class=HTMLResponse)
     @ui_router.get("/saas/{retired_path:path}", response_class=HTMLResponse)
     async def serve_retired_saas_route(retired_path: str = "") -> Response:
