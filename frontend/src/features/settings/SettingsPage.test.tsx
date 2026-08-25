@@ -2,13 +2,10 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
+import { ApiError } from "../../api/errors"
 import type { TranslationKey } from "../../i18n/locale-inventory"
 import { SettingsPage } from "./SettingsPage"
-import {
-  createIngestionApi,
-  createSettingsApi,
-  SETTINGS_FIXTURE,
-} from "./SettingsPage.test-helpers"
+import { createIngestionApi, createSettingsApi } from "./SettingsPage.test-helpers"
 
 vi.mock("../../app/locale-provider", () => ({
   useLocaleContext: () => ({
@@ -121,6 +118,7 @@ describe("SettingsPage save lifecycle", () => {
       await waitFor(() => expect(save).toHaveBeenCalledOnce())
       expect(save).toHaveBeenCalledWith(
         expect.objectContaining({ max_tokens: 4096 }),
+        undefined,
         expect.any(AbortSignal),
       )
       await screen.findByText("settings_saved")
@@ -128,10 +126,8 @@ describe("SettingsPage save lifecycle", () => {
     },
   )
 
-  it("activates key validation and then persists settings from the Save button", async () => {
-    const validateKey = vi.fn(() =>
-      Promise.resolve({ valid: true, provider: "deepseek" as const, error: null }),
-    )
+  it("atomically persists a replacement key with settings from the Save button", async () => {
+    const validateKey = vi.fn()
     const save = vi.fn((draft) => Promise.resolve({ ...draft, chunks_changed: false }))
     render(
       <SettingsPage
@@ -143,19 +139,21 @@ describe("SettingsPage save lifecycle", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "settings_save" }))
 
-    await waitFor(() => expect(validateKey).toHaveBeenCalledOnce())
     await waitFor(() => expect(save).toHaveBeenCalledOnce())
-    expect(validateKey).toHaveBeenCalledWith("deepseek", "replacement-key", expect.any(AbortSignal))
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "deepseek" }),
+      "replacement-key",
+      expect.any(AbortSignal),
+    )
+    expect(validateKey).not.toHaveBeenCalled()
     expect(screen.getByRole("button", { name: "settings_save" })).toBeDisabled()
   })
 
-  it("does not save settings when a newly entered key fails validation", async () => {
-    const save = vi.fn(() => Promise.resolve({ ...SETTINGS_FIXTURE, chunks_changed: false }))
+  it("keeps prior state when the atomic settings save rejects a replacement key", async () => {
+    const save = vi.fn(() => Promise.reject(new ApiError(400, "sanitized", null)))
     const api = createSettingsApi({
       save,
-      validateKey: vi.fn(() =>
-        Promise.resolve({ valid: false, provider: "deepseek" as const, error: "provider body" }),
-      ),
+      validateKey: vi.fn(),
     })
     render(<SettingsPage ingestion={createIngestionApi()} settings={api} />)
     await screen.findByLabelText("settings_api_key_label")
@@ -164,8 +162,9 @@ describe("SettingsPage save lifecycle", () => {
     await userEvent.click(screen.getByRole("button", { name: "settings_save" }))
 
     expect(await screen.findByRole("alert")).toHaveTextContent("settings_invalid_key")
-    expect(save).not.toHaveBeenCalled()
-    expect(screen.queryByText("provider body")).not.toBeInTheDocument()
+    expect(save).toHaveBeenCalledOnce()
+    expect(screen.getByLabelText("settings_api_key_label")).toHaveValue("replacement-key")
+    expect(screen.queryByText("sanitized")).not.toBeInTheDocument()
   })
 
   it("asks before persistence and Skip performs the settings POST", async () => {

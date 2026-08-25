@@ -148,6 +148,11 @@
   margin-top: var(--rs-space-20);
 }
 @media (max-width: 680px) {
+  .rs-personal-knowledge.rs-personal-knowledge--with-ingestion {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
   .rs-document__summary,
   .rs-ingestion__heading,
   .rs-upload {

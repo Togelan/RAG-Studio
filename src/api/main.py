@@ -17,20 +17,21 @@ from pathlib import Path
 from typing import Any, assert_never, cast
 from urllib.parse import urlsplit
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.api.dependencies import log_audit
 from src.api.rate_limiter import RateLimitMiddleware
-from src.api.react_ui import UiMode, load_ui_serving_configuration
 from src.api.routes.chat import router as chat_router
 from src.api.routes.chat import set_graph, shutdown_chat_jobs
 from src.api.routes.health import router as health_router
 from src.api.routes.settings import router as settings_router
 from src.api.routes.ui import create_ui_router
-from src.api.saas_auth_context import BffAuthContextResolver
-from src.api.saas_composition import mount_saas_routes
+from src.api.saas_composition import (
+    load_application_ui_configuration,
+    mount_saas_routes,
+)
 from src.api.saas_runtime import (
     RuntimeMode,
     create_saas_runtime_router,
@@ -68,18 +69,6 @@ _CORS_HEADERS = ("Content-Type", "X-API-Key", "X-CSRF-Token")
 
 # Track in-progress tasks for graceful shutdown
 _pending_tasks: set[asyncio.Task[Any]] = set()
-
-
-def _mount_authenticated_personal_lab_routes(
-    app: FastAPI, auth_context: BffAuthContextResolver
-) -> None:
-    async def require_session(request: Request) -> None:
-        await auth_context.resolve(request, require_workspace=False)
-
-    dependencies = (Depends(require_session),)
-    app.include_router(ingestion_router, dependencies=dependencies)
-    app.include_router(chat_router, dependencies=dependencies)
-    app.include_router(settings_router, dependencies=dependencies)
 
 
 def _cors_origins_from_environment() -> tuple[str, ...]:
@@ -243,8 +232,8 @@ def create_app() -> FastAPI:
     Returns:
         Configured FastAPI application instance.
     """
-    ui_configuration = load_ui_serving_configuration()
     runtime_configuration = load_runtime_configuration()
+    ui_configuration = load_application_ui_configuration(runtime_configuration.mode)
     app = FastAPI(
         title="RAG-Studio",
         description="Local-first RAG tool — chat with your documents privately.",
@@ -253,12 +242,7 @@ def create_app() -> FastAPI:
     )
     app.state.ui_configuration = ui_configuration
     app.state.runtime_configuration = runtime_configuration
-    csrf_protected_roots: tuple[str, ...] = ("/api/saas",)
-    if (
-        runtime_configuration.mode is RuntimeMode.SAAS
-        and ui_configuration.mode is UiMode.REACT
-    ):
-        csrf_protected_roots += ("/api/settings", "/api/ingest", "/api/chat")
+    csrf_protected_roots: tuple[str, ...] = ("/api/saas", "/api/personal")
 
     # CORS middleware — allow local development
     # Apply per-IP sliding-window limits to API requests.
@@ -280,10 +264,7 @@ def create_app() -> FastAPI:
 
     # Mount route modules
     app.include_router(health_router)
-    if (
-        runtime_configuration.mode is RuntimeMode.LOCAL
-        or ui_configuration.mode is UiMode.LEGACY
-    ):
+    if runtime_configuration.mode is RuntimeMode.LOCAL:
         app.include_router(ingestion_router)
         app.include_router(chat_router)
         app.include_router(settings_router)
@@ -291,9 +272,7 @@ def create_app() -> FastAPI:
         case RuntimeMode.LOCAL:
             pass
         case RuntimeMode.SAAS:
-            auth_context = mount_saas_routes(app, runtime_configuration)
-            if ui_configuration.mode is UiMode.REACT:
-                _mount_authenticated_personal_lab_routes(app, auth_context)
+            mount_saas_routes(app, runtime_configuration)
         case unreachable:
             assert_never(unreachable)
     app.include_router(create_ui_router(ui_configuration))

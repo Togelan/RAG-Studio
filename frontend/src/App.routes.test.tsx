@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { MemoryRouter, useLocation } from "react-router-dom"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { RagStudioRoutes } from "./App"
+import { requiresCsrfProof } from "./api/csrf"
 import { ApiError } from "./api/errors"
 import { LocaleProvider } from "./app/locale-provider"
 import {
@@ -33,6 +34,13 @@ function authenticatedSession(): AuthSession {
     ],
     active_account_id: accountId,
     workspace: { id: workspaceId, name: "Support", role: "member" },
+  }
+}
+
+function personalSession(): AuthSession {
+  return {
+    ...authenticatedSession(),
+    workspace: null,
   }
 }
 
@@ -102,6 +110,10 @@ function renderRoute(path: string, authGateway: AuthGateway): void {
     ingestion_delete_document_aria: "Delete {name}",
     ingestion_delete_document_message: "Delete {name}",
     ingestion_upload_file_progress: "Upload {name}",
+    nav_chat: "Chat",
+    nav_knowledge: "Knowledge",
+    nav_settings: "Settings",
+    nav_welcome: "Home",
     settings_upload_file_types_helper: "Types: {count}",
   })
   if (translations === null) throw new Error("test translations must be complete")
@@ -123,6 +135,42 @@ function renderRoute(path: string, authGateway: AuthGateway): void {
 afterEach(cleanup)
 
 describe("canonical RAG-Studio routes", () => {
+  it("shows the Personal Lab journey only for a confirmed personal context", async () => {
+    // Given: a signed-in identity with Personal Lab selected.
+    renderRoute("/app/knowledge", gateway(personalSession()))
+
+    // When: the protected deep link settles in the unified shell.
+    const knowledge = await screen.findByRole("link", { name: "Knowledge" })
+
+    // Then: all Personal destinations are real links and Knowledge is the sole location cue.
+    expect(knowledge).toHaveAttribute("aria-current", "page")
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/app")
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/app/settings")
+    expect(screen.getByRole("link", { name: "Chat" })).toHaveAttribute("href", "/app/chat")
+    expect(screen.queryByRole("heading", { level: 1, name: "Knowledge" })).toBeNull()
+    expect(document.querySelectorAll(".rs-shell")).toHaveLength(1)
+  })
+
+  it("does not expose Personal destinations for a Workspace-only context", async () => {
+    // Given: a signed-in identity with a server-confirmed Workspace selected.
+    renderRoute(`/app/workspaces/${workspaceId}/chatbots`, gateway(authenticatedSession()))
+
+    // When: the workspace route settles.
+    await screen.findByRole("link", { name: "Chatbots" })
+
+    // Then: Personal-only Knowledge, Settings, and Chat navigation stays absent.
+    expect(screen.queryByRole("link", { name: "Knowledge" })).toBeNull()
+    expect(screen.queryByRole("link", { name: "Settings" })).toBeNull()
+    expect(screen.queryByRole("link", { name: "Chat" })).toBeNull()
+  })
+
+  it("requires CSRF proof for Personal mutations without changing public reads", () => {
+    // Given: Personal and unrelated API paths.
+    // When/Then: the Personal namespace joins the protected mutation boundary only.
+    expect(requiresCsrfProof("/api/personal/knowledge/upload")).toBe(true)
+    expect(requiresCsrfProof("/api/ui/locale")).toBe(false)
+  })
+
   it.each(retiredRouteMatrix)("maps retired route %s to %s", async (retired, canonical) => {
     // Given: a signed-in user opens one documented retired route pattern.
     renderRoute(retired, gateway(authenticatedSession()))

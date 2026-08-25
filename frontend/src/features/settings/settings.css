@@ -148,7 +148,7 @@
 }
 .rs-langsmith-notice {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: var(--rs-space-12) var(--rs-space-20);
 }
@@ -156,8 +156,8 @@
   grid-column: 1;
 }
 .rs-langsmith-notice > .rs-button {
-  grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-column: 1;
+  grid-row: auto;
 }
 .rs-reingest-progress {
   display: grid;

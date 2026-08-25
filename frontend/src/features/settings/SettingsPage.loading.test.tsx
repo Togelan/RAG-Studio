@@ -147,7 +147,6 @@ describe("SettingsPage loading and localization", () => {
       "settings_generation",
       "settings_answer_behavior",
       "settings_index_behavior",
-      "settings_knowledge_index",
       "settings_observability",
       "settings_model_connection",
       "settings_stored_keys_helper",
@@ -155,9 +154,7 @@ describe("SettingsPage loading and localization", () => {
       "settings_discard_changes",
     ] as const
     for (const key of keys) expect(screen.getByText(ruMessages[key])).toBeVisible()
-    expect(
-      screen.getByText(ruMessages.settings_upload_file_types_helper.replace("{count}", "20")),
-    ).toBeVisible()
+    expect(screen.queryByText(ruMessages.settings_knowledge_index)).not.toBeInTheDocument()
     expect(
       screen.getAllByRole("option", {
         name: new RegExp(ruMessages.settings_provider_coming_soon, "u"),
@@ -171,7 +168,6 @@ describe("SettingsPage loading and localization", () => {
       "Generation",
       "Answer behavior",
       "Index behavior",
-      "Knowledge index",
       "Observability",
       "Model connection",
       "Stored keys stay masked. Enter a value only when replacing the key.",
@@ -181,7 +177,6 @@ describe("SettingsPage loading and localization", () => {
       "Discard changes",
       "Loading settings",
       "Settings are temporarily unavailable. Please try again.",
-      "TXT, MD, PDF, DOCX or CSV · 50 MB each · 20 files per batch",
     ]) {
       expect(screen.queryByText(english)).not.toBeInTheDocument()
     }

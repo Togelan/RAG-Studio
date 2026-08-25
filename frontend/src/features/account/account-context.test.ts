@@ -1,13 +1,16 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { ApiError } from "../../api/errors"
 import type { AuthGateway, AuthSession } from "../auth/auth-gateway"
+import { ACTIVE_SESSION_STORAGE_KEY } from "../chat/model"
 import { AccountContextController } from "./account-context"
 import { AccountIdSchema, UserIdSchema, WorkspaceIdSchema } from "./account-contracts"
 
 const accountId = AccountIdSchema.parse("00000000-0000-4000-8000-000000000010")
 const workspaceA = WorkspaceIdSchema.parse("00000000-0000-4000-8000-000000000011")
 const workspaceB = WorkspaceIdSchema.parse("00000000-0000-4000-8000-000000000012")
+
+afterEach(() => globalThis.localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY))
 
 function session(workspaceId = workspaceA): AuthSession {
   return {
@@ -35,6 +38,43 @@ function gatewayWith(
 }
 
 describe("Account context controller", () => {
+  it("clears the remembered Personal Chat session only after successful sign-out", async () => {
+    // Given: a ready account with a remembered Personal Chat session.
+    globalThis.localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, "personal-session-a")
+    const controller = new AccountContextController(
+      gatewayWith(() => Promise.resolve(session())),
+      session(),
+    )
+
+    // When: server-side sign-out succeeds.
+    await controller.signOut()
+
+    // Then: the account is unauthenticated and the prior chat cannot be restored.
+    expect(controller.state).toEqual({ kind: "unauthenticated" })
+    expect(globalThis.localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY)).toBeNull()
+  })
+
+  it("preserves the remembered Personal Chat session when sign-out fails", async () => {
+    // Given: a ready account whose server-side sign-out will fail.
+    globalThis.localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, "personal-session-a")
+    const gateway: AuthGateway = {
+      ...gatewayWith(() => Promise.resolve(session())),
+      signOut: () =>
+        Promise.reject(new ApiError(503, "The service is temporarily unavailable.", null)),
+    }
+    const controller = new AccountContextController(gateway, session())
+
+    // When: sign-out is rejected.
+    await controller.signOut()
+
+    // Then: the stale-state cleanup is not mistaken for a completed sign-out.
+    expect(controller.state).toEqual({
+      kind: "error",
+      message: "The service is temporarily unavailable.",
+    })
+    expect(globalThis.localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY)).toBe("personal-session-a")
+  })
+
   it("clears protected context immediately and aborts a stale rapid switch", async () => {
     // Given: two context selections where only the second request resolves.
     const signals: AbortSignal[] = []

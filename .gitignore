@@ -88,4 +88,9 @@ blog-post-ru.md
 .tmp-csrf-gate-r2/
 .tmp-test/
 
+# Disposable browser and pytest QA artefacts
+.playwright-mcp/
+.tmp-pytest-*/
+*-runtime.png
+
 sandbox/

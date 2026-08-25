@@ -30,7 +30,7 @@ describe("ingestion API contract", () => {
       return Promise.resolve(jsonResponse({}))
     }) as unknown as typeof fetch
 
-    await bindBrowserFetch(browserFetch)("/api/ingest/documents")
+    await bindBrowserFetch(browserFetch)("/api/personal/knowledge/documents")
 
     expect(browserFetch).toHaveBeenCalledOnce()
   })
@@ -39,8 +39,9 @@ describe("ingestion API contract", () => {
     const get = vi.fn(() =>
       Promise.resolve(
         jsonResponse({
-          documents: [],
-          total: null,
+          documents: [
+            { doc_id: "doc-1", filename: "safe.txt", chunk_count: 2, strategy: "recursive" },
+          ],
           next_cursor: "next/cursor+value",
           truncated: true,
         }),
@@ -51,58 +52,80 @@ describe("ingestion API contract", () => {
 
     const page = await api.documents("first/cursor+value")
 
-    expect(get).toHaveBeenCalledWith("/api/ingest/documents?cursor=first%2Fcursor%2Bvalue", {})
+    expect(get).toHaveBeenCalledWith(
+      "/api/personal/knowledge/documents?cursor=first%2Fcursor%2Bvalue",
+      {},
+    )
     expect(page.truncated).toBe(true)
     expect(page.next_cursor).toBe("next/cursor+value")
+    expect(page.documents[0]).toMatchObject({ chunks_count: 2, filename: "safe.txt" })
   })
 
   it("uses the exact chunks, progress, re-ingest, delete, and clear contracts", async () => {
     const get = vi
       .fn()
-      .mockResolvedValueOnce(jsonResponse({ chunks: [], next_cursor: "next", truncated: true }))
       .mockResolvedValueOnce(
-        jsonResponse({ file_id: "job/1", status: "done", message: "ready", chunks_count: 2 }),
+        jsonResponse({
+          chunks: [
+            {
+              point_id: "point-1",
+              text: "Scoped content",
+              chunk_index: 0,
+              strategy: "recursive",
+              csv_row: null,
+            },
+          ],
+          next_cursor: "next",
+          truncated: true,
+        }),
       )
+      .mockResolvedValueOnce(jsonResponse({ file_id: "job/1", status: "complete", code: null }))
     const post = vi.fn(() =>
       Promise.resolve(jsonResponse({ status: "processing", file_id: "job", message: "queued" })),
     )
     const remove = vi
       .fn()
-      .mockResolvedValueOnce(jsonResponse({ status: "ok", message: "deleted", deleted_count: 1 }))
-      .mockResolvedValueOnce(jsonResponse({ status: "ok", message: "cleared", deleted_count: 3 }))
+      .mockResolvedValueOnce(jsonResponse({ deleted: 1 }))
+      .mockResolvedValueOnce(jsonResponse({ deleted: 3 }))
     const api = createIngestionApi(
       new ApiClient(fetch, httpClient({ delete: remove, get, post }), () => "csrf-proof"),
       vi.fn(),
     )
     const signal = new AbortController().signal
 
-    await api.chunks("doc/1", "chunk/+", signal)
-    await api.progress("job/1", signal)
+    const chunks = await api.chunks("doc/1", "chunk/+", signal)
+    const progress = await api.progress("job/1", signal)
     await api.reingest({ doc_id: "doc-1", filename: "safe.txt" }, signal)
     await api.deleteDocument("doc/1", signal)
     await api.clear(signal)
 
+    expect(chunks.chunks[0]).toMatchObject({ point_id: "point-1", strategy: "recursive" })
+    expect(progress.status).toBe("done")
+
     expect(get).toHaveBeenNthCalledWith(
       1,
-      "/api/ingest/documents/doc%2F1/chunks?cursor=chunk%2F%2B",
+      "/api/personal/knowledge/documents/doc%2F1/chunks?cursor=chunk%2F%2B",
       { signal },
     )
-    expect(get).toHaveBeenNthCalledWith(2, "/api/ingest/progress/job%2F1", { signal })
-    expect(post).toHaveBeenCalledWith("/api/ingest/reingest", {
+    expect(get).toHaveBeenNthCalledWith(2, "/api/personal/knowledge/progress/job%2F1", { signal })
+    expect(post).toHaveBeenCalledWith("/api/personal/knowledge/documents/doc-1/reindex", {
       headers: { "X-CSRF-Token": "csrf-proof" },
-      json: { doc_id: "doc-1", filename: "safe.txt" },
+      json: {},
       retry: 0,
       signal,
+      throwHttpErrors: false,
     })
-    expect(remove).toHaveBeenNthCalledWith(1, "/api/ingest/documents/doc%2F1", {
+    expect(remove).toHaveBeenNthCalledWith(1, "/api/personal/knowledge/documents/doc%2F1", {
       headers: { "X-CSRF-Token": "csrf-proof" },
       retry: 0,
       signal,
+      throwHttpErrors: false,
     })
-    expect(remove).toHaveBeenNthCalledWith(2, "/api/ingest/clear", {
+    expect(remove).toHaveBeenNthCalledWith(2, "/api/personal/knowledge/clear", {
       headers: { "X-CSRF-Token": "csrf-proof" },
       retry: 0,
       signal,
+      throwHttpErrors: false,
     })
   })
 
@@ -125,7 +148,9 @@ describe("ingestion API contract", () => {
       await api.upload(file, action, signal)
 
       const expectedPath =
-        action === "default" ? "/api/ingest/upload" : `/api/ingest/upload?action=${action}`
+        action === "default"
+          ? "/api/personal/knowledge/upload"
+          : `/api/personal/knowledge/upload?action=${action}`
       expect(upload).toHaveBeenCalledWith(expectedPath, expect.any(FormData), signal)
       const body = vi.mocked(upload).mock.calls[0]?.[1]
       const uploadedFile = body?.get("file")
@@ -133,6 +158,26 @@ describe("ingestion API contract", () => {
       expect((uploadedFile as File).name).toBe("hello.txt")
     },
   )
+
+  it("uses the shared CSRF transport for multipart Personal uploads", async () => {
+    const post = vi.fn(() =>
+      Promise.resolve(jsonResponse({ status: "unchanged", file_id: "", message: "ready" })),
+    )
+    const api = createIngestionApi(
+      new ApiClient(fetch, httpClient({ post }), () => "personal-csrf-proof"),
+    )
+
+    await api.upload(new File(["hello"], "hello.txt", { type: "text/plain" }))
+
+    expect(post).toHaveBeenCalledWith(
+      "/api/personal/knowledge/upload",
+      expect.objectContaining({
+        body: expect.any(FormData),
+        headers: { "X-CSRF-Token": "personal-csrf-proof" },
+        retry: 0,
+      }),
+    )
+  })
 
   it("parses the duplicate 409 contract without treating it as a retry", async () => {
     const upload = vi.fn(() =>

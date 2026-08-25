@@ -21,6 +21,18 @@ export type StreamOptions = StreamCallbacks & {
   readonly signal: AbortSignal
 }
 
+type StreamIdentity = {
+  readonly messageId?: string
+  readonly sessionId?: string
+}
+
+type MutableEventData = {
+  completed?: unknown
+  full_response?: unknown
+  message_id?: unknown
+  type?: unknown
+} & Record<string, unknown>
+
 function nextFrameBoundary(buffer: string): number {
   const crlfBoundary = buffer.indexOf("\r\n\r\n")
   const lfBoundary = buffer.indexOf("\n\n")
@@ -38,7 +50,26 @@ function frameLengthAt(buffer: string, boundary: number): number {
   return buffer.startsWith("\r\n\r\n", boundary) ? 4 : 2
 }
 
-function parseFrame(frame: string): ChatStreamEvent | null {
+function normalizePersonalEvent(
+  eventName: string,
+  eventData: MutableEventData,
+  identity: StreamIdentity,
+): void {
+  if (eventName === "start" && typeof eventData.message_id !== "string") {
+    const messageId = identity.messageId ?? identity.sessionId
+    if (messageId !== undefined) eventData.message_id = messageId
+  }
+  if (
+    eventName === "done" &&
+    eventData.completed === false &&
+    typeof eventData.full_response === "string" &&
+    typeof eventData.message_id === "string"
+  ) {
+    eventData.completed = true
+  }
+}
+
+function parseFrame(frame: string, identity: StreamIdentity = {}): ChatStreamEvent | null {
   if (frame.startsWith(":")) {
     return null
   }
@@ -67,7 +98,7 @@ function parseFrame(frame: string): ChatStreamEvent | null {
     throw error
   }
 
-  const eventData: { completed?: unknown; type?: unknown } & Record<string, unknown> = {}
+  const eventData: MutableEventData = {}
   if (typeof data === "object" && data !== null && !Array.isArray(data)) {
     Object.assign(eventData, data)
   }
@@ -75,6 +106,7 @@ function parseFrame(frame: string): ChatStreamEvent | null {
   if (eventName === "done" && !("completed" in eventData)) {
     eventData.completed = true
   }
+  normalizePersonalEvent(eventName, eventData, identity)
 
   const parsed = ChatStreamEventSchema.safeParse(eventData)
   if (!parsed.success) {
@@ -94,6 +126,8 @@ function parseFrame(frame: string): ChatStreamEvent | null {
 export class SseFrameParser {
   #buffer = ""
 
+  constructor(readonly identity: StreamIdentity = {}) {}
+
   push(text: string): readonly ChatStreamEvent[] {
     this.#buffer += text
     const events: ChatStreamEvent[] = []
@@ -102,7 +136,7 @@ export class SseFrameParser {
     while (boundary !== -1) {
       const frame = this.#buffer.slice(0, boundary)
       this.#buffer = this.#buffer.slice(boundary + frameLengthAt(this.#buffer, boundary))
-      const event = parseFrame(frame)
+      const event = parseFrame(frame, this.identity)
       if (event !== null) {
         events.push(event)
       }
@@ -118,13 +152,17 @@ export class SseFrameParser {
       return []
     }
 
-    const event = parseFrame(this.#buffer)
+    const event = parseFrame(this.#buffer, this.identity)
     this.#buffer = ""
     return event === null ? [] : [event]
   }
 }
 
-async function consumeResponse(response: Response, options: StreamOptions): Promise<void> {
+async function consumeResponse(
+  response: Response,
+  options: StreamOptions,
+  identity: StreamIdentity,
+): Promise<void> {
   if (!response.ok) {
     throw apiErrorFromResponse(response)
   }
@@ -133,7 +171,7 @@ async function consumeResponse(response: Response, options: StreamOptions): Prom
   }
 
   const decoder = new TextDecoder()
-  const parser = new SseFrameParser()
+  const parser = new SseFrameParser(identity)
   const reader = response.body.getReader()
 
   try {
@@ -166,6 +204,7 @@ async function openStream(
   path: `/api/${string}`,
   init: RequestInit,
   options: StreamOptions,
+  identity: StreamIdentity = {},
 ): Promise<void> {
   let response: Response
   try {
@@ -181,7 +220,7 @@ async function openStream(
     throw error
   }
 
-  await consumeResponse(response, options)
+  await consumeResponse(response, options, identity)
 }
 
 export async function streamChat(request: ChatSendRequest, options: StreamOptions): Promise<void> {
@@ -189,7 +228,7 @@ export async function streamChat(request: ChatSendRequest, options: StreamOption
   if (!parsed.success) {
     throw new StreamProtocolError()
   }
-  const csrfHeaders = await csrfHeadersForMutation("/api/chat/send", {
+  const csrfHeaders = await csrfHeadersForMutation("/api/personal/chat/send", {
     establish: () =>
       fetch("/api/saas/auth/csrf", {
         credentials: "same-origin",
@@ -199,7 +238,7 @@ export async function streamChat(request: ChatSendRequest, options: StreamOption
   })
 
   await openStream(
-    "/api/chat/send",
+    "/api/personal/chat/send",
     {
       body: JSON.stringify(parsed.data),
       headers: {
@@ -210,14 +249,19 @@ export async function streamChat(request: ChatSendRequest, options: StreamOption
       method: "POST",
     },
     options,
+    {
+      ...(parsed.data.message_id === undefined ? {} : { messageId: parsed.data.message_id }),
+      ...(parsed.data.session_id === undefined ? {} : { sessionId: parsed.data.session_id }),
+    },
   )
 }
 
 export function reattachChatStream(sessionId: string, options: StreamOptions): Promise<void> {
   return openStream(
-    `/api/chat/sessions/${encodeURIComponent(sessionId)}/stream`,
+    `/api/personal/chat/sessions/${encodeURIComponent(sessionId)}/stream`,
     { headers: { Accept: "text/event-stream" }, method: "GET" },
     options,
+    { sessionId },
   )
 }
 
@@ -227,7 +271,7 @@ export function cancelChatStream(
   client: ApiClient = apiClient,
 ): Promise<ChatCancelResponse> {
   return client.post(
-    `/api/chat/sessions/${encodeURIComponent(sessionId)}/cancel`,
+    `/api/personal/chat/sessions/${encodeURIComponent(sessionId)}/cancel`,
     {},
     ChatCancelResponseSchema,
     signal === undefined ? {} : { signal },

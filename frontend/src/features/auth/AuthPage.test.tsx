@@ -71,7 +71,7 @@ describe("unified RAG-Studio authentication page", () => {
 
     // When: the public hierarchy renders.
     const authSurface = within(view.container)
-    const hero = authSurface.getByRole("heading", { level: 1, name: "RAG‑Studio workspace" })
+    const hero = authSurface.getByRole("heading", { level: 1, name: "RAG‑Studio" })
 
     // Then: the product hero remains distinct from the sign-in task.
     expect(hero).toBeVisible()

@@ -1,5 +1,3 @@
-import ky from "ky"
-
 import { ApiClient } from "../../api/client"
 import { ApiContractError, apiErrorFromResponse } from "../../api/errors"
 import {
@@ -60,18 +58,6 @@ function createBrowserApiClient(): ApiClient {
   return new ApiClient(bindBrowserFetch())
 }
 
-const defaultUploadTransport: UploadTransport = async (path, body, signal) => {
-  const signalOption = signal === undefined ? {} : { signal }
-  return ky.post(path, {
-    body,
-    credentials: "same-origin",
-    fetch: bindBrowserFetch(),
-    retry: 0,
-    ...signalOption,
-    throwHttpErrors: false,
-  })
-}
-
 function queryPath(base: string, cursor: string | undefined): string {
   return cursor === undefined ? base : `${base}?cursor=${encodeURIComponent(cursor)}`
 }
@@ -111,34 +97,43 @@ function options(signal: AbortSignal | undefined): { readonly signal?: AbortSign
 
 export function createIngestionApi(
   client: ApiClient = createBrowserApiClient(),
-  uploadTransport: UploadTransport = defaultUploadTransport,
+  uploadTransport?: UploadTransport,
 ): IngestionApi {
+  const transport =
+    uploadTransport ??
+    ((path: string, body: FormData, signal?: AbortSignal) =>
+      client.postFormResponse(path, body, options(signal)))
   return {
     documents: (cursor, signal) =>
-      client.get(queryPath("/api/ingest/documents", cursor), DocumentsPageSchema, options(signal)),
+      client.get(
+        queryPath("/api/personal/knowledge/documents", cursor),
+        DocumentsPageSchema,
+        options(signal),
+      ),
     chunks: (docId, cursor, signal) =>
       client.get(
-        queryPath(`/api/ingest/documents/${encodeURIComponent(docId)}/chunks`, cursor),
+        queryPath(`/api/personal/knowledge/documents/${encodeURIComponent(docId)}/chunks`, cursor),
         ChunksPageSchema,
         options(signal),
       ),
     deleteDocument: (docId, signal) =>
       client.delete(
-        `/api/ingest/documents/${encodeURIComponent(docId)}`,
+        `/api/personal/knowledge/documents/${encodeURIComponent(docId)}`,
         DeleteResponseSchema,
         options(signal),
       ),
-    clear: (signal) => client.delete("/api/ingest/clear", DeleteResponseSchema, options(signal)),
+    clear: (signal) =>
+      client.delete("/api/personal/knowledge/clear", DeleteResponseSchema, options(signal)),
     progress: (fileId, signal) =>
       client.get(
-        `/api/ingest/progress/${encodeURIComponent(fileId)}`,
+        `/api/personal/knowledge/progress/${encodeURIComponent(fileId)}`,
         ProgressResponseSchema,
         options(signal),
       ),
     reingest: (document, signal) =>
       client.post(
-        "/api/ingest/reingest",
-        { doc_id: document.doc_id, filename: document.filename },
+        `/api/personal/knowledge/documents/${encodeURIComponent(document.doc_id)}/reindex`,
+        {},
         ReingestResponseSchema,
         options(signal),
       ),
@@ -146,7 +141,7 @@ export function createIngestionApi(
       const body = new FormData()
       body.append("file", file, file.name)
       const suffix = action === "default" ? "" : `?action=${action}`
-      const response = await uploadTransport(`/api/ingest/upload${suffix}`, body, signal)
+      const response = await transport(`/api/personal/knowledge/upload${suffix}`, body, signal)
       if (!response.ok && response.status !== 409) throw apiErrorFromResponse(response)
       return parseUploadResult(response, await responseJson(response))
     },

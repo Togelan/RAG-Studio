@@ -169,6 +169,7 @@ def create_ui_router(configuration: UiServingConfiguration) -> APIRouter:
         return _canonical_page_response(request, "chat", configuration)
 
     @ui_router.get("/app", response_class=HTMLResponse)
+    @ui_router.get("/app/knowledge", response_class=HTMLResponse)
     @ui_router.get("/app/settings", response_class=HTMLResponse)
     @ui_router.get("/app/chat", response_class=HTMLResponse)
     async def serve_react_preview() -> Response:
@@ -189,20 +190,22 @@ def create_ui_router(configuration: UiServingConfiguration) -> APIRouter:
         del retired_path
         return _react_preview_response(configuration)
 
-    @ui_router.get("/legacy", response_class=HTMLResponse)
-    async def serve_legacy_welcome(request: Request) -> HTMLResponse:
-        """Serve the explicit legacy Home rollback alias."""
-        return _legacy_page_response(request, "welcome")
+    if configuration.mode is UiMode.LEGACY:
 
-    @ui_router.get("/legacy/settings", response_class=HTMLResponse)
-    async def serve_legacy_settings(request: Request) -> HTMLResponse:
-        """Serve the explicit legacy Settings rollback alias."""
-        return _legacy_page_response(request, "settings")
+        @ui_router.get("/legacy", response_class=HTMLResponse)
+        async def serve_legacy_welcome(request: Request) -> HTMLResponse:
+            """Serve the explicit legacy Home rollback alias."""
+            return _legacy_page_response(request, "welcome")
 
-    @ui_router.get("/legacy/chat", response_class=HTMLResponse)
-    async def serve_legacy_chat(request: Request) -> HTMLResponse:
-        """Serve the explicit legacy Chat rollback alias."""
-        return _legacy_page_response(request, "chat")
+        @ui_router.get("/legacy/settings", response_class=HTMLResponse)
+        async def serve_legacy_settings(request: Request) -> HTMLResponse:
+            """Serve the explicit legacy Settings rollback alias."""
+            return _legacy_page_response(request, "settings")
+
+        @ui_router.get("/legacy/chat", response_class=HTMLResponse)
+        async def serve_legacy_chat(request: Request) -> HTMLResponse:
+            """Serve the explicit legacy Chat rollback alias."""
+            return _legacy_page_response(request, "chat")
 
     @ui_router.get("/react-assets/{asset_path:path}")
     async def serve_react_asset(asset_path: str) -> Response:

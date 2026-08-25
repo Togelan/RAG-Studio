@@ -17,7 +17,7 @@
 > - Added FR-013–FR-020 for Stage 3 authentication, tenant isolation, chatbot management, widget, billing, landing page, local/hosting readiness, and launch demonstration.
 > - Replaced the future UI constraint with React/TypeScript/Tailwind/shadcn while retaining Jinja only as a reversible legacy path during migration.
 > - Clarified FR-008: Stage 2 keeps one application runtime container while permitting a pinned Node builder stage and final Python runtime stage for React assets.
-> - Added mandatory in-app Browser confirmation for every implementation.
+> - Added mandatory browser confirmation through the Playwright MCP server `playwright_qa_2` for every implementation.
 >
 > **v2.0.0 Changelog (Audit against v1.0 codebase):**
 > - AC-001.2: Corrected "tokens" → "characters" (chunker uses character counts); noted configurable chunk sizes
@@ -43,7 +43,7 @@ The approved target is one **locally runnable, hosting-ready RAG-Studio product*
 
 **Languages:** English + Russian (i18n via JSON dictionaries with full key parity, language switcher in header, cookie + localStorage persistence).
 
-**Target design system:** established from user-supplied references in `docs/design/references/saas-ui/` and recorded in `DESIGN.md`. Every UI task follows `design-system-style-intelligence → frontend-design-director → react-shadcn-ui-contract → omo:visual-qa`, followed by independent in-app Browser confirmation.
+**Target design system:** established from user-supplied references in `docs/design/references/saas-ui/` and recorded in `DESIGN.md`. Every UI task follows `design-system-style-intelligence → frontend-design-director → react-shadcn-ui-contract → omo:visual-qa`, followed by independent confirmation through the Playwright MCP server `playwright_qa_2`.
 
 ---
 
@@ -1010,7 +1010,7 @@ data            per-workspace Qdrant collections
 **And** the information hierarchy remains usable on mobile, tablet, and desktop layouts
 
 #### AC-012.4: Reversible Cutover
-**Given** a migrated route has not passed automated parity checks and the in-app Browser journey
+**Given** a migrated route has not passed automated parity checks and the `playwright_qa_2` Playwright MCP journey
 **When** the local application is started
 **Then** the verified legacy Jinja route remains available as the rollback path
 **And** the legacy route is removed only after its React replacement passes the same acceptance criteria
@@ -1020,7 +1020,7 @@ data            per-workspace Qdrant collections
 **Given** a Stage 2 UI task has passed its targeted automated checks
 **When** verification is completed
 **Then** `omo:visual-qa` records reference fidelity, responsive behavior, and relevant visual states
-**And** the running application is exercised independently with the in-app Browser
+**And** the running application is exercised independently with the Playwright MCP server `playwright_qa_2`
 **And** the evidence records the URL, scenario, viewport, observed result, and screenshots for visual changes
 
 ### Technical Notes
@@ -1207,7 +1207,7 @@ data            per-workspace Qdrant collections
 
 #### AC-016.5: Host-Page Browser Verification
 **Given** the widget implementation passes automated component and API tests
-**When** it is verified in the in-app Browser on the reference host fixtures
+**When** it is verified with the Playwright MCP server `playwright_qa_2` on the reference host fixtures
 **Then** open, close, send, stream, error, offline, and rate-limit states are observed
 **And** evidence includes approved and rejected origins plus mobile and desktop screenshots
 
@@ -1303,7 +1303,7 @@ data            per-workspace Qdrant collections
 **When** the landing and pricing surfaces render
 **Then** all user-visible strings have locale parity, keyboard navigation works, focus is visible, and no unintended horizontal scroll occurs
 **And** visual QA demonstrates fidelity to `DESIGN.md`
-**And** the in-app Browser verifies navigation and conversion paths at mobile and desktop viewports
+**And** the Playwright MCP server `playwright_qa_2` verifies navigation and conversion paths at mobile and desktop viewports
 
 ### Technical Notes
 - Expected change areas are public React routes/components/locales under `frontend/`, the shared plan-catalog API, accessibility/responsive tests, and Browser/visual-QA evidence.
@@ -1352,7 +1352,7 @@ data            per-workspace Qdrant collections
 **When** the stack is built and exercised
 **Then** resolved Compose configuration, image builds, service health, persistence, and bounded overload behavior are recorded
 **And** Docker operations follow the repository's sequential safety procedure
-**And** the in-app Browser verifies the primary customer journey only after target services report healthy
+**And** the Playwright MCP server `playwright_qa_2` verifies the primary customer journey only after target services report healthy
 
 ### Technical Notes
 - Expected change areas are `docker-compose.yml`, service Dockerfiles, `.env.example`, health/readiness endpoints, migration/startup scripts, and deployment/runbook documentation.
@@ -1385,7 +1385,7 @@ data            per-workspace Qdrant collections
 #### AC-020.3: Requirement Verification Matrix
 **Given** the customer validation package is complete
 **When** it is reviewed
-**Then** a matrix maps FR-012 through FR-019 to automated checks, in-app Browser scenarios, observed results, and artifact locations
+**Then** a matrix maps FR-012 through FR-019 to automated checks, `playwright_qa_2` Playwright MCP scenarios, observed results, and artifact locations
 **And** failures or unverified conditions remain explicitly open rather than being reported as complete
 
 #### AC-020.4: Hosting Approval Boundary
@@ -1431,7 +1431,7 @@ The following decisions are authoritative for this stage:
   payment flow.
 
 All UI work in this stage modifies FR-012 and follows the mandatory visual
-pipeline plus in-app Browser evidence. Each implementation task must cite one
+pipeline plus evidence from the Playwright MCP server `playwright_qa_2`. Each implementation task must cite one
 primary FR below and every earlier FR it changes or regression-tests.
 
 ---
@@ -1475,7 +1475,7 @@ and Agent state and does not display resources from the prior context.
 **Then** it uses `DESIGN.md` semantic tokens, accessible labels/focus behavior,
 functional motion, loading/empty/error/forbidden states, and no unintended
 horizontal overflow
-**And** the in-app Browser evidence records the active context, viewport,
+**And** the `playwright_qa_2` Playwright MCP evidence records the active context, viewport,
 locale, route, visible result, and a screenshot for visual changes.
 
 ### Technical Notes
@@ -2070,7 +2070,7 @@ Every implementation task must name one primary owning FR, list each existing FR
 | NFR-020 | Persistence | All user data survives container stop/start | Integration test |
 | NFR-021 | Security | API key encryption at rest (AES-256 via Fernet) | `tests/test_security.py` |
 | NFR-022 | UX | First-time user can upload a document and ask a question in < 3 minutes | User journey timing |
-| NFR-032 | Manual QA | Every implementation is exercised in the running web application with the in-app Browser after automated checks | Evidence records URL, scenario, observed result, viewport where relevant, and screenshots for visual changes |
+| NFR-032 | Manual QA | Every implementation is exercised in the running web application with the Playwright MCP server `playwright_qa_2` after automated checks | Evidence records URL, scenario, observed result, viewport where relevant, and screenshots for visual changes |
 | NFR-033 | Design consistency | Every UI task follows the approved reference-to-design-system pipeline and uses recorded tokens/components | `DESIGN.md` review, `omo:visual-qa`, component audit, and reference-fidelity screenshots |
 | NFR-034 | Identity isolation | Account, Workspace, role, and archived/revoked status are resolved server-side for every protected read, write, stream, and cache/checkpoint access | Multi-account/multi-workspace adversarial API, RLS, session, cache, and stale-tab tests with zero leaked records |
 | NFR-035 | Configuration safety | Setting inheritance is explicit and conflict-safe: Personal defaults → Workspace defaults → Agent overrides → Widget presentation; re-indexing changes require an explicit safe operation | UI/API inheritance, optimistic-version conflict, dependency-warning, cancellation, and no-partial-write tests |
@@ -2099,15 +2099,15 @@ Every implementation task must name one primary owning FR, list each existing FR
 | FR-009 | AC-009.1–009.4 | — | `src/api/locales/en.json`, `src/api/locales/ru.json`, `src/api/routes/ui.py` | `tests/i18n/test_locales.py` |
 | FR-010 | AC-010.1–010.6 | ui-design, qdrant-operations | `src/api/templates/settings.html`, `src/api/routes/settings.py`, `src/api/static/js/app.js`, `src/ingestion/router.py` | `tests/api/test_settings_reingest.py` |
 | FR-011 | AC-011.1–011.5 | qdrant-operations, rag-best-practices | `src/ingestion/`, `src/vector_store/`, `src/retrieve/`, `src/api/routes/settings.py`, `src/api/templates/settings.html` | `tests/ingestion/`, `tests/vector_store/`, `tests/retrieve/`, `tests/api/` |
-| FR-012 | AC-012.1–012.5 | design-system-style-intelligence, frontend-design-director, react-shadcn-ui-contract, omo:visual-qa | `frontend/`, `DESIGN.md`, `docs/design/references/saas-ui/`, `src/api/` UI/API routing | Frontend tests, parity tests under `tests/api/`, visual-QA and in-app Browser evidence |
+| FR-012 | AC-012.1–012.5 | design-system-style-intelligence, frontend-design-director, react-shadcn-ui-contract, omo:visual-qa | `frontend/`, `DESIGN.md`, `docs/design/references/saas-ui/`, `src/api/` UI/API routing | Frontend tests, parity tests under `tests/api/`, visual-QA and `playwright_qa_2` Playwright MCP evidence |
 | FR-013 | AC-013.1–013.4 | supabase:supabase | `supabase/migrations/`, `src/api/` authentication/workspace modules, `frontend/` auth/workspace surfaces | Authentication, RLS, role-matrix, invitation, and cross-workspace integration tests |
 | FR-014 | AC-014.1–014.5 | qdrant-operations, rag-best-practices, supabase:supabase | `src/api/` tenant dependencies, `src/ingestion/`, `src/retrieve/`, `src/graph/`, `src/vector_store/` | Tenant-isolation, bounded-admission, cancellation, and clean-start integration tests |
 | FR-015 | AC-015.1–015.4 | react-shadcn-ui-contract, langgraph-patterns | `src/api/` chatbot modules, `supabase/migrations/`, `frontend/` chatbot surfaces, `src/graph/` | Chatbot lifecycle, role, tenant-scope, streaming, and Browser journey tests |
-| FR-016 | AC-016.1–016.5 | react-shadcn-ui-contract, omo:visual-qa | `widget/`, `src/api/` public-widget modules, `supabase/migrations/`, host-page fixtures | Origin/key/rate-limit API tests, Shadow-DOM component tests, and in-app Browser host-page evidence |
+| FR-016 | AC-016.1–016.5 | react-shadcn-ui-contract, omo:visual-qa | `widget/`, `src/api/` public-widget modules, `supabase/migrations/`, host-page fixtures | Origin/key/rate-limit API tests, Shadow-DOM component tests, and `playwright_qa_2` Playwright MCP host-page evidence |
 | FR-017 | AC-017.1–017.5 | stripe:stripe-best-practices, supabase:supabase | `src/api/` billing modules, `supabase/migrations/`, `frontend/` pricing/billing surfaces | Stripe signature/replay/order fixtures, entitlement tests, role tests, and test-mode Browser journey |
 | FR-018 | AC-018.1–018.4 | design-system-style-intelligence, frontend-design-director, react-shadcn-ui-contract, omo:visual-qa | `frontend/` public routes/components/locales, shared plan-catalog API | Content/link, catalog-consistency, locale, accessibility, responsive, visual-QA, and Browser tests |
-| FR-019 | AC-019.1–019.5 | — | `docker-compose.yml`, service Dockerfiles, `.env.example`, health endpoints, deployment documentation | Compose config/build/health/restart/persistence checks and primary in-app Browser journey |
-| FR-020 | AC-020.1–020.4 | omo:visual-qa, browser:control-in-app-browser | `docs/demo/`, verification matrix, approved evidence directories | Full local customer journey and FR-012–FR-019 evidence audit |
+| FR-019 | AC-019.1–019.5 | — | `docker-compose.yml`, service Dockerfiles, `.env.example`, health endpoints, deployment documentation | Compose config/build/health/restart/persistence checks and primary `playwright_qa_2` Playwright MCP journey |
+| FR-020 | AC-020.1–020.4 | omo:visual-qa, `playwright_qa_2` Playwright MCP | `docs/demo/`, verification matrix, approved evidence directories | Full local customer journey and FR-012–FR-019 evidence audit |
 | FR-021 | AC-021.1–021.3 | design-system-style-intelligence, frontend-design-director, react-shadcn-ui-contract, omo:visual-qa | `frontend/`, FastAPI UI/static routing, locales, `DESIGN.md` | Route-compatibility, context-state, responsive/accessibility, visual-QA, and Browser cutover tests |
 | FR-022 | AC-022.1–022.2 | supabase:supabase | Supabase migrations/RLS, `src/api/` auth/account dependencies and routes, `frontend/` auth/context surfaces | Multi-account membership, session/CSRF/revocation, RLS, invitation-redaction, and cross-account negative tests |
 | FR-023 | AC-023.1–023.2 | react-shadcn-ui-contract, qdrant-operations | `frontend/` Personal Lab routes, `src/api/` local/import boundary, `src/ingestion/`, `src/graph/` | Personal parity, explicit promotion preview/cancel, local/shared isolation, and Browser journey tests |
@@ -2119,7 +2119,7 @@ Every implementation task must name one primary owning FR, list each existing FR
 | FR-029 | AC-029.1–029.2 | react-shadcn-ui-contract, supabase:supabase | Account entitlement schema/services, `src/api/` billing/limit modules, `frontend/` Billing/Usage surfaces | Placeholder truthfulness, role, atomic quota enforcement, forged-request, and Browser tests |
 | FR-030 | AC-030.1–030.2 | — | Audit/usage schemas, `src/api/` event/counter modules, `frontend/` Usage/observability views | Counter aggregation/replay, role visibility, redaction/retention, and Browser observability-state tests |
 | FR-031 | AC-031.1–031.2 | supabase:supabase, qdrant-operations | Workspace/resource lifecycle schema, purge/restore services, `src/vector_store/`, `src/ingestion/`, `frontend/` confirmations | Archive/restore, exact-name/recent-auth, grace/purge retry/cancel, isolation, and Browser confirmation tests |
-| FR-032 | AC-032.1–032.2 | omo:visual-qa, browser:control-in-app-browser | Route compatibility/cutover configuration, `docs/demo/`, verification matrix, migration runbook | Compatibility/rollback/restart, end-to-end role and widget scenarios, 360/768/1440 EN/RU Browser evidence |
+| FR-032 | AC-032.1–032.2 | omo:visual-qa, `playwright_qa_2` Playwright MCP | Route compatibility/cutover configuration, `docs/demo/`, verification matrix, migration runbook | Compatibility/rollback/restart, end-to-end role and widget scenarios, 360/768/1440 EN/RU Browser evidence |
 
 ---
 

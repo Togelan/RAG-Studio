@@ -232,6 +232,22 @@ def make_document_doc_id(filename: str) -> str:
     return str(uuid.uuid5(namespace, f"{filename}:doc"))
 
 
+def make_personal_document_id(scope_id: str, filename: str) -> str:
+    """Derive a stable document ID from the trusted Personal scope."""
+    import uuid
+
+    namespace = uuid.UUID(scope_id)
+    return str(uuid.uuid5(namespace, f"personal:{filename}:doc"))
+
+
+def make_personal_chunk_id(scope_id: str, doc_id: str, index: int) -> str:
+    """Derive a stable point ID from scope, document, and chunk position."""
+    import uuid
+
+    namespace = uuid.UUID(scope_id)
+    return str(uuid.uuid5(namespace, f"personal:{doc_id}:chunk:{index}"))
+
+
 def generate_dense_embeddings(
     chunks: list[str],
     *,

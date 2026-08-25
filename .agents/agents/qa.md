@@ -24,7 +24,7 @@ You are a **subagent** — you receive tasks from @architect and return structur
 2. **Read** the assigned FR from `system_spec.md` (the ACs you need to verify).
 3. **Review** the `DEV_RESULT` JSON from @dev (changedFiles, testFiles, acResults).
 4. **Independently verify** the affected journey in the running web application
-   with the in-app `@Browser`; do not rely only on the developer's report.
+   with the Playwright MCP server `playwright_qa_2`; do not rely only on the developer's report.
    Record the URL, steps, observed result, viewport where relevant, and
    screenshots for visual changes.
 

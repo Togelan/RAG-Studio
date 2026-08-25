@@ -132,6 +132,35 @@ describe("SaaS ApiClient boundary", () => {
     },
   )
 
+  it("refreshes stale CSRF proof after one rejected Personal mutation", async () => {
+    const requests: RecordedRequest[] = []
+    let proof = "stale-proof"
+    let mutationCount = 0
+    const client = new ApiClient(
+      fetch,
+      recordingHttp((input) => {
+        if (input === "/api/saas/auth/csrf") {
+          proof = "fresh-proof"
+          return new Response(null, { status: 204 })
+        }
+        mutationCount += 1
+        return new Response("{}", { status: mutationCount === 1 ? 403 : 200 })
+      }, requests),
+      () => proof,
+    )
+
+    await client.post("/api/personal/settings", {}, z.object({}).strict())
+
+    expect(requests.map(({ input }) => input)).toEqual([
+      "/api/personal/settings",
+      "/api/saas/auth/csrf",
+      "/api/personal/settings",
+    ])
+    expect(requests[0]?.options.throwHttpErrors).toBe(false)
+    expect(requests[2]?.options.throwHttpErrors).toBe(false)
+    expect(requests[2]?.options.headers).toEqual({ "X-CSRF-Token": "fresh-proof" })
+  })
+
   it.each(["/api/settings", "/api/ingest/documents", "/api/chat/sessions"])(
     "renews expired CSRF state before protected Personal Lab mutations at %s",
     async (path) => {

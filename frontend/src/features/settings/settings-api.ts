@@ -68,7 +68,11 @@ export type ModelsResponse = z.infer<typeof ModelsResponseSchema>
 export type SettingsApi = {
   readonly load: (signal?: AbortSignal) => Promise<SettingsResponse>
   readonly models: (provider: Provider, signal?: AbortSignal) => Promise<ModelsResponse>
-  readonly save: (draft: SettingsDraft, signal?: AbortSignal) => Promise<SavedSettings>
+  readonly save: (
+    draft: SettingsDraft,
+    apiKey?: string,
+    signal?: AbortSignal,
+  ) => Promise<SavedSettings>
   readonly validateKey: (
     provider: Provider,
     apiKey: string,
@@ -92,18 +96,24 @@ function signalOptions(signal: AbortSignal | undefined): { readonly signal?: Abo
 
 export function createSettingsApi(client: ApiClient = createBrowserApiClient()): SettingsApi {
   return {
-    load: (signal) => client.get("/api/settings", SettingsResponseSchema, signalOptions(signal)),
+    load: (signal) =>
+      client.get("/api/personal/settings", SettingsResponseSchema, signalOptions(signal)),
     models: (provider, signal) =>
       client.get(
-        `/api/settings/models/${encodeURIComponent(provider)}`,
+        `/api/personal/settings/models/${encodeURIComponent(provider)}`,
         ModelsResponseSchema,
         signalOptions(signal),
       ),
-    save: (draft, signal) =>
-      client.post("/api/settings", draft, SavedSettingsSchema, signalOptions(signal)),
+    save: (draft, apiKey, signal) =>
+      client.post(
+        "/api/personal/settings",
+        apiKey === undefined ? draft : { ...draft, api_key: apiKey },
+        SavedSettingsSchema,
+        signalOptions(signal),
+      ),
     validateKey: (provider, apiKey, signal) =>
       client.post(
-        "/api/settings/validate-key",
+        "/api/personal/settings/validate-key",
         { api_key: apiKey, provider },
         ValidateKeyResponseSchema,
         signalOptions(signal),

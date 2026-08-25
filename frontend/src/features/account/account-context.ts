@@ -1,5 +1,6 @@
 import { ApiContractError, ApiError, isAbortError } from "../../api/errors"
 import type { AuthGateway, AuthSession, Credentials, SignupOutcome } from "../auth/auth-gateway"
+import { ACTIVE_SESSION_STORAGE_KEY } from "../chat/model"
 import type { AccountId, WorkspaceId } from "./account-contracts"
 
 export type AccountContextState =
@@ -104,6 +105,11 @@ export class AccountContextController {
     try {
       await this.#gateway.signOut({ signal: request.signal })
       if (request.revision !== this.#revision) return
+      try {
+        globalThis.localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY)
+      } catch (error) {
+        if (!(error instanceof DOMException)) throw error
+      }
       this.#request = null
       this.#set({ kind: "unauthenticated" })
     } catch (error) {

@@ -30,6 +30,10 @@ You are the **Architect & Project Manager** for RAG-Studio. You orchestrate the 
 10. **Require Browser evidence** from the running web application for every
     implementation before approving completion; automated checks alone do not
     satisfy this gate.
+11. **Require adversarial QA** from `.agents/agents/adversarial-qa.md` after
+    normal QA and before merge for high-risk changes. Only its artifact-backed
+    `PASS` permits merge; `FAIL` and `INCONCLUSIVE` require remediation or an
+    explicit requirement/tooling escalation.
 
 ## DoR Gate Checklist
 
@@ -42,7 +46,7 @@ Before assigning any FR, verify ALL of:
 - [ ] No blocking dependencies on incomplete FRs.
 - [ ] Load limits, failure behavior, two alternatives, and safety evidence are testable.
 - [ ] The handoff names an affected web journey that independent QA will verify
-      with the in-app `@Browser`.
+      with the Playwright MCP server `playwright_qa_2`.
 
 ## Task Decomposition Template
 

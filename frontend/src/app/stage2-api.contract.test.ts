@@ -39,19 +39,19 @@ function jsonResponse(value: unknown, status: number = 200): Response {
 }
 
 function responseFor(path: string, method: RequestRecord["method"]): Response {
-  if (path === "/api/settings") {
+  if (path === "/api/personal/settings") {
     return jsonResponse(
       method === "post"
         ? { ...settingsDraft, chunks_changed: false }
         : { ...settingsDraft, api_key: "********" },
     )
   }
-  if (path.startsWith("/api/settings/models/")) {
+  if (path.startsWith("/api/personal/settings/models/")) {
     return jsonResponse({ cached: false, models: ["gpt-4o-mini"], provider: "openai" })
   }
-  if (path === "/api/settings/validate-key")
+  if (path === "/api/personal/settings/validate-key")
     return jsonResponse({ provider: "openai", valid: true })
-  if (path === "/api/chat/sessions") {
+  if (path === "/api/personal/chat/sessions") {
     return method === "post"
       ? jsonResponse({ created_at: "2026-08-15", id: "s1", title: "New" })
       : jsonResponse([])
@@ -63,27 +63,27 @@ function responseFor(path: string, method: RequestRecord["method"]): Response {
         ? jsonResponse({ session_id: "s1", status: "cleared" })
         : jsonResponse([])
   }
-  if (path === "/api/chat/feedback") return jsonResponse({ feedback: "positive", status: "saved" })
-  if (path.startsWith("/api/chat/sessions/")) {
+  if (path === "/api/personal/chat/feedback")
+    return jsonResponse({ feedback: "like", id: "feedback-1", status: "saved" })
+  if (path.startsWith("/api/personal/chat/sessions/")) {
     return method === "patch"
       ? jsonResponse({ created_at: "2026-08-15", id: "s1", title: "Renamed" })
       : jsonResponse({ session_id: "s1", status: method === "delete" ? "deleted" : "stopped" })
   }
   if (path.includes("/chunks"))
     return jsonResponse({ chunks: [], next_cursor: null, truncated: false })
-  if (path.startsWith("/api/ingest/documents")) {
+  if (path.endsWith("/reindex"))
+    return jsonResponse({ file_id: "job-1", message: "safe", status: "skipped" })
+  if (path.startsWith("/api/personal/knowledge/documents")) {
     if (method === "delete") {
-      return jsonResponse({ deleted_count: 0, message: "safe", status: "ok" })
+      return jsonResponse({ deleted: 0 })
     }
-    return jsonResponse({ documents: [], next_cursor: null, total: 0, truncated: false })
+    return jsonResponse({ documents: [], next_cursor: null, truncated: false })
   }
-  if (path === "/api/ingest/clear")
-    return jsonResponse({ deleted_count: 0, message: "safe", status: "ok" })
-  if (path.startsWith("/api/ingest/progress/")) {
+  if (path === "/api/personal/knowledge/clear") return jsonResponse({ deleted: 0 })
+  if (path.startsWith("/api/personal/knowledge/progress/")) {
     return jsonResponse({ file_id: "job-1", message: "done", status: "done" })
   }
-  if (path === "/api/ingest/reingest")
-    return jsonResponse({ file_id: "job-1", message: "safe", status: "skipped" })
   return jsonResponse({ deleted_count: 0, message: "safe", status: "ok" })
 }
 
@@ -136,44 +136,64 @@ describe("Stage 2 frontend endpoint contract", () => {
     await ingestion.upload(new File(["safe"], "safe.txt", { type: "text/plain" }), "replace")
 
     expect(records).toEqual([
-      { body: undefined, method: "get", path: "/api/settings" },
-      { body: undefined, method: "get", path: "/api/settings/models/openai" },
+      { body: undefined, method: "get", path: "/api/personal/settings" },
+      { body: undefined, method: "get", path: "/api/personal/settings/models/openai" },
       {
         body: { api_key: "secret-value", provider: "openai" },
         method: "post",
-        path: "/api/settings/validate-key",
+        path: "/api/personal/settings/validate-key",
       },
-      { body: settingsDraft, method: "post", path: "/api/settings" },
-      { body: { title: "New" }, method: "post", path: "/api/chat/sessions" },
-      { body: { title: "Renamed" }, method: "patch", path: "/api/chat/sessions/s1" },
-      { body: undefined, method: "get", path: "/api/chat/sessions" },
-      { body: undefined, method: "get", path: "/api/chat/sessions/s1/messages" },
+      { body: settingsDraft, method: "post", path: "/api/personal/settings" },
+      { body: { title: "New" }, method: "post", path: "/api/personal/chat/sessions" },
+      {
+        body: { title: "Renamed" },
+        method: "patch",
+        path: "/api/personal/chat/sessions/s1",
+      },
+      { body: undefined, method: "get", path: "/api/personal/chat/sessions" },
+      { body: undefined, method: "get", path: "/api/personal/chat/sessions/s1/messages" },
       {
         body: { content: "Question", message_id: "m1" },
         method: "post",
-        path: "/api/chat/sessions/s1/messages",
+        path: "/api/personal/chat/sessions/s1/messages",
       },
       {
-        body: { feedback: "positive", message_id: "m1", session_id: "s1" },
+        body: { feedback: "like", message_id: "m1", session_id: "s1" },
         method: "post",
-        path: "/api/chat/feedback",
+        path: "/api/personal/chat/feedback",
       },
-      { body: {}, method: "post", path: "/api/chat/sessions/s1/cancel" },
-      { body: undefined, method: "delete", path: "/api/chat/sessions/s1/messages" },
-      { body: undefined, method: "delete", path: "/api/chat/sessions/s1" },
-      { body: undefined, method: "get", path: "/api/ingest/documents?cursor=cursor%201" },
-      { body: undefined, method: "get", path: "/api/ingest/documents/doc%2F1/chunks?cursor=next" },
-      { body: undefined, method: "delete", path: "/api/ingest/documents/doc%2F1" },
-      { body: undefined, method: "delete", path: "/api/ingest/clear" },
-      { body: undefined, method: "get", path: "/api/ingest/progress/job%2F1" },
+      { body: {}, method: "post", path: "/api/personal/chat/sessions/s1/cancel" },
       {
-        body: { doc_id: "doc/1", filename: "safe.txt" },
+        body: undefined,
+        method: "delete",
+        path: "/api/personal/chat/sessions/s1/messages",
+      },
+      { body: undefined, method: "delete", path: "/api/personal/chat/sessions/s1" },
+      {
+        body: undefined,
+        method: "get",
+        path: "/api/personal/knowledge/documents?cursor=cursor%201",
+      },
+      {
+        body: undefined,
+        method: "get",
+        path: "/api/personal/knowledge/documents/doc%2F1/chunks?cursor=next",
+      },
+      {
+        body: undefined,
+        method: "delete",
+        path: "/api/personal/knowledge/documents/doc%2F1",
+      },
+      { body: undefined, method: "delete", path: "/api/personal/knowledge/clear" },
+      { body: undefined, method: "get", path: "/api/personal/knowledge/progress/job%2F1" },
+      {
+        body: {},
         method: "post",
-        path: "/api/ingest/reingest",
+        path: "/api/personal/knowledge/documents/doc%2F1/reindex",
       },
     ])
     expect(upload).toHaveBeenCalledWith(
-      "/api/ingest/upload?action=replace",
+      "/api/personal/knowledge/upload?action=replace",
       expect.any(FormData),
       undefined,
     )
@@ -199,7 +219,7 @@ describe("Stage 2 frontend endpoint contract", () => {
         throw new Error("expected the typed API error")
       }
       expect(error.message).not.toContain("provider")
-      expect(http.get).toHaveBeenCalledWith("/api/settings", {})
+      expect(http.get).toHaveBeenCalledWith("/api/personal/settings", {})
     },
   )
 })

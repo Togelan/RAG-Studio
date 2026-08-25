@@ -37,7 +37,7 @@ class ChunkingPersistence(TypedDict):
 
 
 class ChunkingSettings(BaseModel):
-    """Normalized global chunking configuration for all supported strategies."""
+    """Normalized strategy persisted globally for Legacy or per Personal Lab."""
 
     model_config = ConfigDict(populate_by_name=True, frozen=True)
 

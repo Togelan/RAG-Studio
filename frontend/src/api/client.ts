@@ -19,6 +19,7 @@ export type KyRequestOptions = {
   readonly json?: unknown
   readonly retry?: number
   readonly signal?: AbortSignal
+  readonly throwHttpErrors?: boolean
 }
 
 export type KyHttpClient = {
@@ -108,6 +109,7 @@ export class ApiClient {
         ...payload,
         retry: 0,
         ...signalOption(signal),
+        throwHttpErrors: false,
       }
     }
 
@@ -122,7 +124,21 @@ export class ApiClient {
       ...payload,
       retry: 0,
       ...signalOption(signal),
+      throwHttpErrors: false,
     }
+  }
+
+  async #retryAfterStaleCsrf(
+    response: Response,
+    path: string,
+    body: unknown,
+    options: JsonRequestOptions,
+    send: (requestOptions: KyRequestOptions) => Promise<Response>,
+  ): Promise<Response> {
+    if (response.status !== 403 || !requiresCsrfProof(path)) return response
+    const established = await this.#http.get("/api/saas/auth/csrf", signalOption(options.signal))
+    if (!established.ok) throw apiErrorFromResponse(established)
+    return send(await this.#unsafeOptions(path, body, options.headers, options.signal))
   }
 
   async get<T>(path: string, schema: z.ZodType<T>, options: JsonRequestOptions = {}): Promise<T> {
@@ -146,9 +162,12 @@ export class ApiClient {
   ): Promise<T> {
     try {
       validateApiPath(path)
-      const response = await this.#http.post(
+      let response = await this.#http.post(
         path,
         await this.#unsafeOptions(path, body, options.headers, options.signal),
+      )
+      response = await this.#retryAfterStaleCsrf(response, path, body, options, (retryOptions) =>
+        this.#http.post(path, retryOptions),
       )
       if (!response.ok) {
         throw apiErrorFromResponse(response)
@@ -167,9 +186,12 @@ export class ApiClient {
   ): Promise<T> {
     try {
       validateApiPath(path)
-      const response = await this.#http.post(
+      let response = await this.#http.post(
         path,
         await this.#unsafeOptions(path, body, options.headers, options.signal),
+      )
+      response = await this.#retryAfterStaleCsrf(response, path, body, options, (retryOptions) =>
+        this.#http.post(path, retryOptions),
       )
       if (!response.ok) {
         throw apiErrorFromResponse(response)
@@ -177,6 +199,26 @@ export class ApiClient {
       return await parseJsonResponse(response, schema)
     } catch (error) {
       return mapHttpError(error)
+    }
+  }
+
+  async postFormResponse(
+    path: string,
+    body: FormData,
+    options: JsonRequestOptions = {},
+  ): Promise<Response> {
+    try {
+      validateApiPath(path)
+      const requestOptions = await this.#unsafeOptions(path, body, options.headers, options.signal)
+      const response = await this.#http.post(path, { ...requestOptions, throwHttpErrors: false })
+      return await this.#retryAfterStaleCsrf(response, path, body, options, (retryOptions) =>
+        this.#http.post(path, { ...retryOptions, throwHttpErrors: false }),
+      )
+    } catch (error) {
+      if (error instanceof HTTPError) {
+        throw apiErrorFromResponse(error.response)
+      }
+      throw error
     }
   }
 
@@ -188,9 +230,12 @@ export class ApiClient {
   ): Promise<T> {
     try {
       validateApiPath(path)
-      const response = await this.#http.patch(
+      let response = await this.#http.patch(
         path,
         await this.#unsafeOptions(path, body, options.headers, options.signal),
+      )
+      response = await this.#retryAfterStaleCsrf(response, path, body, options, (retryOptions) =>
+        this.#http.patch(path, retryOptions),
       )
       if (!response.ok) {
         throw apiErrorFromResponse(response)
@@ -208,9 +253,16 @@ export class ApiClient {
   ): Promise<T> {
     try {
       validateApiPath(path)
-      const response = await this.#http.delete(
+      let response = await this.#http.delete(
         path,
         await this.#unsafeOptions(path, options.body, options.headers, options.signal),
+      )
+      response = await this.#retryAfterStaleCsrf(
+        response,
+        path,
+        options.body,
+        options,
+        (retryOptions) => this.#http.delete(path, retryOptions),
       )
       if (!response.ok) {
         throw apiErrorFromResponse(response)

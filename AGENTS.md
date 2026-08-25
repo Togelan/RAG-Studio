@@ -60,8 +60,9 @@ docs/              Accepted ADRs, feature designs, visual references
 
 ## Canonical implementation workflow
 
-Use: **understand → `$ulw-plan` → `$start-work` → `$ulw-loop` → in-app
-`@Browser` → `$review-work` → Graphify when needed → commit**.
+Use: **understand → `$ulw-plan` → `$start-work` → `$ulw-loop` → Playwright
+MCP browser QA → adversarial QA for high-risk changes → `$review-work` →
+Graphify when needed → commit**.
 
 1. Plan before product edits; use small, atomic, reversible changes.
 2. Run targeted checks, then full applicable checks.
@@ -69,6 +70,23 @@ Use: **understand → `$ulw-plan` → `$start-work` → `$ulw-loop` → in-app
    observed result, viewport, and screenshots for visual changes.
 4. Review before commit; never substitute LazyCodex for project roles/Graphify.
 5. Use `$remove-ai-slops` only for behavior-preserving cleanup after green tests.
+
+For high-risk changes, run the read-only `.agents/skills/adversarial-review/`
+gate after normal QA and before merge. Invoke `.agents/agents/adversarial-qa.md`
+against the final diff and evidence. `PASS` is required; `FAIL` and
+`INCONCLUSIVE` block merge. High-risk areas include identity/CSRF/roles,
+Personal Lab/Workspace/Agent/Widget/billing, ingestion and re-indexing,
+Qdrant/cache/checkpoint/migration/rollback, streaming/concurrency, secrets and
+redaction, retrieval/citations, public endpoints, and stateful React UI.
+
+Browser QA uses only the configured Playwright MCP server `playwright_qa_2` and
+its structured interactions:
+navigate, snapshot, click, type/fill form, press keys,
+upload files, wait, resize, screenshot, and verification. Do not use
+`browser_run_code`, `browser_run_code_unsafe`, `browser_evaluate`, or arbitrary
+JavaScript/Playwright code. No other Playwright MCP server, browser-control
+mechanism, or non-Playwright browser tool is permitted in tests or project
+instructions.
 
 Non-trivial features start with `.agents/skills/feature-discussion/SKILL.md`.
 It records `CONTEXT.md`, an ADR, and `docs/features/<slug>.md`, then stops for

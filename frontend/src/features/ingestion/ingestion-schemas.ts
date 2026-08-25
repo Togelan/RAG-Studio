@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-export const DocumentSchema = z.object({
+const LegacyDocumentSchema = z.object({
   doc_id: z.string().min(1),
   filename: z.string().min(1),
   chunks_count: z.number().int().nonnegative(),
@@ -10,22 +10,37 @@ export const DocumentSchema = z.object({
   strategy: z.string().min(1),
   schema_version: z.number().int().positive(),
 })
+
+const PersonalDocumentSchema = z
+  .object({
+    doc_id: z.string().min(1),
+    filename: z.string().min(1),
+    chunk_count: z.number().int().nonnegative(),
+    strategy: z.string().min(1),
+  })
+  .transform(({ chunk_count, ...document }) => ({ ...document, chunks_count: chunk_count }))
+
+export const DocumentSchema = z.union([LegacyDocumentSchema, PersonalDocumentSchema])
 export type DocumentRecord = z.infer<typeof DocumentSchema>
 
-export const DocumentsPageSchema = z.object({
-  documents: z.array(DocumentSchema),
-  total: z.number().int().nonnegative().nullable(),
-  next_cursor: z.string().nullable(),
-  truncated: z.boolean(),
-})
+export const DocumentsPageSchema = z
+  .object({
+    documents: z.array(DocumentSchema),
+    total: z.number().int().nonnegative().nullable().optional(),
+    next_cursor: z.string().nullable(),
+    truncated: z.boolean(),
+  })
+  .transform(({ total, ...page }) => ({ ...page, total: total ?? null }))
 export type DocumentsPage = z.infer<typeof DocumentsPageSchema>
 
 export const ChunkSchema = z.object({
   point_id: z.string().min(1),
   chunk_index: z.number().int().nonnegative(),
   text: z.string(),
-  token_count: z.number().int().nonnegative(),
-  page: z.number().int().nonnegative().nullable(),
+  token_count: z.number().int().nonnegative().optional(),
+  page: z.number().int().nonnegative().nullable().optional(),
+  strategy: z.string().min(1).optional(),
+  csv_row: z.number().int().nonnegative().nullable().optional(),
 })
 export type ChunkRecord = z.infer<typeof ChunkSchema>
 
@@ -36,11 +51,18 @@ export const ChunksPageSchema = z.object({
 })
 export type ChunksPage = z.infer<typeof ChunksPageSchema>
 
-export const DeleteResponseSchema = z.object({
-  status: z.literal("ok"),
-  message: z.string(),
-  deleted_count: z.number().int().nonnegative(),
-})
+export const DeleteResponseSchema = z.union([
+  z.object({
+    status: z.literal("ok"),
+    message: z.string(),
+    deleted_count: z.number().int().nonnegative(),
+  }),
+  z.object({ deleted: z.number().int().nonnegative() }).transform(({ deleted }) => ({
+    status: "ok" as const,
+    message: "",
+    deleted_count: deleted,
+  })),
+])
 export type DeleteResponse = z.infer<typeof DeleteResponseSchema>
 
 export const UploadResponseSchema = z.object({
@@ -65,13 +87,27 @@ export const DuplicateResponseSchema = z.object({
 })
 export type DuplicateResponse = z.infer<typeof DuplicateResponseSchema>
 
-export const ProgressResponseSchema = z.object({
-  file_id: z.string().min(1),
-  status: z.enum(["processing", "done", "error"]),
-  message: z.string(),
-  chunks_count: z.number().int().nonnegative().nullable().optional(),
-  error: z.string().nullable().optional(),
-})
+export const ProgressResponseSchema = z.union([
+  z.object({
+    file_id: z.string().min(1),
+    status: z.enum(["processing", "done", "error"]),
+    message: z.string(),
+    chunks_count: z.number().int().nonnegative().nullable().optional(),
+    error: z.string().nullable().optional(),
+  }),
+  z
+    .object({
+      file_id: z.string().min(1),
+      status: z.enum(["processing", "complete", "error"]),
+      code: z.string().nullable().optional(),
+    })
+    .transform(({ code, file_id, status }) => ({
+      file_id,
+      status: status === "complete" ? ("done" as const) : status,
+      message: code ?? "",
+      error: status === "error" ? code : null,
+    })),
+])
 export type IngestionProgress = z.infer<typeof ProgressResponseSchema>
 
 export const ReingestResponseSchema = z.object({

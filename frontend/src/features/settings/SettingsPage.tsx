@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react"
 
 import { ApiContractError, ApiError, isAbortError } from "../../api/errors"
 import { useLocaleContext } from "../../app/locale-provider"
-import { IngestionPanel } from "../ingestion/IngestionPanel"
 import { type IngestionApi, ingestionApi, type ReingestSummary } from "../ingestion/ingestion-api"
 import { ReingestDialog } from "../ingestion/ReingestDialog"
 import { SettingsForm } from "./SettingsForm"
@@ -67,7 +66,6 @@ export function SettingsPage({
   const [saveState, setSaveState] = useState<SaveState>("idle")
   const [reingestOpen, setReingestOpen] = useState(false)
   const saveButtonRef = useRef<HTMLButtonElement>(null)
-  const [refreshToken, setRefreshToken] = useState(0)
   const controllers = useRef(new Set<AbortController>())
   const loadRequest = useRef(0)
   const modelRequest = useRef(0)
@@ -174,18 +172,8 @@ export function SettingsPage({
     const controller = trackedController()
     setSaveState("saving")
     try {
-      if (apiKey.trim().length > 0) {
-        const validation = await settings.validateKey(
-          draft.provider,
-          apiKey.trim(),
-          controller.signal,
-        )
-        if (!validation.valid) {
-          setSaveState("invalid-key")
-          return false
-        }
-      }
-      const saved = await settings.save(draft, controller.signal)
+      const replacementKey = apiKey.trim() || undefined
+      const saved = await settings.save(draft, replacementKey, controller.signal)
       const nextBaseline = savedDraft(saved)
       setDraft(nextBaseline)
       setBaseline(nextBaseline)
@@ -196,7 +184,13 @@ export function SettingsPage({
       setSaveState("saved")
       return true
     } catch (error) {
-      if (!isAbortError(error)) setSaveState("error")
+      if (!isAbortError(error)) {
+        setSaveState(
+          apiKey.trim().length > 0 && error instanceof ApiError && error.status === 400
+            ? "invalid-key"
+            : "error",
+        )
+      }
       return false
     } finally {
       controllers.current.delete(controller)
@@ -230,7 +224,6 @@ export function SettingsPage({
   }
 
   const completeReingest = (summary: ReingestSummary): void => {
-    setRefreshToken((current) => current + 1)
     setSaveState(summary.failed > 0 ? "error" : "saved")
   }
 
@@ -275,7 +268,6 @@ export function SettingsPage({
             saveButtonRef={saveButtonRef}
             state={saveState}
           />
-          <IngestionPanel api={ingestion} refreshToken={refreshToken} />
           <ObservabilityNotice />
         </>
       ) : null}

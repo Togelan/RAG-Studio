@@ -32,10 +32,10 @@ describe("stream CSRF recovery", () => {
     // Then: the BFF proof endpoint runs first and the stream carries the renewed proof.
     expect(fetchSpy.mock.calls.map(([input]) => input)).toEqual([
       "/api/saas/auth/csrf",
-      "/api/chat/send",
+      "/api/personal/chat/send",
     ])
     expect(fetchSpy).toHaveBeenLastCalledWith(
-      "/api/chat/send",
+      "/api/personal/chat/send",
       expect.objectContaining({
         headers: expect.objectContaining({ "X-CSRF-Token": "renewed-proof" }),
         method: "POST",

@@ -328,7 +328,7 @@ pytest tests/ -v
 
 LazyCodex is installed as a **Codex harness**, not an application dependency. It complements the project agents in `.agents/agents/`, the reusable skills in `.agents/skills/`, and the Graphify workflow; it does not replace them.
 
-The canonical sequence is **understand → plan with LazyCodex → implement → test → review → update Graphify → commit**.
+The canonical sequence is **understand → plan with LazyCodex → implement → test → Browser QA → adversarial QA for high-risk changes → review → update Graphify → commit**.
 
 ```text
 $init-deep
@@ -337,6 +337,13 @@ $start-work
 $ulw-loop "Verify the implementation, run all relevant tests, and fix remaining issues"
 $review-work
 ```
+
+High-risk changes must also pass the read-only `adversarial-qa` agent using the
+`.agents/skills/adversarial-review/` skill before merge. It actively attempts
+to falsify invariants, boundaries, tests, fixtures, failures, stale state,
+concurrency, security, data isolation, and applicable UI behavior. `FAIL` or
+`INCONCLUSIVE` blocks merge; see
+[`docs/features/adversarial-qa-workflow.md`](docs/features/adversarial-qa-workflow.md).
 
 After review, refresh Graphify through the team's existing local workflow when the code graph needs updating, then commit only after applicable checks pass. See `AGENTS.md` for operating rules and verification commands.
 

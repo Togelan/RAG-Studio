@@ -216,5 +216,6 @@ The post-change structural check names these contract markers and must pass;
 the baseline inventory and red-check receipt are retained in the task evidence
 directory. Browser screenshots are deliberately not claimed here: this task
 changes documentation only and starts no application. The future UI executor
-must run the in-app Browser and `omo:visual-qa` against the real implementation
+must run browser QA through the Playwright MCP server `playwright_qa_2` and
+`omo:visual-qa` against the real implementation
 at the six locale/viewport combinations.

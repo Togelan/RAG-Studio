@@ -18,8 +18,25 @@ def _client_for_mode(
 ) -> Generator[TestClient]:
     monkeypatch.setenv("RAG_STUDIO_UI_MODE", mode)
     monkeypatch.delenv("RAG_STUDIO_REACT_DIST", raising=False)
+    monkeypatch.setenv("RAG_STUDIO_RUNTIME_MODE", "saas" if mode == "react" else "local")
     if react_dist is not None:
         monkeypatch.setenv("RAG_STUDIO_REACT_DIST", str(react_dist))
+        monkeypatch.setenv("RAG_STUDIO_DATA_ROOT", str(react_dist.parent / "runtime-data"))
+        monkeypatch.setenv("RAG_STUDIO_SUPABASE_URL", "http://127.0.0.1:9")
+        monkeypatch.setenv(
+            "RAG_STUDIO_SUPABASE_JWT_ISSUER", "http://127.0.0.1:9/auth/v1"
+        )
+        monkeypatch.setenv("RAG_STUDIO_SUPABASE_JWT_AUDIENCE", "authenticated")
+        monkeypatch.setenv(
+            "RAG_STUDIO_SUPABASE_DATABASE_URL", "postgresql://invalid/db"
+        )
+        monkeypatch.setenv("RAG_STUDIO_SESSION_SIGNING_KEY", "x" * 32)
+        monkeypatch.setenv(
+            "RAG_STUDIO_SESSION_ENCRYPTION_KEYS",
+            "v1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+        )
+        monkeypatch.setenv("QDRANT_URL", "http://127.0.0.1:9")
+        monkeypatch.setenv("RAG_STUDIO_CORS_ORIGINS", "https://testserver")
 
     with (
         patch(
@@ -97,7 +114,15 @@ def test_react_mode_serves_canonical_and_preview_routes_from_contained_manifest(
     _write_valid_react_dist(react_dist)
 
     with _client_for_mode(monkeypatch, "react", react_dist) as client:
-        for path in ("/", "/settings", "/chat", "/app", "/app/settings", "/app/chat"):
+        for path in (
+            "/",
+            "/settings",
+            "/chat",
+            "/app",
+            "/app/knowledge",
+            "/app/settings",
+            "/app/chat",
+        ):
             response = client.get(path)
             assert response.status_code == 200
             assert 'data-stage2-react="true"' in response.text
@@ -122,7 +147,7 @@ def test_react_mode_serves_canonical_and_preview_routes_from_contained_manifest(
     assert legacy_static.status_code == 200
 
 
-def test_react_mode_keeps_explicit_legacy_aliases_available(
+def test_react_mode_does_not_mount_local_legacy_aliases(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -132,9 +157,7 @@ def test_react_mode_keeps_explicit_legacy_aliases_available(
     with _client_for_mode(monkeypatch, "react", react_dist) as client:
         for path in ("/legacy", "/legacy/settings", "/legacy/chat"):
             response = client.get(path)
-            assert response.status_code == 200
-            assert 'data-stage2-react="true"' not in response.text
-            assert response.headers["cache-control"] == "no-store"
+            assert response.status_code == 404
 
 
 def test_invalid_ui_mode_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:

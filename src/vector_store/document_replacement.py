@@ -67,6 +67,22 @@ async def replace_tenant_document(
     )
 
 
+async def replace_personal_document(
+    client: AsyncQdrantClient,
+    collection_name: str,
+    upsert: TenantUpsertRecords,
+    replacement: DocumentReplacement,
+) -> int:
+    """Replace one document in a server-resolved Personal Lab collection."""
+    return await _replace_in_collection(
+        client,
+        collection_name,
+        upsert,
+        replacement,
+        maintain_legacy_index=False,
+    )
+
+
 async def _replace_in_collection(
     client: AsyncQdrantClient,
     collection_name: str,

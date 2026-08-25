@@ -163,9 +163,9 @@ describe("Stage 2 AppShell", () => {
     expect(screen.getAllByRole("link", { name: "en nav_welcome" })[0]).not.toHaveAttribute(
       "aria-current",
     )
-    expect(screen.getAllByRole("link", { name: "en nav_chat" })[0]).not.toHaveAttribute(
-      "aria-current",
-    )
+    expect(screen.queryByRole("link", { name: "en nav_knowledge" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "en nav_settings" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "en nav_chat" })).not.toBeInTheDocument()
   })
 
   it("keeps Workspace selection out of the header and available in the drawer", async () => {

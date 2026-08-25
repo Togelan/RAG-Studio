@@ -24,7 +24,7 @@ describe("settings API contract", () => {
       return Promise.resolve(jsonResponse({}))
     }) as unknown as typeof fetch
 
-    await bindBrowserFetch(browserFetch)("/api/settings")
+    await bindBrowserFetch(browserFetch)("/api/personal/settings")
 
     expect(browserFetch).toHaveBeenCalledOnce()
   })
@@ -46,7 +46,7 @@ describe("settings API contract", () => {
     ).toBe(true)
   })
 
-  it("loads masked credentials but never resubmits them when settings are saved", async () => {
+  it("loads masked credentials and atomically saves a replacement key with settings", async () => {
     const settings = {
       provider: "deepseek",
       model: "deepseek-chat",
@@ -64,11 +64,37 @@ describe("settings API contract", () => {
     const api = createSettingsApi(new ApiClient(fetch, http, () => "csrf-proof"))
 
     const loaded = await api.load()
-    await api.save(settings)
+    await api.save(settings, "replacement-secret")
 
     expect(loaded.api_key).toBe("********")
     expect(post).toHaveBeenCalledWith(
-      "/api/settings",
+      "/api/personal/settings",
+      expect.objectContaining({
+        json: { ...settings, api_key: "replacement-secret" },
+        retry: 0,
+      }),
+    )
+  })
+
+  it("omits the credential field when the stored masked key is unchanged", async () => {
+    const settings = {
+      provider: "deepseek",
+      model: "deepseek-chat",
+      temperature: 1,
+      max_tokens: 2048,
+      system_prompt: "Answer from context.",
+      top_k: 5,
+      chunk_size: 512,
+      chunk_overlap: 64,
+      chunking,
+    } as const
+    const post = vi.fn(() => Promise.resolve(jsonResponse({ ...settings, chunks_changed: false })))
+    const http: KyHttpClient = { delete: vi.fn(), get: vi.fn(), patch: vi.fn(), post }
+
+    await createSettingsApi(new ApiClient(fetch, http, () => "csrf-proof")).save(settings)
+
+    expect(post).toHaveBeenCalledWith(
+      "/api/personal/settings",
       expect.objectContaining({
         json: expect.not.objectContaining({ api_key: expect.anything() }),
         retry: 0,
@@ -92,13 +118,13 @@ describe("settings API contract", () => {
     const result = await api.models("deepseek")
 
     expect(post).toHaveBeenCalledWith(
-      "/api/settings/validate-key",
+      "/api/personal/settings/validate-key",
       expect.objectContaining({
         json: { api_key: "secret-value", provider: "deepseek" },
         retry: 0,
       }),
     )
-    expect(get).toHaveBeenCalledWith("/api/settings/models/deepseek", {})
+    expect(get).toHaveBeenCalledWith("/api/personal/settings/models/deepseek", {})
     expect(result.cached).toBe(true)
   })
 

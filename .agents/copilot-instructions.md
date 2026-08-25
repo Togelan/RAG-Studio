@@ -214,7 +214,8 @@ understand the actual current checkout ($init-deep when project memory needs ref
     -> plan with LazyCodex: $ulw-plan "<feature or bug>" (plan only)
     -> implement: $start-work (execute the approved plan)
     -> test: $ulw-loop "Verify the implementation, run all relevant tests, and fix remaining issues"
-    -> confirm the affected journey in the running web app with @Browser
+    -> confirm the affected journey in the running web app with the Playwright MCP server `playwright_qa_2`
+    -> adversarial QA for high-risk changes
     -> review: $review-work
     -> update Graphify with the team's existing local graph workflow when needed
     -> commit only after verification
@@ -224,10 +225,23 @@ understand the actual current checkout ($init-deep when project memory needs ref
 - Keep the existing `@ba -> @architect -> @dev -> @qa` responsibilities for requirements and specialist project review. Do not create duplicate roles or hooks for LazyCodex.
 - Use `$remove-ai-slops` only for behavior-preserving cleanup after relevant tests pass.
 - Never report an implementation complete without recorded results from the relevant tests and quality checks.
-- Never report any implementation complete without in-app `@Browser` evidence
-  from the running web application. Record the URL, scenario, observed result,
-  viewport where relevant, and screenshots for visual changes. For backend-only
-  work, exercise the closest web journey that consumes the changed behavior.
+- Never report any implementation complete without evidence from the Playwright
+  MCP server `playwright_qa_2` from the running web application. Use only its
+  structured interactions: navigate, snapshot, click, type/fill form, press
+  keys, upload files, wait, resize, screenshot, and verification. Do not use
+  `browser_run_code`, `browser_run_code_unsafe`, `browser_evaluate`, or
+  arbitrary JavaScript/Playwright code. Do not use another Playwright MCP
+  server, another browser-control mechanism, or a non-Playwright browser tool.
+  Record the URL, scenario, observed result, viewport where relevant, and screenshots for
+  visual changes. For backend-only work, exercise the closest web journey that
+  consumes the changed behavior.
+
+- For high-risk changes, run `.agents/skills/adversarial-review/SKILL.md` with
+  the read-only `.agents/agents/adversarial-qa.md` after normal QA and before
+  merge. The adversarial verdict must be `PASS`; `FAIL` and `INCONCLUSIVE`
+  block merge. The reviewer must challenge invariants, boundaries, weak tests,
+  fixtures, failures/timeouts, stale state, concurrency, security/data leaks,
+  and applicable UI behavior rather than merely rerun green tests.
 
 ### Feature discussion before implementation
 

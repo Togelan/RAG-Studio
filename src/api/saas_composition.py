@@ -2,12 +2,30 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+from typing import Never, assert_never
 
 from fastapi import FastAPI
 from pydantic import SecretStr
 
 from src.api.chat_stream import MAX_CONCURRENT_STREAMS
+from src.api.personal_lab_registry import (
+    PersonalLabRouteDependencies,
+    PersonalLabRouterRegistry,
+)
+from src.api.personal_lab_scope import (
+    PersonalLabScopeResolver,
+    PostgresPersonalLabScopeRegistry,
+)
+from src.api.react_ui import (
+    UiMode,
+    UiServingConfiguration,
+    load_ui_serving_configuration,
+)
+from src.api.routes.personal_chat import create_personal_chat_router
+from src.api.routes.personal_lab import create_personal_lab_router
+from src.api.routes.personal_settings import create_personal_settings_router
 from src.api.routes.saas_auth import create_saas_auth_router
 from src.api.routes.saas_auth_confirmation import (
     SupabaseConfirmationVerifier,
@@ -26,7 +44,11 @@ from src.api.saas_chat_runtime import TenantChatRuntime
 from src.api.saas_chatbot_store import PostgresChatbotService
 from src.api.saas_collection_registry import PostgresWorkspaceCollectionRegistry
 from src.api.saas_identity import SupabaseAccessTokenVerifier, SupabaseIdentityProvider
-from src.api.saas_runtime import RuntimeConfiguration, SaasConfigurationError
+from src.api.saas_runtime import (
+    RuntimeConfiguration,
+    RuntimeMode,
+    SaasConfigurationError,
+)
 from src.api.saas_session_crypto import SessionKeyRing
 from src.api.saas_session_store import PostgresBffSessionStore
 from src.api.saas_tenant_graph import PersistentTenantGraphRunner
@@ -34,6 +56,7 @@ from src.api.saas_workspace_context import PostgresMembershipResolver
 from src.api.saas_workspaces import create_postgres_workspace_service
 from src.graph.llm_provider import OpenAIProviderFactory
 from src.ingestion.embedder import get_embedder
+from src.ingestion.personal_router import create_personal_knowledge_router
 from src.paths import data_path
 from src.vector_store.client import get_qdrant_client
 from src.vector_store.tenant_resolver import TrustedTenantRagResolver
@@ -57,6 +80,50 @@ class _SaasAuthorities:
     session_signing_key: SecretStr
 
 
+class InvalidApplicationModeError(ValueError):
+    """Raised when runtime and UI modes do not form an approved composition."""
+
+
+def load_application_ui_configuration(
+    runtime_mode: RuntimeMode,
+) -> UiServingConfiguration:
+    """Load UI configuration and enforce the closed runtime/UI mode matrix."""
+    if "RAG_STUDIO_UI_MODE" not in os.environ and runtime_mode is RuntimeMode.LOCAL:
+        configuration = UiServingConfiguration(mode=UiMode.LEGACY, react_build=None)
+    else:
+        configuration = load_ui_serving_configuration()
+    _validate_application_mode(runtime_mode, configuration.mode)
+    return configuration
+
+
+def _validate_application_mode(runtime_mode: RuntimeMode, ui_mode: UiMode) -> None:
+    match runtime_mode:
+        case RuntimeMode.SAAS:
+            match ui_mode:
+                case UiMode.REACT:
+                    return
+                case UiMode.LEGACY:
+                    _raise_invalid_application_mode()
+                case unreachable:
+                    assert_never(unreachable)
+        case RuntimeMode.LOCAL:
+            match ui_mode:
+                case UiMode.LEGACY:
+                    return
+                case UiMode.REACT:
+                    _raise_invalid_application_mode()
+                case unreachable:
+                    assert_never(unreachable)
+        case unreachable:
+            assert_never(unreachable)
+
+
+def _raise_invalid_application_mode() -> Never:
+    raise InvalidApplicationModeError(
+        "RAG-Studio requires either SaaS with React or local with Legacy UI."
+    )
+
+
 def mount_saas_routes(
     app: FastAPI, runtime: RuntimeConfiguration
 ) -> BffAuthContextResolver:
@@ -68,7 +135,27 @@ def mount_saas_routes(
     app.state.saas_chatbot_service = authorities.chatbots
     _mount_identity_routes(app, authorities)
     _mount_tenant_routes(app, authorities)
+    _mount_personal_lab_routes(app, authorities)
     return authorities.auth_context
+
+
+def _mount_personal_lab_routes(app: FastAPI, authority: _SaasAuthorities) -> None:
+    registry = PersonalLabRouterRegistry()
+    registry.register("context", create_personal_lab_router)
+    registry.register("chat", create_personal_chat_router)
+    registry.register("settings", create_personal_settings_router)
+    registry.register("knowledge", create_personal_knowledge_router)
+    dependencies = PersonalLabRouteDependencies(
+        auth_context=authority.auth_context,
+        scopes=PersonalLabScopeResolver(
+            PostgresPersonalLabScopeRegistry(authority.database_url),
+            data_path("personal-labs"),
+        ),
+    )
+    for router in registry.build(dependencies):
+        app.include_router(router)
+    app.state.personal_lab_router_registry = registry
+    app.state.personal_lab_scope_resolver = dependencies.scopes
 
 
 def _build_authorities(runtime: RuntimeConfiguration) -> _SaasAuthorities:

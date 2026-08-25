@@ -88,6 +88,25 @@ class VectorCollectionError(ValueError):
         super().__init__("vector_collection_invalid")
 
 
+@dataclass(frozen=True, slots=True)
+class PersonalVectorScope:
+    """Server-resolved Personal Lab vector namespace."""
+
+    scope_id: UUID
+    collection_name: str
+
+    def __post_init__(self) -> None:
+        if not self.collection_name.startswith("pl_"):
+            raise PersonalVectorScopeError
+
+
+class PersonalVectorScopeError(ValueError):
+    """Reject caller-selectable or malformed Personal collection names."""
+
+    def __init__(self) -> None:
+        super().__init__("personal_vector_scope_invalid")
+
+
 class VectorSearchQueryError(ValueError):
     """Raised when a vector search query has invalid bounds."""
 

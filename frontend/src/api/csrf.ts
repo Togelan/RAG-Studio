@@ -23,7 +23,7 @@ export function browserCsrfToken(): string | null {
 }
 
 export function requiresCsrfProof(path: string): boolean {
-  if (path.startsWith("/api/saas/")) {
+  if (path.startsWith("/api/saas/") || path.startsWith("/api/personal/")) {
     return true
   }
   return ["/api/settings", "/api/ingest", "/api/chat"].some(

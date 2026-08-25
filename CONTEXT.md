@@ -49,11 +49,16 @@ starts with empty workspaces and explicit user-controlled imports.
   orange/purple design is removed only after verified React parity preserves a
   rollback path.
 - **Browser completion gate**: every implementation must be exercised through
-  the running web application with the in-app `@Browser` after automated
-  checks pass. Backend-only changes use the closest affected web journey that
-  consumes the changed behavior. Completion evidence records the URL,
-  scenario, observed result, viewport where relevant, and screenshots for
-  visual changes.
+  the running web application with the Playwright MCP server `playwright_qa_2`
+  after automated checks pass. Use only its structured interactions: navigate,
+  snapshot, click, type/fill form, press keys, upload files, wait, resize,
+  screenshot, and verification. Do not use `browser_run_code`,
+  `browser_run_code_unsafe`, `browser_evaluate`, or arbitrary
+  JavaScript/Playwright code. Do not use another Playwright MCP server, another
+  browser-control mechanism, or a non-Playwright browser tool. Backend-only
+  changes use the closest affected web journey that consumes the changed
+  behavior. Completion evidence records the URL, scenario, observed result,
+  viewport where relevant, and screenshots for visual changes.
 
 ## Chunking terminology
 
@@ -112,3 +117,24 @@ profile, the 50,000 indexed-point benchmark is informational, with p95
 retrieval below 3 seconds reported where the machine and corpus permit;
 memory, ingestion duration, and failure behavior are measured rather than
 assumed.
+
+## Personal Lab boundary (Group 2 contract)
+
+- **Personal Lab** is the identity-scoped private RAG area delivered by Group
+  2 as the AC-023.1 portion of FR-023. Its server-owned scope identifier is
+  opaque to the browser and namespaces its settings, provider-secret metadata,
+  knowledge, vectors/cache, jobs, chat state, checkpoints, and feedback.
+- React Personal Lab requests use the cookie-authenticated, same-origin,
+  CSRF-protected `/api/personal/*` boundary only. Browser routes, route
+  parameters, local storage, and client role state are never authority for a
+  Personal Lab scope.
+- Legacy data stays host-global and is reachable only in explicit
+  `local + legacy` operator mode. Group 2 must neither import, claim,
+  transform, expose, nor delete Legacy documents, vectors, uploads, settings,
+  sessions, cache/checkpoints, feedback, or provider keys.
+- Legacy purge remains a Group 12 decision after verified Personal Lab parity,
+  verified backup/export, and a separate purge confirmation. Rollback returns
+  to Legacy mode without mutating either store.
+- Group 2 is deliberately a partial FR-023 delivery: AC-023.2 `Create agent
+  from Personal Lab` promotion/copy belongs to Group 5. No Group 2 UI or
+  completion statement may imply that an Agent or shared data was created.

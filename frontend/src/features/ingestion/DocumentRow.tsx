@@ -91,9 +91,16 @@ export function DocumentRow({ api, document, onDelete }: DocumentRowProps): Reac
             <h3 title={document.filename}>{document.filename}</h3>
             <p>
               {extension(document.filename, t("ingestion_file_type_unknown"))} ·{" "}
-              {document.chunks_count} {t("settings_doc_col_chunks")} · {document.chunk_size} /{" "}
-              {document.chunk_overlap} ·{" "}
-              <time dateTime={document.created_at}>{document.created_at.slice(0, 10)}</time>
+              {document.chunks_count} {t("settings_doc_col_chunks")}
+              {"chunk_size" in document
+                ? ` · ${document.chunk_size} / ${document.chunk_overlap}`
+                : ""}
+              {"created_at" in document ? (
+                <>
+                  {" · "}
+                  <time dateTime={document.created_at}>{document.created_at.slice(0, 10)}</time>
+                </>
+              ) : null}
             </p>
           </div>
         </div>
@@ -137,15 +144,19 @@ export function DocumentRow({ api, document, onDelete }: DocumentRowProps): Reac
             <section className="rs-chunk" key={chunk.point_id}>
               <div className="rs-chunk__meta">
                 <strong>#{chunk.chunk_index + 1}</strong>
-                <span>
-                  {chunk.token_count} {t("ingestion_tokens")}
-                  {chunk.page === null ? null : (
-                    <>
-                      {" · "}
-                      {t("chat_page")} {chunk.page}
-                    </>
-                  )}
-                </span>
+                {chunk.token_count === undefined && chunk.page === undefined ? null : (
+                  <span>
+                    {chunk.token_count === undefined
+                      ? null
+                      : `${chunk.token_count} ${t("ingestion_tokens")}`}
+                    {chunk.page === null || chunk.page === undefined ? null : (
+                      <>
+                        {" · "}
+                        {t("chat_page")} {chunk.page}
+                      </>
+                    )}
+                  </span>
+                )}
               </div>
               <p>{preview(chunk.text)}</p>
             </section>

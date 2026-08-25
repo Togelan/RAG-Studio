@@ -1,4 +1,4 @@
-import { LogOut, Menu, PanelTop, Settings2, Sparkles, UserRound } from "lucide-react"
+import { BookOpenText, LogOut, Menu, PanelTop, Settings2, Sparkles, UserRound } from "lucide-react"
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 
@@ -10,17 +10,18 @@ import { type ContextState, ContextStateNotice, ContextSwitcher } from "./contex
 import { LocaleMenu } from "./locale-menu"
 import "./app-shell.css"
 
-type ShellPage = "welcome" | "settings" | "chat"
+type ShellPage = "welcome" | "knowledge" | "settings" | "chat"
 type ResolvedShellPage = ShellPage | "workspace" | "neutral"
 
 type NavigationItem = {
   readonly icon: typeof Sparkles
-  readonly key: "nav_welcome" | "nav_settings" | "nav_chat"
+  readonly key: "nav_welcome" | "nav_knowledge" | "nav_settings" | "nav_chat"
   readonly page: ShellPage
 }
 
-const navigationItems = [
-  { icon: Sparkles, key: "nav_welcome", page: "welcome" },
+const homeNavigation = { icon: Sparkles, key: "nav_welcome", page: "welcome" } as const
+const personalNavigationItems = [
+  { icon: BookOpenText, key: "nav_knowledge", page: "knowledge" },
   { icon: Settings2, key: "nav_settings", page: "settings" },
   { icon: PanelTop, key: "nav_chat", page: "chat" },
 ] as const satisfies readonly NavigationItem[]
@@ -30,6 +31,8 @@ function pagePath(page: ShellPage, pathname: string): string {
   switch (page) {
     case "welcome":
       return prefix || "/"
+    case "knowledge":
+      return `${prefix}/knowledge`
     case "settings":
       return `${prefix}/settings`
     case "chat":
@@ -44,14 +47,19 @@ export type WorkspaceNavigationItem = {
 
 function NavigationLinks({
   onNavigate,
+  personalNavigation,
   workspaceNavigation = [],
 }: {
   readonly onNavigate?: (() => void) | undefined
+  readonly personalNavigation: boolean
   readonly workspaceNavigation?: readonly WorkspaceNavigationItem[] | undefined
 }): React.JSX.Element {
   const { pathname } = useLocation()
   const { t } = useLocaleContext()
   const activePage = pageFromPath(pathname)
+  const navigationItems = personalNavigation
+    ? [homeNavigation, ...personalNavigationItems]
+    : [homeNavigation]
 
   return (
     <>
@@ -94,6 +102,8 @@ function pageFromPath(pathname: string): ResolvedShellPage {
     case "/settings":
     case "/app/settings":
       return "settings"
+    case "/app/knowledge":
+      return "knowledge"
     case "/chat":
     case "/app/chat":
       return "chat"
@@ -102,8 +112,13 @@ function pageFromPath(pathname: string): ResolvedShellPage {
       return "neutral"
     default:
       if (pathname.startsWith("/app/workspaces/")) return "workspace"
-      return "welcome"
+      return "neutral"
   }
+}
+
+function selectedContext(context: ContextState | undefined) {
+  if (context?.state !== "ready") return undefined
+  return context.availableContexts.find((candidate) => candidate.id === context.selectedContextId)
 }
 
 export function AppShell({
@@ -128,6 +143,10 @@ export function AppShell({
   const shellPageTitle = pageTitle ?? (page === "welcome" ? t("welcome_title") : undefined)
   const showPageHeader = shellPageTitle !== undefined
   const [menuOpen, setMenuOpen] = useState(false)
+  const activeContext = selectedContext(context)
+  const personalNavigation = activeContext?.kind === "personal"
+  const activeContextLabel =
+    activeContext?.kind === "personal" ? shellCopy.personalLab : activeContext?.name
 
   return (
     <div className={`rs-shell${page === "chat" ? " rs-shell--workspace" : ""}`}>
@@ -141,7 +160,10 @@ export function AppShell({
           <span>RAG-Studio</span>
         </Link>
         <nav aria-label={t("aria_main_nav")} className="rs-shell__desktop-nav">
-          <NavigationLinks workspaceNavigation={workspaceNavigation} />
+          <NavigationLinks
+            personalNavigation={personalNavigation}
+            workspaceNavigation={workspaceNavigation}
+          />
         </nav>
         <div className="rs-shell__tools">
           <LocaleMenu
@@ -162,6 +184,12 @@ export function AppShell({
                   <>
                     <p>{shellCopy.account}</p>
                     <strong>{context.accountName}</strong>
+                  </>
+                ) : null}
+                {activeContextLabel !== undefined ? (
+                  <>
+                    <p>{shellCopy.context}</p>
+                    <strong>{activeContextLabel}</strong>
                   </>
                 ) : null}
                 <Button onClick={() => void user.onSignOut()} variant="secondary">
@@ -196,6 +224,7 @@ export function AppShell({
                 ) : null}
                 <NavigationLinks
                   onNavigate={() => setMenuOpen(false)}
+                  personalNavigation={personalNavigation}
                   workspaceNavigation={workspaceNavigation}
                 />
                 {user !== undefined ? (

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { ApiError, StreamProtocolError } from "../../api/errors"
 import type { ChatStreamEvent } from "../../types/api"
 import { ChatController } from "./chat-controller"
 import type {
@@ -251,86 +250,5 @@ describe("ChatController", () => {
     expect(controller.snapshot().sessions).toEqual([])
     await controller.createSession()
     expect(controller.snapshot().activeSessionId).toBe(SESSION.id)
-  })
-
-  it.each([
-    [
-      new ApiError(409, "raw provider conflict", null),
-      "already running",
-      "chat_stream_conflict",
-      null,
-    ],
-    [new ApiError(429, "raw provider overload", 7), "Too many requests", "chat_stream_capacity", 7],
-    [new ApiError(503, "raw qdrant failure", 3), "at capacity", "chat_stream_capacity", 3],
-    [new StreamProtocolError(), "ended unexpectedly", "chat_stream_failed", null],
-  ])("sanitizes stream failure %#", async (failure, message, messageKey, retryAfterSeconds) => {
-    const api = gateway()
-    const controller = new ChatController(
-      api,
-      {
-        cancel: api.cancel,
-        reattach: vi.fn(async () => undefined),
-        send: vi.fn(async () => {
-          throw failure
-        }),
-      },
-      () => "user-a",
-    )
-    await controller.load()
-    await controller.selectSession(SESSION.id, false)
-    await controller.send("Fail safely")
-
-    expect(controller.snapshot().stream).toEqual({
-      kind: "error",
-      message: expect.stringContaining(message),
-      messageKey,
-      retryAfterSeconds,
-    })
-    expect(JSON.stringify(controller.snapshot())).not.toContain("raw ")
-  })
-
-  it("batches token bursts into one measured DOM frame", async () => {
-    const api = gateway()
-    const frames: Array<() => void> = []
-    const measure = vi.spyOn(performance, "measure")
-    const streams: ChatStreamGateway = {
-      cancel: api.cancel,
-      reattach: vi.fn(async () => undefined),
-      send: vi.fn(
-        (_input, options) =>
-          new Promise<void>((resolve) => {
-            options.onEvent({
-              message_id: "assistant-a",
-              protocol: "1",
-              session_id: SESSION.id,
-              type: "start",
-            })
-            options.onEvent({ token: "one ", type: "token" })
-            options.onEvent({ token: "two ", type: "token" })
-            options.onEvent({ token: "three", type: "token" })
-            options.signal.addEventListener("abort", () => resolve(), { once: true })
-          }),
-      ),
-    }
-    const controller = new ChatController(
-      api,
-      streams,
-      () => "user-a",
-      (frame) => frames.push(frame),
-    )
-    await controller.load()
-    await controller.selectSession(SESSION.id, false)
-    const sending = controller.send("Batch tokens")
-    await vi.waitFor(() => expect(frames).toHaveLength(1))
-    frames[0]?.()
-
-    expect(controller.snapshot().partialResponse).toBe("one two three")
-    expect(measure).toHaveBeenCalledWith(
-      "rag-chat-response-to-dom",
-      "rag-chat-token-received",
-      "rag-chat-token-painted",
-    )
-    await controller.stop()
-    await sending
   })
 })

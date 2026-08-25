@@ -51,7 +51,8 @@ requirements and must not be implemented implicitly during Stage 2.
 Every plan task must name one owning FR and list every existing FR it modifies.
 Task IDs are not substitutes for FR numbers.
 
-Every implementation task also has a mandatory in-app `@Browser` completion
+Every implementation task also has a mandatory completion scenario through the
+Playwright MCP server `playwright_qa_2`
 scenario. After automated checks pass, developer and independent QA each
 exercise the affected journey in the running web application and record the
 URL, steps, observed result, viewport where relevant, and screenshots for

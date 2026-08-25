@@ -28,9 +28,17 @@ export const ChatMessageSchema = z.object({
   citations: z.array(CitationSchema).optional(),
   content: z.string(),
   created_at: z.string(),
-  generated_from: z.string().optional(),
+  generated_from: z
+    .string()
+    .nullable()
+    .transform((value) => value ?? undefined)
+    .optional(),
   id: z.string().min(1),
-  in_reply_to: z.string().optional(),
+  in_reply_to: z
+    .string()
+    .nullable()
+    .transform((value) => value ?? undefined)
+    .optional(),
   role: z.enum(["user", "assistant"]),
 })
 export const ChatMessageListSchema = z.array(ChatMessageSchema)

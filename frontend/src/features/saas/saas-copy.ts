@@ -40,7 +40,7 @@ const copy = {
     owner: "Owner",
     password: "Password",
     people: "People & invitations",
-    productLabel: "RAG-Studio workspace",
+    productLabel: "RAG-Studio",
     signIn: "Sign in",
     signInPrompt: "New to RAG-Studio?",
     signOut: "Sign out",

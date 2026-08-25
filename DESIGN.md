@@ -359,6 +359,70 @@ blue-violet interactive state rather than a new SaaS brand.
 
 Every UI task follows:
 
-`design-system-style-intelligence -> frontend-design-director -> react-shadcn-ui-contract -> omo:visual-qa -> in-app Browser confirmation`
+`design-system-style-intelligence -> frontend-design-director -> react-shadcn-ui-contract -> omo:visual-qa -> Playwright MCP server playwright_qa_2 confirmation`
 
 Verification records the governing reference, route, scenario, viewport, observed state, keyboard/focus behavior, reduced-motion behavior, and screenshots. A visual match without working data, error states, accessible interaction, or mobile behavior is not accepted.
+
+## Group 2 Personal Lab navigation contract (FR-023.1)
+
+### Primary job and scope honesty
+
+Personal Lab lets one signed-in person move through one private workflow:
+understand the next step on Home, manage private sources in Knowledge, configure
+retrieval and generation in Settings, then use those sources in Chat. The
+server-confirmed context remains authority. A Personal destination must not be
+shown while a Workspace is active, while context is unresolved, or before the
+session is confirmed.
+
+The visual direction continues the approved Group 1 shell rather than creating
+a second Personal Lab shell. Product identity stays left, the active navigation
+stays centered on wide viewports, and locale plus the icon-only profile control
+stay right. Personal scope is communicated by the Home context selector, the
+mobile drawer, and the profile detail panel; it does not reintroduce the large
+header workspace card the unified shell removed.
+
+### Information hierarchy and reusable states
+
+- **Personal primary navigation:** Home, Knowledge, Settings, and Chat appear
+  only for a ready Personal Lab context. Knowledge is the sole document-management
+  destination; Settings contains provider, generation, retrieval, and chunking
+  configuration without a second document list.
+- **PersonalLabHome:** one welcome heading, confirmed scope/context, and an
+  ordered three-step path from Knowledge to Settings to Chat. Links are real
+  destinations, use existing focus and active-state tokens, and never imply that
+  documents, Agents, or shared Workspace resources already exist.
+- **PersonalKnowledgePage:** one labelled task region inside the shared shell.
+  The selected Knowledge navigation item is the location cue, so the page does
+  not repeat a `RAG-Studio` eyebrow or a second `Knowledge` heading. Loading,
+  empty, populated, recoverable error, and permission-denied content occupy the
+  same stable region; Todo 7 supplies the scoped document workflow.
+- **Context recovery:** loading, missing context, denied/revoked context, and
+  signed-out states clear Personal children and Personal navigation before
+  presenting localized recovery. A Workspace-only session receives only Home
+  plus its real Workspace destinations.
+
+At 1440px the existing one-line header remains the shell frame. At 768px and
+360px primary navigation moves into the existing labelled drawer; its context
+control precedes destinations, every target remains at least 44px, Russian copy
+wraps without clipping, and no primary region owns horizontal scroll. Page-body
+scroll remains the sole vertical scroll owner.
+
+### Accessibility, motion, and decision record
+
+The flow serves keyboard and screen-reader users, people at 200% zoom, and people
+with temporary or situational memory constraints. Navigation uses real links,
+the active destination uses `aria-current` plus a surface change, task order is
+written in plain language, focus remains visible, and locale parity preserves the
+same hierarchy. Motion is limited to existing press/control feedback and follows
+the reduced-motion token; there is no decorative entrance animation.
+
+Two alternatives were rejected. A persistent header context switcher was rejected
+because it crowds the single-line shell and repeats the Home recovery task; revisit
+only if future work proves frequent cross-context switching from non-Home pages is
+a measured primary journey. A second Personal Lab side rail was rejected because
+four destinations fit the unified navigation and another shell would fragment
+wayfinding; revisit only when a future, approved Personal Lab information
+architecture exceeds the compact top-navigation capacity. Accepted debt: Todo 6
+provides navigation and the Knowledge task region; Todo 7 owns live scoped
+document controls and must replace the region's integration state before Group 2
+can close.

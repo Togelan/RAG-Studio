@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { ChatCancelResponseSchema } from "../types/api"
+import { ChatCancelResponseSchema, type ChatStreamEvent } from "../types/api"
 import type { KyHttpClient, KyRequestOptions } from "./client"
 import { ApiClient } from "./client"
 import { ApiContractError, ApiError, StreamProtocolError } from "./errors"
@@ -109,7 +109,7 @@ describe("SseFrameParser", () => {
 describe("stream boundary", () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it("adds the double-submit CSRF proof when starting a protected chat stream", async () => {
+  it("adds the double-submit CSRF proof when starting a protected Personal Chat stream", async () => {
     // Given: the SaaS BFF has established its readable CSRF companion cookie.
     vi.stubGlobal("document", { cookie: "__Host-ragstudio-csrf=chat-proof" })
     const fetchSpy = vi.fn(() => Promise.resolve(streamResponse([])))
@@ -121,7 +121,7 @@ describe("stream boundary", () => {
 
     // Then: the protected endpoint receives the matching proof.
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/chat/send",
+      "/api/personal/chat/send",
       expect.objectContaining({
         headers: expect.objectContaining({ "X-CSRF-Token": "chat-proof" }),
         method: "POST",
@@ -154,29 +154,44 @@ describe("stream boundary", () => {
     expect(tokens).toEqual([greeting])
   })
 
-  it("uses one AbortSignal for POST streaming and emits only parsed public events", async () => {
+  it("normalizes the Personal Chat terminal stream without fabricating token events", async () => {
     // Given: the authenticated browser still has its readable CSRF companion cookie.
     stubReadableCsrfCookie()
     const fetchSpy = vi.fn(() =>
       Promise.resolve(
         streamResponse([
-          'event: start\ndata: {"protocol":"1","message_id":"assistant-1","session_id":"session-1"}\n\n',
-          'event: done\ndata: {"done":true,"message_id":"assistant-1","full_response":"safe","citations":[]}\n\n',
+          'event: start\ndata: {"protocol":"1","session_id":"session-1"}\n\n',
+          'event: done\ndata: {"done":true,"completed":false,"message_id":"assistant-1","full_response":"safe","citations":[]}\n\n',
         ]),
       ),
     )
     vi.stubGlobal("fetch", fetchSpy)
     const controller = new AbortController()
-    const events: string[] = []
+    const events: ChatStreamEvent[] = []
 
     await streamChat(
       { content: "question", message_id: "message-1", session_id: "session-1" },
-      { onEvent: (event) => events.push(event.type), signal: controller.signal },
+      { onEvent: (event) => events.push(event), signal: controller.signal },
     )
 
-    expect(events).toEqual(["start", "done"])
+    expect(events).toEqual([
+      {
+        message_id: "message-1",
+        protocol: "1",
+        session_id: "session-1",
+        type: "start",
+      },
+      {
+        citations: [],
+        completed: true,
+        done: true,
+        full_response: "safe",
+        message_id: "assistant-1",
+        type: "done",
+      },
+    ])
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/chat/send",
+      "/api/personal/chat/send",
       expect.objectContaining({
         body: '{"content":"question","session_id":"session-1","message_id":"message-1"}',
         method: "POST",
@@ -218,7 +233,7 @@ describe("stream boundary", () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/api/chat/sessions/session%2F1/stream",
+      "/api/personal/chat/sessions/session%2F1/stream",
       expect.objectContaining({ method: "GET", signal: controller.signal }),
     )
   })
@@ -232,11 +247,11 @@ describe("stream boundary", () => {
     )
 
     await expect(
-      client.post("/api/chat/sessions/session-1/cancel", {}, ChatCancelResponseSchema),
+      client.post("/api/personal/chat/sessions/session-1/cancel", {}, ChatCancelResponseSchema),
     ).rejects.toMatchObject(
       new ApiError(503, "The service is temporarily unavailable. Please try again.", null),
     )
-    expect(inputs).toEqual(["/api/chat/sessions/session-1/cancel"])
+    expect(inputs).toEqual(["/api/personal/chat/sessions/session-1/cancel"])
   })
 
   it("rejects absolute and cross-origin paths before invoking ky", async () => {
@@ -268,6 +283,6 @@ describe("stream boundary", () => {
       status: "stopped",
       session_id: "session-1",
     })
-    expect(inputs).toEqual(["/api/chat/sessions/session-1/cancel"])
+    expect(inputs).toEqual(["/api/personal/chat/sessions/session-1/cancel"])
   })
 })

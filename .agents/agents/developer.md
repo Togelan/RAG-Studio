@@ -43,7 +43,7 @@ You are a **subagent** — you receive tasks from @architect and return structur
 
 9. Run the full test suite: `pytest tests/ -v`
 10. Exercise the affected user journey in the running web application with the
-    in-app `@Browser`. Record the URL, steps, observed result, viewport where
+    Playwright MCP server `playwright_qa_2`. Record the URL, steps, observed result, viewport where
     relevant, and screenshots for visual changes. For backend-only changes,
     use the closest web journey that consumes the changed behavior.
 11. Return a **structured `DEV_RESULT` JSON** to @architect, including Browser
