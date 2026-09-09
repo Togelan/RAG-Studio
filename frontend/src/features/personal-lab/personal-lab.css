@@ -69,6 +69,17 @@
   padding: var(--rs-space-24);
 }
 
+.rs-personal-knowledge--with-ingestion,
+.rs-personal-knowledge--with-ingestion > * {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.rs-personal-knowledge--with-ingestion {
+  overflow-x: clip;
+}
+
 @media (max-width: 47.999rem) {
   .rs-personal-home,
   .rs-personal-knowledge {

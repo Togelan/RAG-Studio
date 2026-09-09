@@ -181,9 +181,25 @@ class _PersonalKnowledgeService:
         try:
             replacement = await self._replacement(scope, staged, doc_id=doc_id)
             store = await self._store(scope, replacement)
-            await store.replace_document(replacement)
-            updated = await anyio.to_thread.run_sync(
-                self.storage.update_chunks, scope, doc_id, len(replacement.records)
+            async def commit_metadata() -> None:
+                await anyio.to_thread.run_sync(
+                    self.storage.update_chunks,
+                    scope,
+                    doc_id,
+                    len(replacement.records),
+                    replacement.chunk_size,
+                    replacement.chunk_overlap,
+                    replacement.strategy,
+                )
+
+            await store.replace_document(replacement, after_publish=commit_metadata)
+            updated = document.model_copy(
+                update={
+                    "chunk_count": len(replacement.records),
+                    "chunk_size": replacement.chunk_size,
+                    "chunk_overlap": replacement.chunk_overlap,
+                    "strategy": replacement.strategy,
+                }
             )
         except (
             EmbeddingError,
@@ -497,4 +513,7 @@ def _upload_response(document: StoredPersonalDocument) -> dict[str, object]:
         "doc_id": str(document.doc_id),
         "filename": document.filename,
         "chunk_count": document.chunk_count,
+        "chunk_size": document.chunk_size,
+        "chunk_overlap": document.chunk_overlap,
+        "strategy": document.strategy,
     }

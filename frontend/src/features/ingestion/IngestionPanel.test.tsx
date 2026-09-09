@@ -55,6 +55,15 @@ interface FileSystemModule {
 }
 
 describe("IngestionPanel", () => {
+  it("exposes Browse files through a native file-control label", () => {
+    render(<IngestionPanel api={emptyApi()} refreshToken={0} />)
+
+    const input = screen.getByLabelText("settings_browse_files") as HTMLInputElement
+    expect(input.type).toBe("file")
+    expect(input.labels).toHaveLength(1)
+    expect(input.labels?.[0]).toHaveTextContent("settings_browse_files")
+  })
+
   it("renders document and clear actions at the ingestion touch-target size", async () => {
     const api = emptyApi({
       documents: vi.fn(() =>
@@ -93,6 +102,40 @@ describe("IngestionPanel", () => {
     )
   })
 
+  it("keeps a long document identity and its actions inside the Knowledge card", async () => {
+    const filename = `${"long-unbroken-document-name-".repeat(8)}.pdf`
+    const api = emptyApi({
+      documents: vi.fn(() =>
+        Promise.resolve({
+          documents: [
+            {
+              doc_id: "doc-long",
+              filename,
+              chunks_count: 154,
+              chunk_size: 512,
+              chunk_overlap: 64,
+              created_at: "2026-08-26T00:00:00Z",
+              strategy: "sentence_window",
+              schema_version: 1,
+            },
+          ],
+          total: 1,
+          next_cursor: null,
+          truncated: false,
+        }),
+      ),
+    })
+    render(<IngestionPanel api={api} refreshToken={0} />)
+
+    expect(await screen.findByTitle(filename)).toHaveTextContent(filename)
+    expect(screen.getByText("settings_chunking_strategy_sentence_window")).toBeVisible()
+    const moduleName = ["node", "fs"].join(":")
+    const fileSystem = (await import(moduleName)) as unknown as FileSystemModule
+    const styles = fileSystem.readFileSync("src/features/ingestion/ingestion.css", "utf8")
+    expect(styles).toMatch(/\.rs-document h3\s*\{[^}]*overflow-wrap:\s*anywhere/u)
+    expect(styles).toMatch(/\.rs-document__summary[^}]*\{[^}]*flex-wrap:\s*wrap/u)
+  })
+
   it("returns focus to Browse files when Escape dismisses a duplicate dialog", async () => {
     const upload = vi
       .fn<IngestionApi["upload"]>()
@@ -117,7 +160,7 @@ describe("IngestionPanel", () => {
         response: { status: "cancelled", file_id: "", message: "cancelled" },
       })
     render(<IngestionPanel api={emptyApi({ upload })} refreshToken={0} />)
-    const browse = screen.getByRole("button", { name: "settings_browse_files" })
+    const browse = screen.getByLabelText("settings_browse_files")
     const file = new File(["replacement"], "report.txt", { type: "text/plain" })
     browse.focus()
     fireEvent.change(screen.getByLabelText("settings_browse_files"), {

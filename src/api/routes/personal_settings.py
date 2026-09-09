@@ -13,6 +13,7 @@ from pydantic import TypeAdapter, ValidationError
 from src.api.personal_lab_registry import PersonalLabRouteDependencies
 from src.api.personal_lab_scope import PersonalLabScope
 from src.api.personal_lab_settings import (
+    ClearPersonalKeyRequest,
     PersonalLabSettingsStore,
     PersonalModelsResponse,
     PersonalSettings,
@@ -113,6 +114,27 @@ class _PersonalSettingsHandlers:
             error=None if valid else "Provider validation failed.",
         )
 
+    async def clear_credential(
+        self, request: Request, payload: ClearPersonalKeyRequest
+    ) -> PersonalSettingsResponse:
+        """Remove only the selected provider credential after explicit confirmation."""
+        del payload
+        if "scope_id" in request.query_params or request.headers.get(
+            "X-Personal-Lab-ID"
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Personal Lab scope selectors are not accepted.",
+            )
+        scope = await _resolve_scope(request, self.dependencies)
+        current = await _load(self.store, scope)
+        cleared = await _clear_provider_secret(
+            self.store,
+            scope,
+            current.settings.provider,
+        )
+        return _response(cleared)
+
     async def get_models(
         self, request: Request, provider: str
     ) -> PersonalModelsResponse:
@@ -168,6 +190,12 @@ def create_personal_settings_router(
         response_model=ValidatePersonalKeyResponse,
     )
     router.add_api_route(
+        "/credential",
+        handlers.clear_credential,
+        methods=["DELETE"],
+        response_model=PersonalSettingsResponse,
+    )
+    router.add_api_route(
         "/models/{provider}",
         handlers.get_models,
         methods=["GET"],
@@ -218,6 +246,20 @@ async def _save(
     except PersonalSettingsPersistenceError:
         raise HTTPException(
             status_code=500, detail="Personal settings could not be saved."
+        ) from None
+
+
+async def _clear_provider_secret(
+    store: PersonalLabSettingsStore,
+    scope: PersonalLabScope,
+    provider: ProviderName,
+) -> PersonalSettingsRecord:
+    try:
+        clear = partial(store.clear_provider_secret, scope, provider)
+        return await anyio.to_thread.run_sync(clear)
+    except PersonalSettingsPersistenceError:
+        raise HTTPException(
+            status_code=500, detail="Personal credential could not be removed."
         ) from None
 
 

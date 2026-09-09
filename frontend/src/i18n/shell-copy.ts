@@ -9,6 +9,7 @@ export type ShellCopy = {
   readonly contextLoading: string
   readonly contextPending: string
   readonly contextRevoked: string
+  readonly healthDegraded: string
   readonly noContext: string
   readonly personalLab: string
   readonly roleAdmin: string
@@ -30,6 +31,7 @@ const shellCopyByLocale = {
     contextLoading: "Loading confirmed context",
     contextPending: "Updating context",
     contextRevoked: "This context is no longer available. Choose an available context.",
+    healthDegraded: "Degraded",
     noContext: "No context is available yet.",
     personalLab: "Personal Lab",
     roleAdmin: "Admin",
@@ -49,6 +51,7 @@ const shellCopyByLocale = {
     contextLoading: "Загрузка подтверждённого контекста",
     contextPending: "Обновление контекста",
     contextRevoked: "Этот контекст больше недоступен. Выберите доступный контекст.",
+    healthDegraded: "Сниженная доступность",
     noContext: "Доступный контекст пока отсутствует.",
     personalLab: "Личная лаборатория",
     roleAdmin: "Администратор",

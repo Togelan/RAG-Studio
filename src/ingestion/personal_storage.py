@@ -196,7 +196,13 @@ class PersonalKnowledgeStorage:
         return _uploads(scope) / document.raw_name
 
     def update_chunks(
-        self, scope: PersonalLabScope, doc_id: UUID, chunk_count: int
+        self,
+        scope: PersonalLabScope,
+        doc_id: UUID,
+        chunk_count: int,
+        chunk_size: int,
+        chunk_overlap: int,
+        strategy: str,
     ) -> StoredPersonalDocument:
         """Publish revised chunk metadata after a successful re-index."""
         manifest = _load(scope)
@@ -205,7 +211,14 @@ class PersonalKnowledgeStorage:
         )
         if current is None:
             raise PersonalKnowledgeStorageError
-        updated = current.model_copy(update={"chunk_count": chunk_count})
+        updated = current.model_copy(
+            update={
+                "chunk_count": chunk_count,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "strategy": strategy,
+            }
+        )
         _save(
             scope,
             manifest.model_copy(

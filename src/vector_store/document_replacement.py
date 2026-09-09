@@ -31,6 +31,7 @@ _MAX_DOCUMENT_POINTS: Final = 10_000
 EnsureCollection = Callable[[VectorCollection], Awaitable[None]]
 UpsertRecords = Callable[[str, Sequence[VectorRecord]], Awaitable[None]]
 TenantUpsertRecords = Callable[[Sequence[VectorRecord]], Awaitable[None]]
+ReplacementCommit = Callable[[], Awaitable[None]]
 
 
 async def replace_document(
@@ -72,6 +73,8 @@ async def replace_personal_document(
     collection_name: str,
     upsert: TenantUpsertRecords,
     replacement: DocumentReplacement,
+    *,
+    after_publish: ReplacementCommit | None = None,
 ) -> int:
     """Replace one document in a server-resolved Personal Lab collection."""
     return await _replace_in_collection(
@@ -80,6 +83,7 @@ async def replace_personal_document(
         upsert,
         replacement,
         maintain_legacy_index=False,
+        after_publish=after_publish,
     )
 
 
@@ -90,6 +94,7 @@ async def _replace_in_collection(
     replacement: DocumentReplacement,
     *,
     maintain_legacy_index: bool,
+    after_publish: ReplacementCommit | None = None,
 ) -> int:
     previous_points = await _snapshot_document_points(
         client, collection_name, replacement.doc_id
@@ -116,6 +121,8 @@ async def _replace_in_collection(
             metadata,
             maintain_legacy_index=maintain_legacy_index,
         )
+        if after_publish is not None:
+            await after_publish()
         completed = True
     finally:
         if not completed:

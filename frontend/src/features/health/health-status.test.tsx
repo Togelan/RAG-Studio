@@ -74,4 +74,31 @@ describe("HealthStatus", () => {
       expect(screen.getByRole("status")).toHaveTextContent("label status_disconnected"),
     )
   })
+
+  it("uses a distinct textual degraded state instead of the offline label", async () => {
+    const gateway: HealthGateway = {
+      getStatus: async () => ({ api_key_configured: true, status: "degraded" }),
+    }
+    render(
+      <LocaleProvider runtime={runtime()}>
+        <HealthStatus gateway={gateway} />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Degraded"))
+    expect(screen.getByRole("status")).not.toHaveTextContent("label status_disconnected")
+  })
+
+  it("treats a malformed health payload as an offline state without rendering its contents", async () => {
+    const gateway: HealthGateway = { getStatus: async () => ({ status: "unexpected" }) }
+    render(
+      <LocaleProvider runtime={runtime()}>
+        <HealthStatus gateway={gateway} />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("label status_disconnected"),
+    )
+  })
 })

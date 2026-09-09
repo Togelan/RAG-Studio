@@ -77,12 +77,36 @@ function Add-LedgerRow {
 function Invoke-Docker {
     param([string]$Operation, [string[]]$Arguments, [switch]$AllowFailure)
     $previousPreference = $ErrorActionPreference
+    $process = [Diagnostics.Process]::new()
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $DockerCli
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+    $process.StartInfo = $startInfo
     try {
         $ErrorActionPreference = "Continue"
-        $output = & $DockerCli @Arguments 2>&1
-        $exitCode = $LASTEXITCODE
+        if (-not $process.Start()) {
+            throw "Docker process could not be started: $DockerCli"
+        }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        $output = @()
+        if ($stdout) { $output += $stdout.TrimEnd("`r", "`n").Split([Environment]::NewLine) }
+        if ($stderr) { $output += $stderr.TrimEnd("`r", "`n").Split([Environment]::NewLine) }
+        $exitCode = $process.ExitCode
     }
-    finally { $ErrorActionPreference = $previousPreference }
+    finally {
+        $process.Dispose()
+        $ErrorActionPreference = $previousPreference
+    }
     Add-LedgerRow $Operation $Arguments $exitCode
     if (-not $AllowFailure -and $exitCode -ne 0) {
         throw "Docker operation failed: $Operation"

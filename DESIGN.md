@@ -55,6 +55,7 @@ Use semantic CSS variables mapped to Tailwind and shadcn. Do not scatter raw col
 | `--rs-focus` | `#B4B2FF` | Keyboard focus ring |
 | `--rs-layout-workspace` | `1280px` | FR-012 Chat workspace outer content width |
 | `--rs-layout-bottom-nav-reserve` | `76px` | Compact fixed navigation clearance |
+| `--rs-layout-status-label` | `128px` | Billing and compact definition-list label column |
 | `--rs-layout-loading-block` | `120px` | Minimum Settings loading-skeleton block height |
 | `--rs-layout-progress` | `200px` | Inline ingestion upload-progress width |
 
@@ -362,6 +363,28 @@ Every UI task follows:
 `design-system-style-intelligence -> frontend-design-director -> react-shadcn-ui-contract -> omo:visual-qa -> Playwright MCP server playwright_qa_2 confirmation`
 
 Verification records the governing reference, route, scenario, viewport, observed state, keyboard/focus behavior, reduced-motion behavior, and screenshots. A visual match without working data, error states, accessible interaction, or mobile behavior is not accepted.
+
+## MVP Personal Lab widget publication
+
+The `/app/widget` route extends the confirmed Personal Lab navigation without
+introducing a workspace, Agent, or multi-widget management surface. Its primary
+job is one deliberate sequence: enter one exact website origin, publish, copy a
+non-secret embed snippet, and later disable, re-enable, or revoke access. The
+page uses the existing reading width, card, labelled input, status definition
+list, code treatment, semantic badges/colors, and restrained destructive action
+patterns; it adds no new token or motion primitive.
+
+Loading and unavailable states occupy the same stable reading-width region.
+Unpublished state shows only the exact-origin form and never publishes on load.
+Published and disabled states show the server-confirmed origin, lifecycle
+status, fixed 500-message UTC-month limit, and public-key embed snippet without
+rendering publication IDs, Personal Lab scope, collection, provider data, or
+secrets. Revoked state is terminal and removes the obsolete snippet and lifecycle
+actions. At 360px, status rows stack, actions become one column, code wraps
+without page overflow, and every control retains the existing 44px target and
+visible focus treatment. English and Russian preserve identical hierarchy and
+use natural wrapping; functional feedback alone uses the existing control
+motion and reduced-motion contract.
 
 ## Group 2 Personal Lab navigation contract (FR-023.1)
 

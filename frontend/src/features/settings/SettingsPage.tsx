@@ -4,6 +4,7 @@ import { ApiContractError, ApiError, isAbortError } from "../../api/errors"
 import { useLocaleContext } from "../../app/locale-provider"
 import { type IngestionApi, ingestionApi, type ReingestSummary } from "../ingestion/ingestion-api"
 import { ReingestDialog } from "../ingestion/ReingestDialog"
+import { ClearProviderCredentialDialog } from "./ClearProviderCredentialDialog"
 import { SettingsForm } from "./SettingsForm"
 import {
   ObservabilityNotice,
@@ -60,6 +61,9 @@ export function SettingsPage({
   const [baseline, setBaseline] = useState<SettingsDraft | null>(null)
   const [apiKey, setApiKey] = useState("")
   const [keyIsStored, setKeyIsStored] = useState(false)
+  const [clearCredentialOpen, setClearCredentialOpen] = useState(false)
+  const [clearCredentialPending, setClearCredentialPending] = useState(false)
+  const [clearCredentialError, setClearCredentialError] = useState(false)
   const [models, setModels] = useState<readonly string[]>([])
   const [modelsStatus, setModelsStatus] = useState<ModelsResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -227,6 +231,23 @@ export function SettingsPage({
     setSaveState(summary.failed > 0 ? "error" : "saved")
   }
 
+  const clearCredential = async (): Promise<void> => {
+    const controller = trackedController()
+    setClearCredentialPending(true)
+    setClearCredentialError(false)
+    try {
+      const cleared = await settings.clearCredential(controller.signal)
+      setKeyIsStored(cleared.api_key === "********")
+      setApiKey("")
+      setClearCredentialOpen(false)
+    } catch (error) {
+      if (!isAbortError(error)) setClearCredentialError(true)
+    } finally {
+      controllers.current.delete(controller)
+      setClearCredentialPending(false)
+    }
+  }
+
   return (
     <div className="rs-settings-page">
       <SettingsHero />
@@ -246,6 +267,10 @@ export function SettingsPage({
             models={models}
             modelsStatus={modelsStatus}
             onApiKeyChange={setApiKey}
+            onClearStoredKey={() => {
+              setClearCredentialError(false)
+              setClearCredentialOpen(true)
+            }}
             onDraftChange={(nextDraft) => {
               setDraft(nextDraft)
               setSaveState("idle")
@@ -279,6 +304,17 @@ export function SettingsPage({
         onSkip={persistSave}
         open={reingestOpen}
         restoreFocusRef={saveButtonRef}
+      />
+      <ClearProviderCredentialDialog
+        error={clearCredentialError}
+        onClose={() => {
+          if (clearCredentialPending) return
+          setClearCredentialError(false)
+          setClearCredentialOpen(false)
+        }}
+        onConfirm={() => void clearCredential()}
+        open={clearCredentialOpen}
+        pending={clearCredentialPending}
       />
     </div>
   )

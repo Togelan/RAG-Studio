@@ -50,6 +50,71 @@ function gateway(): ChatGateway {
 }
 
 describe("ChatController stream failures", () => {
+  it("reloads a persisted cited answer when generation finishes before reattach", async () => {
+    const api = gateway()
+    const user: ChatMessage = {
+      content: "Question",
+      created_at: "2026-08-15T00:00:00Z",
+      id: "user-a",
+      role: "user",
+    }
+    const assistant: ChatMessage = {
+      citations: [{ filename: "guide.md", location: "Characters 10–20" }],
+      content: "Grounded answer",
+      created_at: "2026-08-15T00:00:01Z",
+      generated_from: user.id,
+      id: "assistant-a",
+      role: "assistant",
+    }
+    api.listMessages = vi
+      .fn()
+      .mockResolvedValueOnce([user])
+      .mockResolvedValueOnce([user, assistant])
+    const streams: ChatStreamGateway = {
+      cancel: api.cancel,
+      reattach: vi.fn(async () => {
+        throw new ApiError(404, "No active response. Reload session messages.", null)
+      }),
+      send: vi.fn(async () => undefined),
+    }
+    const controller = new ChatController(api, streams, () => "user-a")
+
+    await controller.load()
+    await controller.selectSession(SESSION.id, true)
+
+    expect(api.listMessages).toHaveBeenCalledTimes(2)
+    expect(controller.snapshot().messages).toEqual([user, assistant])
+    expect(controller.snapshot().sessions[0]?.message_count).toBe(2)
+    expect(controller.snapshot().stream.kind).toBe("idle")
+  })
+
+  it("keeps reattach recovery bounded when the authoritative reload fails", async () => {
+    const api = gateway()
+    api.listMessages = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new ApiError(503, "private upstream detail", 2))
+    const streams: ChatStreamGateway = {
+      cancel: api.cancel,
+      reattach: vi.fn(async () => {
+        throw new ApiError(404, "No active response. Reload session messages.", null)
+      }),
+      send: vi.fn(async () => undefined),
+    }
+    const controller = new ChatController(api, streams, () => "user-a")
+
+    await controller.load()
+    await controller.selectSession(SESSION.id, true)
+
+    expect(controller.snapshot().stream).toEqual({
+      kind: "error",
+      message: "Chat is at capacity. Try again shortly.",
+      messageKey: "chat_stream_capacity",
+      retryAfterSeconds: 2,
+    })
+    expect(JSON.stringify(controller.snapshot())).not.toContain("private upstream detail")
+  })
+
   it.each([
     [
       new ApiError(401, "The request could not be completed. Please try again.", null),

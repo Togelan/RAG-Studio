@@ -31,6 +31,9 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/*.tsbuildinfo
 frontend/.react-doctor-report.json
+widget/node_modules/
+widget/dist/
+widget/coverage/
 
 # Tests & quality reports
 tests/

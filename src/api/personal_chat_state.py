@@ -14,24 +14,12 @@ from uuid import uuid4
 
 from pydantic import TypeAdapter, ValidationError
 
+from src.api.personal_citations import CitationPayload, project_safe_citation
 from src.api.personal_lab_scope import PersonalLabScope
 from src.vector_store.models import JsonValue
 
-type CitationPayload = dict[str, JsonValue]
+__all__ = ["CitationPayload", "project_safe_citation"]
 _CITATIONS_ADAPTER: Final = TypeAdapter(list[dict[str, JsonValue]])
-_SAFE_CITATION_FIELDS: Final = frozenset(
-    {
-        "document_id",
-        "doc_id",
-        "filename",
-        "source",
-        "page",
-        "chunk_index",
-        "start_line",
-        "end_line",
-        "score",
-    }
-)
 
 
 class PersonalChatNotFoundError(LookupError):
@@ -85,20 +73,6 @@ class PreparedPersonalTurn:
     user_message: PersonalChatMessage
     completed: PersonalChatMessage | None
     created: bool
-
-
-def project_safe_citation(item: Mapping[str, JsonValue]) -> CitationPayload:
-    """Project provider citations onto the persistence-safe public fields."""
-    result: CitationPayload = {}
-    metadata = item.get("metadata")
-    sources = (item, metadata) if isinstance(metadata, Mapping) else (item,)
-    for source in sources:
-        for key, value in source.items():
-            if key in _SAFE_CITATION_FIELDS and isinstance(
-                value, (str, int, float, bool)
-            ):
-                result[str(key)] = value
-    return result
 
 
 class _PersonalChatSessionStore:

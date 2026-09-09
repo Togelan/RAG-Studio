@@ -65,6 +65,28 @@
   padding: 0 var(--rs-space-12);
 }
 
+.rs-shell__nav-location {
+  display: inline-flex;
+  min-height: var(--rs-space-44);
+  align-items: center;
+  gap: var(--rs-space-8);
+  border-radius: var(--rs-radius-control);
+  color: var(--rs-text-muted);
+  font-weight: var(--rs-font-weight-label);
+  padding: 0 var(--rs-space-12);
+}
+
+.rs-shell__nav-location--disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.rs-shell__nav-location-hint {
+  color: var(--rs-text-muted);
+  font-size: var(--rs-font-xs);
+  font-weight: var(--rs-font-weight-normal);
+}
+
 .rs-shell__nav-link:hover {
   background: var(--rs-surface-raised);
   color: var(--rs-text);
@@ -347,6 +369,9 @@
 .rs-shell__drawer-nav .rs-shell__nav-link {
   width: 100%;
 }
+.rs-shell__drawer-nav .rs-shell__nav-location {
+  width: 100%;
+}
 .rs-shell__drawer-nav .rs-context-switcher {
   padding: 0 0 var(--rs-space-12);
 }
@@ -388,6 +413,10 @@
   margin: 0;
 }
 
+.rs-shell__bottom-nav {
+  display: none;
+}
+
 @media (max-width: 64rem) {
   .rs-shell__header {
     min-height: var(--rs-space-60);
@@ -414,6 +443,46 @@
   }
   .rs-shell__menu.rs-button {
     display: inline-flex;
+  }
+}
+
+@media (max-width: 48rem) {
+  .rs-shell__main {
+    padding-bottom: calc(var(--rs-layout-bottom-nav-reserve) + var(--rs-space-24));
+  }
+  .rs-shell__bottom-nav {
+    position: fixed;
+    z-index: 10;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    min-height: var(--rs-layout-bottom-nav-reserve);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: stretch;
+    border-top: var(--rs-border-width) solid var(--rs-border);
+    background: var(--rs-surface);
+    padding: var(--rs-space-4) var(--rs-space-8) env(safe-area-inset-bottom);
+  }
+  .rs-shell__bottom-nav .rs-shell__nav-link,
+  .rs-shell__bottom-nav .rs-shell__nav-location {
+    flex-direction: column;
+    min-width: 0;
+    justify-content: center;
+    gap: var(--rs-space-4);
+    padding: 0 var(--rs-space-4);
+  }
+  .rs-shell__bottom-nav .rs-shell__nav-link span,
+  .rs-shell__bottom-nav .rs-shell__nav-location > span:first-of-type {
+    overflow: hidden;
+    font-size: var(--rs-font-xs);
+    line-height: var(--rs-line-height-tight);
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rs-shell__bottom-nav .rs-shell__nav-location-hint {
+    display: none;
   }
 }
 

@@ -5,10 +5,12 @@ import { getShellCopy } from "../../i18n/shell-copy"
 import type { AccountContextController } from "../account/account-context"
 import type { WorkspaceGateway } from "../account/workspace-gateway"
 import type { AuthSession } from "../auth/auth-gateway"
+import { BillingPage } from "../billing/BillingPage"
 import { ChatPage } from "../chat/ChatPage"
 import { type HealthGateway, HealthStatus } from "../health/health-status"
 import { PersonalKnowledgePage } from "../personal-lab/PersonalKnowledgePage"
 import { PersonalLabHome } from "../personal-lab/PersonalLabHome"
+import { WidgetPublicationPage } from "../publication/WidgetPublicationPage"
 import { SettingsPage } from "../settings/SettingsPage"
 import { WelcomePage } from "../welcome/WelcomePage"
 import { CanonicalInvitation, NotFound, PermissionNotice } from "./canonical-entry-context"
@@ -64,6 +66,12 @@ export function CanonicalWorkspaceContent({
   }
   if (location.pathname === "/app/settings") {
     return hasPersonalContext ? <SettingsPage /> : <NotFound locale={locale} />
+  }
+  if (location.pathname === "/app/billing") {
+    return hasPersonalContext ? <BillingPage /> : <NotFound locale={locale} />
+  }
+  if (location.pathname === "/app/widget") {
+    return hasPersonalContext ? <WidgetPublicationPage /> : <NotFound locale={locale} />
   }
   if (location.pathname === "/app/invitations/accept") {
     return <CanonicalInvitation controller={controller} locale={locale} />

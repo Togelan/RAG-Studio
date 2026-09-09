@@ -166,8 +166,9 @@ describe("ingestion API contract", () => {
     const api = createIngestionApi(
       new ApiClient(fetch, httpClient({ post }), () => "personal-csrf-proof"),
     )
+    const signal = new AbortController().signal
 
-    await api.upload(new File(["hello"], "hello.txt", { type: "text/plain" }))
+    await api.upload(new File(["hello"], "hello.txt", { type: "text/plain" }), "default", signal)
 
     expect(post).toHaveBeenCalledWith(
       "/api/personal/knowledge/upload",
@@ -175,6 +176,8 @@ describe("ingestion API contract", () => {
         body: expect.any(FormData),
         headers: { "X-CSRF-Token": "personal-csrf-proof" },
         retry: 0,
+        signal,
+        timeout: 300_000,
       }),
     )
   })

@@ -18,6 +18,7 @@ type IngestionPanelProps = {
 
 const ACCEPTED_FILES = ".txt,.md,.pdf,.docx,.csv"
 const MAX_BATCH_FILES = 20
+const FILE_GUIDANCE_ID = "personal-knowledge-file-guidance"
 
 export function IngestionPanel({
   api = ingestionApi,
@@ -26,7 +27,6 @@ export function IngestionPanel({
   const { format, t } = useLocaleContext()
   const controller = useIngestionController(api, refreshToken)
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const browseButtonRef = useRef<HTMLButtonElement | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [batchWarning, setBatchWarning] = useState<string | null>(null)
   const [clearOpen, setClearOpen] = useState(false)
@@ -80,20 +80,24 @@ export function IngestionPanel({
         <UploadCloud aria-hidden="true" size={30} />
         <strong>{t("settings_drag_drop")}</strong>
         <span>{t("settings_or")}</span>
-        <Button onClick={() => inputRef.current?.click()} ref={browseButtonRef} variant="secondary">
-          <FileUp aria-hidden="true" size={17} />
-          {t("settings_browse_files")}
-        </Button>
-        <input
-          accept={ACCEPTED_FILES}
-          aria-label={t("settings_browse_files")}
-          className="rs-visually-hidden"
-          multiple
-          onChange={(event) => acceptFiles(event.currentTarget.files)}
-          ref={inputRef}
-          type="file"
-        />
-        <small>{format("settings_upload_file_types_helper", { count: MAX_BATCH_FILES })}</small>
+        <label className="rs-file-picker">
+          <input
+            accept={ACCEPTED_FILES}
+            aria-describedby={FILE_GUIDANCE_ID}
+            className="rs-file-picker__control"
+            multiple
+            onChange={(event) => acceptFiles(event.currentTarget.files)}
+            ref={inputRef}
+            type="file"
+          />
+          <span className="rs-button rs-button--secondary rs-file-picker__surface">
+            <FileUp aria-hidden="true" size={17} />
+            {t("settings_browse_files")}
+          </span>
+        </label>
+        <small id={FILE_GUIDANCE_ID}>
+          {format("settings_upload_file_types_helper", { count: MAX_BATCH_FILES })}
+        </small>
       </fieldset>
 
       {batchWarning ? (
@@ -158,7 +162,7 @@ export function IngestionPanel({
       <DuplicateDialog
         decision={controller.duplicate}
         onDecision={(action) => void controller.resolveDuplicate(action)}
-        restoreFocusRef={browseButtonRef}
+        restoreFocusRef={inputRef}
       />
       <Dialog onOpenChange={setClearOpen} open={clearOpen}>
         <DialogContent>

@@ -161,6 +161,42 @@ describe("SaaS ApiClient boundary", () => {
     expect(requests[2]?.options.headers).toEqual({ "X-CSRF-Token": "fresh-proof" })
   })
 
+  it("keeps multipart upload timeout and cancellation bounds after stale CSRF recovery", async () => {
+    // Given: a long upload whose first mutation is rejected by stale CSRF state.
+    const requests: RecordedRequest[] = []
+    const signal = new AbortController().signal
+    let proof = "stale-proof"
+    let mutationCount = 0
+    const client = new ApiClient(
+      fetch,
+      recordingHttp((input) => {
+        if (input === "/api/saas/auth/csrf") {
+          proof = "fresh-proof"
+          return new Response(null, { status: 204 })
+        }
+        mutationCount += 1
+        return new Response("{}", { status: mutationCount === 1 ? 403 : 200 })
+      }, requests),
+      () => proof,
+    )
+
+    // When: the multipart request performs its single CSRF recovery retry.
+    await client.postFormResponse("/api/personal/knowledge/upload", new FormData(), { signal })
+
+    // Then: both attempts preserve the five-minute wall clock and caller cancellation bounds.
+    expect(requests.map(({ input }) => input)).toEqual([
+      "/api/personal/knowledge/upload",
+      "/api/saas/auth/csrf",
+      "/api/personal/knowledge/upload",
+    ])
+    expect(requests[0]?.options).toMatchObject({ signal, timeout: 300_000 })
+    expect(requests[2]?.options).toMatchObject({
+      headers: { "X-CSRF-Token": "fresh-proof" },
+      signal,
+      timeout: 300_000,
+    })
+  })
+
   it.each(["/api/settings", "/api/ingest/documents", "/api/chat/sessions"])(
     "renews expired CSRF state before protected Personal Lab mutations at %s",
     async (path) => {

@@ -111,6 +111,8 @@ function renderRoute(path: string, authGateway: AuthGateway): void {
     ingestion_delete_document_message: "Delete {name}",
     ingestion_upload_file_progress: "Upload {name}",
     nav_chat: "Chat",
+    nav_billing: "Billing",
+    nav_widget: "Widget",
     nav_knowledge: "Knowledge",
     nav_settings: "Settings",
     nav_welcome: "Home",
@@ -144,9 +146,20 @@ describe("canonical RAG-Studio routes", () => {
 
     // Then: all Personal destinations are real links and Knowledge is the sole location cue.
     expect(knowledge).toHaveAttribute("aria-current", "page")
-    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/app")
-    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/app/settings")
-    expect(screen.getByRole("link", { name: "Chat" })).toHaveAttribute("href", "/app/chat")
+    expect(screen.getAllByRole("link", { name: "Home" })[0]).toHaveAttribute("href", "/app")
+    expect(screen.getAllByRole("link", { name: "Settings" })[0]).toHaveAttribute(
+      "href",
+      "/app/settings",
+    )
+    expect(screen.getAllByRole("link", { name: "Chat" })[0]).toHaveAttribute("href", "/app/chat")
+    expect(screen.getAllByRole("link", { name: "Billing" })[0]).toHaveAttribute(
+      "href",
+      "/app/billing",
+    )
+    expect(screen.getAllByRole("link", { name: "Widget" })[0]).toHaveAttribute(
+      "href",
+      "/app/widget",
+    )
     expect(screen.queryByRole("heading", { level: 1, name: "Knowledge" })).toBeNull()
     expect(document.querySelectorAll(".rs-shell")).toHaveLength(1)
   })
@@ -162,6 +175,19 @@ describe("canonical RAG-Studio routes", () => {
     expect(screen.queryByRole("link", { name: "Knowledge" })).toBeNull()
     expect(screen.queryByRole("link", { name: "Settings" })).toBeNull()
     expect(screen.queryByRole("link", { name: "Chat" })).toBeNull()
+    expect(screen.queryByRole("link", { name: "Billing" })).toBeNull()
+    expect(screen.queryByRole("link", { name: "Widget" })).toBeNull()
+  })
+
+  it("renders publication management only in confirmed Personal Lab context", async () => {
+    renderRoute("/app/widget", gateway(personalSession()))
+
+    expect(await screen.findByRole("heading", { name: "publication_page_title" })).toBeVisible()
+    expect(screen.getAllByRole("link", { name: "Widget" })[0]).toHaveAttribute(
+      "aria-current",
+      "page",
+    )
+    expect(document.querySelectorAll(".rs-shell")).toHaveLength(1)
   })
 
   it("requires CSRF proof for Personal mutations without changing public reads", () => {
@@ -186,7 +212,7 @@ describe("canonical RAG-Studio routes", () => {
     expect(screen.getByTestId("location")).not.toHaveTextContent("private|foreign|tab=")
   })
 
-  it.each(["/", "/sign-up", "/app/settings"])(
+  it.each(["/", "/sign-up", "/app/settings", "/app/billing"])(
     "renders %s in a minimal public access surface when signed out",
     async (path) => {
       renderRoute(path, gateway(null))
@@ -198,7 +224,7 @@ describe("canonical RAG-Studio routes", () => {
       expect(screen.queryByRole("link", { name: "RAG-Studio Home" })).toBeNull()
       expect(screen.queryByRole("heading", { name: "Welcome to RAG Studio" })).toBeNull()
       expect(JSON.parse(screen.getByTestId("location").textContent ?? "{}").pathname).toBe(
-        path === "/app/settings" ? "/sign-in" : path,
+        path.startsWith("/app/") ? "/sign-in" : path,
       )
     },
   )

@@ -52,6 +52,7 @@
   --rs-layout-reading: 680px;
   --rs-layout-dialog: 560px;
   --rs-layout-drawer: 360px;
+  --rs-layout-status-label: 128px;
   --rs-layout-loading-block: 120px;
   --rs-layout-progress: 200px;
   --rs-viewport-min: 320px;

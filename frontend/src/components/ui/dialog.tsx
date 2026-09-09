@@ -22,8 +22,11 @@ export const DialogDescription = ({
 export function DialogContent({
   children,
   className,
+  closeLabel = "Close dialog",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>): React.JSX.Element {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  readonly closeLabel?: string | undefined
+}): React.JSX.Element {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="rs-dialog__overlay" />
@@ -31,7 +34,7 @@ export function DialogContent({
         {children}
         <DialogPrimitive.Close asChild>
           <Button
-            aria-label="Close dialog"
+            aria-label={closeLabel}
             className="rs-dialog__close"
             size="icon"
             variant="secondary"

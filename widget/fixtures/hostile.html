@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Hostile CSS widget host</title>
+    <style>
+      html body *:not(rag-studio-widget) { box-sizing: content-box; color: #7a0015; font: 32px/1 cursive; letter-spacing: 8px; }
+      html body button, html body textarea, html body section, html body header, html body form { all: unset; display: block; width: 8px; }
+      body { margin: 0; min-height: 100vh; background: repeating-linear-gradient(45deg, #fff 0 12px, #ffd2dc 12px 24px); }
+      rag-studio-widget { --rsw-accent: #65d6a6; }
+    </style>
+    <script src="../dist/rag-studio-widget.v1.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>Hostile CSS fixture</h1>
+      <button type="button">Host button</button>
+    </main>
+    <rag-studio-widget open widget-key="widget_fixture_hostile"></rag-studio-widget>
+  </body>
+</html>

@@ -66,6 +66,7 @@ const ModelsResponseSchema = z.object({
 export type ModelsResponse = z.infer<typeof ModelsResponseSchema>
 
 export type SettingsApi = {
+  readonly clearCredential: (signal?: AbortSignal) => Promise<SettingsResponse>
   readonly load: (signal?: AbortSignal) => Promise<SettingsResponse>
   readonly models: (provider: Provider, signal?: AbortSignal) => Promise<ModelsResponse>
   readonly save: (
@@ -96,6 +97,11 @@ function signalOptions(signal: AbortSignal | undefined): { readonly signal?: Abo
 
 export function createSettingsApi(client: ApiClient = createBrowserApiClient()): SettingsApi {
   return {
+    clearCredential: (signal) =>
+      client.delete("/api/personal/settings/credential", SettingsResponseSchema, {
+        body: { confirm: true },
+        ...signalOptions(signal),
+      }),
     load: (signal) =>
       client.get("/api/personal/settings", SettingsResponseSchema, signalOptions(signal)),
     models: (provider, signal) =>

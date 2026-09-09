@@ -1,6 +1,6 @@
 ---
 name: feature-discussion
-description: Run a repository-grounded, one-question-at-a-time architecture discussion for non-trivial feature requests such as “I want to add ...”. Use before implementation to challenge assumptions, capture approved design decisions in CONTEXT.md, docs/adr/, and docs/features/<feature-slug>.md, then stop for explicit approval before handing off to LazyCodex planning.
+description: Run a repository-grounded, one-question-at-a-time architecture discussion for non-trivial feature requests such as “I want to add ...”. Use before implementation to challenge assumptions, capture approved design decisions in CONTEXT.md, docs/adr/, and docs/features/<feature-slug>.md, then stop for explicit approval before handing off to executable planning.
 ---
 
 # Feature Discussion
@@ -143,24 +143,14 @@ them as facts.
 ## Approval and handoff
 
 After writing the documents, stop and wait for the user's explicit approval.
-Do not automatically invoke `$ulw-plan`, `$start-work`, `$ulw-loop`,
-`$review-work`, a developer, or a QA workflow.
+Do not automatically start executable planning, implementation, a developer,
+or a QA workflow.
 
-After the user approves, explain that the expected manual sequence is:
-
-1. User reviews the discussion and documents.
-2. User manually invokes `$ulw-plan "<feature>"`.
-3. User reviews and approves the generated plan.
-4. User manually invokes `$start-work`.
-5. User manually invokes `$ulw-loop` with the acceptance criteria.
-6. User manually invokes `$review-work`.
-7. User performs final manual testing and verifies CI/CD.
-
-The approved feature document is the input to `$ulw-plan`; it does not replace
-LazyCodex planning. Preserve the project's existing `@ba -> @architect ->
-@dev -> @qa` roles and the canonical understand -> plan -> implement -> test
--> review -> Graphify -> commit sequence. This skill ends before planning and
-must not commit or modify production code.
+After the user approves, explain that the feature document is input to
+executable planning through the globally installed `alexey-workflow` skill.
+That plan must propose an Execution Intensity for every executable task and
+model-reasoning final gate; human approval locks them before execution. This
+skill ends before planning and must not commit or modify production code.
 
 ## Resources (optional)
 

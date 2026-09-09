@@ -88,6 +88,14 @@ class ValidatePersonalKeyRequest(BaseModel):
     api_key: str = Field(min_length=1, max_length=4096)
 
 
+class ClearPersonalKeyRequest(BaseModel):
+    """Require an explicit browser confirmation before key removal."""
+
+    model_config = ConfigDict(frozen=True)
+
+    confirm: Literal[True]
+
+
 class ValidatePersonalKeyResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -162,6 +170,21 @@ class PersonalLabSettingsStore:
         ciphertext = encrypt_api_key(stored.model_dump_json())
         self._atomic_write(self.path_for(scope), ciphertext)
         return PersonalSettingsRecord(settings, secrets)
+
+    def clear_provider_secret(
+        self, scope: PersonalLabScope, provider: ProviderName
+    ) -> PersonalSettingsRecord:
+        """Atomically remove one selected provider secret and retain non-secret settings."""
+        current = self.load(scope)
+        secrets = dict(current.provider_secrets)
+        secrets.pop(provider, None)
+        stored = _StoredPersonalSettings(
+            settings=current.settings,
+            provider_secrets=secrets,
+        )
+        ciphertext = encrypt_api_key(stored.model_dump_json())
+        self._atomic_write(self.path_for(scope), ciphertext)
+        return PersonalSettingsRecord(current.settings, secrets)
 
     def path_for(self, scope: PersonalLabScope) -> Path:
         """Return the fixed file below the trusted server-derived scope root."""

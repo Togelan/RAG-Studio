@@ -16,6 +16,7 @@ type SettingsFormProps = {
   readonly models: readonly string[]
   readonly modelsStatus?: ModelsResponse | null
   readonly onApiKeyChange: (value: string) => void
+  readonly onClearStoredKey: () => void
   readonly onDraftChange: (draft: SettingsDraft) => void
   readonly onRefreshModels: () => void
   readonly onResetPrompt: () => void
@@ -39,6 +40,7 @@ export function SettingsForm({
   models,
   modelsStatus = null,
   onApiKeyChange,
+  onClearStoredKey,
   onDraftChange,
   onRefreshModels,
   onResetPrompt,
@@ -125,6 +127,11 @@ export function SettingsForm({
               value={apiKey}
             />
             <small className="rs-field__hint">{t("settings_stored_keys_helper")}</small>
+            {keyIsStored ? (
+              <Button onClick={onClearStoredKey} size="compact" variant="danger">
+                {t("settings_clear_stored_key")}
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>

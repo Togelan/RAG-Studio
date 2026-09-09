@@ -43,6 +43,17 @@ def test_harness_exposes_only_bounded_task_owned_scenarios() -> None:
     assert "/api/personal/knowledge/upload" in source
 
 
+def test_harness_redirects_docker_process_streams_before_capture() -> None:
+    source = HARNESS.read_text(encoding="utf-8")
+
+    assert "$startInfo.RedirectStandardOutput = $true" in source
+    assert "$startInfo.RedirectStandardError = $true" in source
+    assert "$startInfo.UseShellExecute = $false" in source
+    assert "$process.StandardOutput.ReadToEndAsync()" in source
+    assert "$process.StandardError.ReadToEndAsync()" in source
+    assert "$output = & $DockerCli @Arguments 2>&1" not in source
+
+
 def test_compose_profile_fits_four_gibibytes_and_two_cpus() -> None:
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
     services = compose["services"]

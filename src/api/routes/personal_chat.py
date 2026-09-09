@@ -34,8 +34,8 @@ from src.api.personal_chat_state import (
     PersonalChatStateStore,
     PersonalChatStorageError,
     PreparedPersonalTurn,
-    project_safe_citation,
 )
+from src.api.personal_citations import project_safe_citations
 from src.api.personal_lab_registry import PersonalLabRouteDependencies
 from src.api.personal_lab_scope import PersonalLabScope
 from src.graph.personal_lab_execution import run_personal_lab_graph
@@ -166,7 +166,7 @@ class _PersonalChatSendHandlers:
         safe_result = PersonalChatResult(
             answer=result.answer,
             generated_from=result.generated_from,
-            citations=tuple(project_safe_citation(item) for item in result.citations),
+            citations=project_safe_citations(result.citations),
         )
         saved = await _state_call(
             self.state.complete_turn,

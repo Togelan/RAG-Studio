@@ -4,6 +4,7 @@ import { z } from "zod"
 
 import { apiClient } from "../../api/client"
 import { useLocaleContext } from "../../app/locale-provider"
+import { getShellCopy } from "../../i18n/shell-copy"
 
 const HealthResponseSchema = z.object({
   api_key_configured: z.boolean(),
@@ -11,7 +12,7 @@ const HealthResponseSchema = z.object({
 })
 
 export type HealthGateway = {
-  readonly getStatus: (signal: AbortSignal) => Promise<z.infer<typeof HealthResponseSchema>>
+  readonly getStatus: (signal: AbortSignal) => Promise<unknown>
 }
 
 type HealthDisplayStatus = "checking" | "ready" | "degraded" | "offline" | "no-api-key"
@@ -27,13 +28,14 @@ function createHealthGateway(): HealthGateway {
 
 function labelKey(
   status: HealthDisplayStatus,
-): "status_checking" | "status_ready" | "status_disconnected" | "status_no_api_key" {
+): "status_checking" | "status_ready" | "status_disconnected" | "status_no_api_key" | null {
   switch (status) {
     case "checking":
       return "status_checking"
     case "ready":
       return "status_ready"
     case "degraded":
+      return null
     case "offline":
       return "status_disconnected"
     case "no-api-key":
@@ -62,7 +64,7 @@ export function HealthStatus({
   readonly gateway?: HealthGateway | undefined
 }): React.JSX.Element {
   const [status, setStatus] = useState<HealthDisplayStatus>("checking")
-  const { t } = useLocaleContext()
+  const { locale, t } = useLocaleContext()
 
   useEffect(() => {
     let activeRequest: AbortController | null = null
@@ -77,9 +79,14 @@ export function HealthStatus({
           if (!mounted || request.signal.aborted) {
             return
           }
+          const parsedResponse = HealthResponseSchema.safeParse(response)
+          if (!parsedResponse.success) {
+            setStatus("offline")
+            return
+          }
           setStatus(
-            response.status === "ready"
-              ? response.api_key_configured
+            parsedResponse.data.status === "ready"
+              ? parsedResponse.data.api_key_configured
                 ? "ready"
                 : "no-api-key"
               : "degraded",
@@ -103,10 +110,13 @@ export function HealthStatus({
     }
   }, [gateway])
 
+  const translationKey = labelKey(status)
+  const label = translationKey === null ? getShellCopy(locale).healthDegraded : t(translationKey)
+
   return (
     <p aria-live="polite" className={`rs-health rs-health--${status}`} role="status">
       <StatusIcon status={status} />
-      <span>{t(labelKey(status))}</span>
+      <span>{label}</span>
     </p>
   )
 }

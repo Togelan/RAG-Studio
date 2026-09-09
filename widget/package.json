@@ -1,0 +1,31 @@
+{
+  "name": "@rag-studio/widget",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.17.0",
+  "engines": {
+    "node": "24.19.0",
+    "npm": "11.17.0"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "lint": "biome check .",
+    "test": "vitest run --exclude tests/artifact.test.ts",
+    "test:artifact": "vitest run tests/artifact.test.ts",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run lint && npm run test && npm run build && npm run test:artifact"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.8",
+    "@testing-library/dom": "10.4.1",
+    "@types/node": "24.13.3",
+    "jsdom": "30.0.1",
+    "typescript": "7.0.2",
+    "vite": "8.2.1",
+    "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "zod": "4.1.12"
+  }
+}

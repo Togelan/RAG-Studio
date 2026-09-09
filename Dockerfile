@@ -12,6 +12,16 @@ COPY frontend/ ./
 COPY src/api/locales/ /src/api/locales/
 RUN npm run build
 
+FROM node:24.19.0-bookworm-slim AS widget-builder
+
+WORKDIR /widget
+
+COPY widget/package.json widget/package-lock.json ./
+RUN npm ci
+
+COPY widget/ ./
+RUN npm run build
+
 # The runtime remains one Python application container; only built assets
 # cross this boundary, never Node/npm, frontend source, or QA tooling.
 FROM python:3.14-slim
@@ -60,6 +70,7 @@ RUN python -c "from flashrank import Ranker; \
 COPY src/ ./src/
 
 COPY --from=frontend-builder /frontend/dist ./frontend/dist
+COPY --from=widget-builder /widget/dist ./widget/dist
 
 # Set PYTHONPATH so IDE imports like `from src.api.xxx` resolve
 ENV PYTHONPATH=/app

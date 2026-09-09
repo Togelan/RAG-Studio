@@ -1,27 +1,25 @@
 # RAG-Studio Agent Guide
 
-**Generated:** 2026-08-14 | **Commit:** `3f5e6e0` | **Branch:** `features-v2`
+**Generated:** 2026-09-04 | **Commit:** `94581e0` | **Branch:** `codex/mvp-v1`
 
 ## Overview
 
-Python 3.14 local-first RAG application: FastAPI/Jinja2 web surface,
-LangGraph orchestration, hybrid Qdrant retrieval, and safe document ingestion.
-The approved target is a staged React/FastAPI multi-tenant SaaS; the current
-local runtime and explicit user-controlled import boundary remain authoritative.
-Read `.agents/copilot-instructions.md` plus relevant source/tests before edits.
+Python 3.14 local-first RAG application with FastAPI, LangGraph, hybrid Qdrant
+retrieval, and safe document ingestion. React/TypeScript is the active SaaS
+migration surface; local runtime/import boundaries remain authoritative. Read
+`.agents/copilot-instructions.md` and the nearest domain guide before edits.
 
 ## Structure
 
 ```text
-src/api/           FastAPI wiring, routes, encrypted settings, legacy UI
-src/graph/         LangGraph topology, state, sessions, retries, providers
-src/ingestion/     Admission, parsing, chunking, embedding, re-ingestion
-src/retrieve/      Hybrid search, context expansion, reranking
-src/vector_store/  Domain contracts and Qdrant adapter/persistence
-src/generate/      Reserved generation boundary; currently a placeholder
-tests/             Mirrored unit/integration/E2E/JS coverage
-scripts/           Manual benchmarks, model download, disposable QA servers
-docs/              Accepted ADRs, feature designs, visual references
+src/               Production Python; six approved domain packages
+frontend/          React/Vite SaaS client, browser tests, build/audit scripts
+widget/            Separate distributable IIFE widget package and artifact QA
+tests/             Mirrored pytest domains plus E2E, QA, SQL, and JS contracts
+scripts/            Benchmarks, model tools, disposable QA servers and harnesses
+docs/              ADRs, feature records, deployment runbooks, design evidence
+supabase/          Versioned SaaS schema migrations
+.agents/           Project roles, skills, and workflow instructions
 ```
 
 ## Where to look
@@ -36,40 +34,47 @@ docs/              Accepted ADRs, feature designs, visual references
 | Document lifecycle | `src/ingestion/`, `src/vector_store/` | Atomic replacement and metadata. |
 | Retrieval | `src/retrieve/` | Final context units, budgets, reranking. |
 | Persistent paths | `src/paths.py` | Environment overrides anchored to project. |
-| Tests | `tests/<domain>/` | Mirror source boundaries; root tests are cross-cutting. |
+| React SaaS | `frontend/src/` | Routes, feature state, API gateways, i18n. |
+| Widget | `widget/src/` | Embeddable custom-element runtime; artifact contract. |
+| QA/build | `scripts/qa/`, `frontend/package.json`, `widget/package.json` | Disposable and package-specific workflows. |
+| Tests | `tests/<domain>/`, `frontend/tests/` | Python, browser, SQL, and SSE contracts. |
+| Schema/decisions | `supabase/`, `docs/adr/`, `docs/features/` | Durable migrations and requirement traceability. |
 
 ## Code map
 
 | Symbol | Type | Location | CodeGraph refs | Role |
 | --- | --- | --- | ---: | --- |
-| `create_app` | function | `src/api/main.py:206` | 26 | FastAPI composition root. |
-| `create_graph` | async context | `src/graph/builder.py:250` | 10 | Compiled graph/checkpointer lifecycle. |
-| `build_rag_graph` | function | `src/graph/builder.py:156` | 8 | Seven-node StateGraph topology. |
-| `hybrid_search` | async function | `src/retrieve/orchestrator.py:124` | 16 | Search, expansion, reranking, fallback. |
+| `create_app` | function | `src/api/main.py:245` | 26 | FastAPI composition root. |
+| `create_graph` | async context | `src/graph/builder.py` | 10 | Compiled graph/checkpointer lifecycle. |
+| `build_rag_graph` | function | `src/graph/builder.py` | 8 | Seven-node StateGraph topology. |
+| `hybrid_search` | async function | `src/retrieve/orchestrator.py` | 16 | Search, expansion, reranking, fallback. |
 | `get_vector_store` | dependency | `src/api/dependencies.py:314` | 11 | Vendor-neutral storage boundary. |
 | `VectorRecord` | domain type | `src/vector_store/models.py` | 20 | Shared persisted/search result contract. |
-
-## Current-checkout rules
-
-- Use only actual code in this checkout. Do not inspect/switch/create alternate,
-  stale, prunable, or deleted branches/worktrees unless explicitly requested.
-- Preserve unrelated dirty-worktree changes; never reset, discard, or overwrite them.
-- `.agents/copilot-instructions.md` is canonical for architecture, DoR/DoD,
-  security, typing, file limits, and NFR thresholds.
-- Production code stays under the six allowed `src/` domains; tests stay in `tests/`.
+| `SaasEntry` | React component | `frontend/src/features/saas/SaasEntry.tsx` | 4 | SaaS route composition and auth mode. |
+| `IngestionApi` | TypeScript gateway | `frontend/src/features/ingestion/ingestion-api.ts` | 26 | Client-side ingestion contract. |
 
 ## Canonical implementation workflow
 
-Use: **understand → `$ulw-plan` → `$start-work` → `$ulw-loop` → Playwright
-MCP browser QA → adversarial QA for high-risk changes → `$review-work` →
-Graphify when needed → commit**.
+For substantial work, use the globally installed `alexey-workflow` skill with
+the project adapter at `.agents/workflow-adapter.md`. The global workflow owns
+lifecycle, delegation roles, and model routing; this repository owns its domain
+rules, commands, and evidence requirements.
 
-1. Plan before product edits; use small, atomic, reversible changes.
-2. Run targeted checks, then full applicable checks.
-3. Exercise the affected journey in the running app and record URL, scenario,
-   observed result, viewport, and screenshots for visual changes.
-4. Review before commit; never substitute LazyCodex for project roles/Graphify.
-5. Use `$remove-ai-slops` only for behavior-preserving cleanup after green tests.
+Non-trivial executable plans must show an explicit proposed `Intensity:` for
+every implementation task and every independent model-reasoning final gate:
+`L1_SIMPLE`, `L2_EASY`, `L3_MEDIUM`, `L4_HARD`, `L5_INSANE`, or `L6_EXTREME`.
+The human approves and locks those values; the coordinator does not infer or
+change them during execution.
+
+For each human-reviewable non-trivial plan version, use the project
+`lavish-plan-review` skill at `.agents/skills/SKILL.md`. Keep the Markdown plan
+canonical; its local `.lavish/` artifact is an annotatable companion only.
+Annotations are feedback, not approval or authority to start execution.
+
+Plan before product edits; use small, atomic, reversible changes. Run targeted
+checks, then applicable complete checks. Exercise the affected journey in the
+running app and record URL, scenario, observed result, viewport, and screenshots
+for visual changes.
 
 For high-risk changes, run the read-only `.agents/skills/adversarial-review/`
 gate after normal QA and before merge. Invoke `.agents/agents/adversarial-qa.md`
@@ -90,11 +95,7 @@ instructions.
 
 Non-trivial features start with `.agents/skills/feature-discussion/SKILL.md`.
 It records `CONTEXT.md`, an ADR, and `docs/features/<slug>.md`, then stops for
-user approval; the user manually invokes `$ulw-plan` afterward.
-
-For `$architect`, gate the FR against DoR first. If ready, produce a file-scoped
-plan, one developer subtask, then independent QA against the actual diff. If not
-ready, stop with exact gaps. Never commit/discard unless explicitly requested.
+user approval; create the executable plan through `alexey-workflow` afterward.
 
 ## Required decision evidence
 
@@ -117,7 +118,11 @@ Unmeasured claims such as “scalable”, “safe”, or “best” are not evid
   SDK, transport, or model exceptions in logs/responses.
 - Qdrant document point IDs are deterministic UUID5; keep SDK shapes in adapters.
 - Preserve cancellation, bounded work, metadata/citations, and replacement rollback.
-- Do not add LazyCodex to runtime dependencies or delete/commit `graphify-out/`.
+- Resolve tenant identity, roles, collections, entitlements, and publication
+  scope server-side; browser values are selectors, never authority.
+- Keep typed frontend gateways and safe rendering at the React boundary. Legacy
+  `innerHTML` is confined to Jinja/vanilla/widget surfaces.
+- Do not delete or commit `graphify-out/`.
 
 ## UI and documentation
 
@@ -139,12 +144,18 @@ bandit -r src/
 docker compose build
 ```
 
+Frontend and widget checks are separate package workflows. Use `cd frontend;
+npm run lint; npm run typecheck; npm run test; npm run build; npm run audit:prod`
+and `cd widget; npm run verify` as applicable. Playwright runs through the
+configured structured QA server, one worker, with retained evidence.
+
 Run Docker sequentially only. Inspect the full-path Docker CLI `version` and
 `ps -a`, set `COMPOSE_PARALLEL_LIMIT=1`, run `docker compose config`, start
 detached, then verify `ps` and `stats --no-stream`. Never restart Docker Desktop,
 prune/remove data/images/volumes, rebuild an unchanged suitable image, repeat a
-stalled command, or use unbounded waits without explicit authority. Browser QA
-starts only after the target container is confirmed `Up`.
+stalled command, or use unbounded waits without explicit authority. Use unique
+Compose project names and operator-owned env files; preserve volumes during
+restart/rollback checks. Browser QA starts only after the target container is
+confirmed `Up`.
 
-Do not modify `.env`, credentials, production data, or unrelated files. Ask
-before destructive actions or major architecture changes.
+Do not modify `.env`, credentials, production data, or unrelated files; ask before destructive actions or major architecture changes.

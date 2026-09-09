@@ -103,16 +103,17 @@ class TestAC0084DockerfileBuild:
         dockerfile = Path(__file__).parent.parent / "Dockerfile"
         assert dockerfile.exists(), f"Dockerfile not found at {dockerfile}"
 
-    def test_dockerfile_has_pinned_frontend_builder_and_one_python_runtime(
+    def test_dockerfile_has_pinned_asset_builders_and_one_python_runtime(
         self,
     ) -> None:
         dockerfile = Path(__file__).parent.parent / "Dockerfile"
         content = dockerfile.read_text()
         from_lines = [line for line in content.splitlines() if line.startswith("FROM ")]
-        assert len(from_lines) == 2
-        assert from_lines[0].startswith("FROM node:24.19.0")
-        assert " AS frontend-builder" in from_lines[0]
-        assert from_lines[1] == "FROM python:3.14-slim"
+        assert from_lines == [
+            "FROM node:24.19.0-bookworm-slim AS frontend-builder",
+            "FROM node:24.19.0-bookworm-slim AS widget-builder",
+            "FROM python:3.14-slim",
+        ]
 
     def test_dockerfile_exposes_port_8000(self) -> None:
         """Dockerfile exposes port 8000."""

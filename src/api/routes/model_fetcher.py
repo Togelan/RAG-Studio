@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -19,6 +20,14 @@ import httpx
 from src.paths import data_path
 
 logger = logging.getLogger(__name__)
+
+
+class ProviderModelsUnavailable(RuntimeError):
+    """Signal a provider probe outage without retaining transport details."""
+
+    def __str__(self) -> str:
+        return "Provider models are unavailable."
+
 
 # ============================================================
 # Models cache
@@ -204,9 +213,16 @@ async def fetch_deepseek_models(api_key: str) -> list[str]:
         api_key: DeepSeek API key.
 
     Returns:
-        List of model IDs, or empty list on failure.
+        List of model IDs. Explicit credential rejection returns an empty list;
+        transport and service failures raise a sanitized outage signal.
     """
-    url = "https://api.deepseek.com/v1/models"
+    public_base_url = "https://api.deepseek.com/v1"
+    configured_base_url = os.getenv("DEEPSEEK_BASE_URL")
+    base_url = (
+        configured_base_url if configured_base_url is not None else public_base_url
+    )
+    accepts_compatible_models = base_url.rstrip("/") != public_base_url
+    url = f"{base_url.rstrip('/')}/models"
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -221,13 +237,22 @@ async def fetch_deepseek_models(api_key: str) -> list[str]:
                             for m in all_models
                             if isinstance(m, dict)
                             and "id" in m
-                            and str(cast("dict[str, Any]", m)["id"]).startswith(
-                                "deepseek-"
+                            and (
+                                accepts_compatible_models
+                                or str(cast("dict[str, Any]", m)["id"]).startswith(
+                                    "deepseek-"
+                                )
                             )
                         ]
                     )
-    except (httpx.TimeoutException, httpx.RequestError, OSError) as e:
-        logger.warning("Failed to fetch DeepSeek models: %s", e)
+            if resp.status_code == 429 or resp.status_code >= 500:
+                raise ProviderModelsUnavailable
+    except (httpx.RequestError, OSError, json.JSONDecodeError) as error:
+        logger.warning(
+            "DeepSeek model probe unavailable: failure_type=%s",
+            type(error).__name__,
+        )
+        raise ProviderModelsUnavailable from None
     return []
 
 

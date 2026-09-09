@@ -24,6 +24,7 @@ export const SETTINGS_FIXTURE = {
 
 export function createSettingsApi(overrides: Partial<SettingsApi> = {}): SettingsApi {
   return {
+    clearCredential: vi.fn(() => Promise.resolve({ ...SETTINGS_FIXTURE, api_key: null })),
     load: vi.fn(() => Promise.resolve({ ...SETTINGS_FIXTURE, api_key: "********" as const })),
     models: vi.fn(() =>
       Promise.resolve({ provider: "deepseek" as const, models: ["deepseek-chat"], cached: true }),

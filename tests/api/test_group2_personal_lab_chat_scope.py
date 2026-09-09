@@ -62,8 +62,24 @@ async def _execute(
                 "document_id": "doc-a",
                 "filename": "synthetic.txt",
                 "chunk_index": 2,
+                "start_offset": 10,
+                "end_offset": 20,
                 "text": "must-not-cross-the-wire",
                 "path": "private/system/path",
+            },
+            {
+                "document_id": "doc-a",
+                "filename": "synthetic.txt",
+                "chunk_index": 2,
+                "start_offset": 10,
+                "end_offset": 20,
+            },
+            {
+                "document_id": "doc-a",
+                "filename": "synthetic.txt",
+                "chunk_index": 3,
+                "start_offset": 21,
+                "end_offset": 30,
             },
         ),
     )
@@ -175,10 +191,27 @@ def test_sessions_messages_citations_and_feedback_are_scope_owned(
     assert all(response.status_code == 404 for response in foreign[1:])
     assistant = first_messages.json()[-1]
     assert assistant["citations"] == [
-        {"document_id": "doc-a", "filename": "synthetic.txt", "chunk_index": 2}
+        {
+            "document_id": "doc-a",
+            "filename": "synthetic.txt",
+            "chunk_index": 2,
+            "start_offset": 10,
+            "end_offset": 20,
+            "location": "Characters 10–20",
+        },
+        {
+            "document_id": "doc-a",
+            "filename": "synthetic.txt",
+            "chunk_index": 3,
+            "start_offset": 21,
+            "end_offset": 30,
+            "location": "Characters 21–30",
+        },
     ]
     assert "must-not-cross-the-wire" not in sent.text
     assert "private/system/path" not in sent.text
+    assert sent.text.count('"location":"Characters 10–20"') == 1
+    assert '"location":"Characters 21–30"' in sent.text
     assert (tmp_path / "personal" / f"pl_{first_scope.hex}" / "chat.sqlite").is_file()
     assert not (
         tmp_path / "personal" / f"pl_{second_scope.hex}" / "chat.sqlite"

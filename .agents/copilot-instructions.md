@@ -205,25 +205,24 @@ data preservation, secret/error redaction, cancellation or rollback, and the
 exact automated checks run. Unmeasured claims that a design is scalable, safe,
 or best do not satisfy Definition of Done.
 
-### Codex + LazyCodex orchestration (canonical)
+### Global workflow integration
 
-For Codex sessions, LazyCodex is the orchestration layer and the existing roles below remain the project-domain workflow. The canonical sequence is **understand → plan with LazyCodex → implement → test → Browser confirmation → review → update Graphify → commit**. Use this sequence for work that changes the application:
+For substantial Codex work, use the globally installed `alexey-workflow` skill
+and read `.agents/workflow-adapter.md` before planning or dispatching. The
+global workflow defines lifecycle, roles, and routing; this repository defines
+only its commands, domain constraints, and evidence requirements.
 
-```
-understand the actual current checkout ($init-deep when project memory needs refresh)
-    -> plan with LazyCodex: $ulw-plan "<feature or bug>" (plan only)
-    -> implement: $start-work (execute the approved plan)
-    -> test: $ulw-loop "Verify the implementation, run all relevant tests, and fix remaining issues"
-    -> confirm the affected journey in the running web app with the Playwright MCP server `playwright_qa_2`
-    -> adversarial QA for high-risk changes
-    -> review: $review-work
-    -> update Graphify with the team's existing local graph workflow when needed
-    -> commit only after verification
-```
+Every non-trivial executable plan must propose an explicit `Intensity:` for
+each implementation task and each independent model-reasoning final gate from
+`L1_SIMPLE`, `L2_EASY`, `L3_MEDIUM`, `L4_HARD`, `L5_INSANE`, or `L6_EXTREME`.
+Human approval locks those values. The coordinator must not infer or change a
+locked intensity during execution.
 
-- LazyCodex must not replace the project agents, skills, quality gates, or Graphify. It is the Codex harness for planning, execution, verification, and review.
-- Keep the existing `@ba -> @architect -> @dev -> @qa` responsibilities for requirements and specialist project review. Do not create duplicate roles or hooks for LazyCodex.
-- Use `$remove-ai-slops` only for behavior-preserving cleanup after relevant tests pass.
+For every human-reviewable version of a non-trivial plan, use
+`.agents/skills/SKILL.md` (`lavish-plan-review`) to create or refresh one local
+annotatable companion in `.lavish/`. The Markdown plan remains canonical;
+annotations are feedback and never start execution or replace human approval.
+
 - Never report an implementation complete without recorded results from the relevant tests and quality checks.
 - Never report any implementation complete without evidence from the Playwright
   MCP server `playwright_qa_2` from the running web application. Use only its
@@ -249,9 +248,9 @@ For non-trivial feature requests, invoke the project skill
 `.agents/skills/feature-discussion/SKILL.md` before implementation. It starts
 with current-checkout inspection, asks exactly one architecture question at a
 time, and records the approved design in `CONTEXT.md`, `docs/adr/`, and
-`docs/features/<feature-slug>.md` before stopping for user approval. It is not
-needed for typo fixes, formatting, simple renames, or isolated one-line bug
-fixes. The user manually starts `$ulw-plan` after reviewing the documents.
+  `docs/features/<feature-slug>.md` before stopping for user approval. It is not
+  needed for typo fixes, formatting, simple renames, or isolated one-line bug
+  fixes. After approval, create the executable plan through `alexey-workflow`.
 
 ### SaaS UI skill chain
 
@@ -268,34 +267,3 @@ two design stages and use `ui-design` only for the existing implementation
 mechanics. Do not write UI code until the applicable design stages are complete.
 Run `omo:visual-qa` after every UI change and do not treat source inspection as
 visual verification.
-
-### `$architect` entry point
-
-For a one-prompt architect-led workflow, accept this form:
-
-```text
-$architect Check FR-XXX for Definition of Ready.
-If it is ready, create a bounded implementation subtask using the dev role.
-After implementation, create an independent verification subtask using the qa role.
-Return the DoR verdict, plan, test results, and blockers. Do not commit or discard changes.
-```
-
-The architect must perform the DoR gate first. If it passes, it uses LazyCodex
-planning and execution where available, dispatches the existing developer
-responsibilities for a non-overlapping file scope, then dispatches independent
-QA against the actual diff. If it fails, it returns the missing requirements
-and creates no implementation subtask.
-
-### Existing project roles
-
-```
-@ba writes system_spec.md
-    ↓
-@architect gates (DoR check), decomposes FRs, spawns subagents
-    ↓
-@dev implements FR → returns DEV_RESULT
-    ↓
-@qa runs tests + lint + type check + security scan + RAGAS eval → returns QA_VERDICT
-    ↓
-@architect reviews, merges or reopens
-```

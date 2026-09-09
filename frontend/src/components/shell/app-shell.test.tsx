@@ -120,9 +120,19 @@ describe("Stage 2 AppShell", () => {
       "href",
       "/app/chat",
     )
-    expect(screen.queryByRole("link", { name: /Dashboard/iu })).not.toBeInTheDocument()
-    expect(screen.queryByText("en nav_dashboard")).not.toBeInTheDocument()
-    expect(screen.queryByText("en nav_coming_soon")).not.toBeInTheDocument()
+    const navigation = within(screen.getByRole("navigation", { name: "en aria_main_nav" }))
+    expect(navigation.queryByText("en nav_dashboard")).not.toBeInTheDocument()
+    expect(navigation.queryByText("en nav_coming_soon")).not.toBeInTheDocument()
+  })
+
+  it.each(["/chat", "/app/chat"])("marks Chat current for the %s alias", async (path) => {
+    renderShell(path)
+
+    expect(await screen.findByRole("region", { name: "en nav_chat" })).toBeVisible()
+    expect(screen.getAllByRole("link", { name: "en nav_chat" })[0]).toHaveAttribute(
+      "aria-current",
+      "page",
+    )
   })
 
   it("assigns the wide workspace layout only to Chat routes", async () => {
@@ -240,8 +250,9 @@ describe("Stage 2 AppShell", () => {
     )
     expect(runtime.getState().locale).toBe("ru")
     expect(document.documentElement).toHaveAttribute("lang", "ru")
-    expect(screen.queryByText("ru nav_dashboard")).not.toBeInTheDocument()
-    expect(screen.queryByText("ru nav_coming_soon")).not.toBeInTheDocument()
+    const navigation = within(screen.getByRole("navigation", { name: "ru aria_main_nav" }))
+    expect(navigation.queryByText("ru nav_dashboard")).not.toBeInTheDocument()
+    expect(navigation.queryByText("ru nav_coming_soon")).not.toBeInTheDocument()
   })
 
   it("renders the authoritative initial Russian locale without a mount request", async () => {

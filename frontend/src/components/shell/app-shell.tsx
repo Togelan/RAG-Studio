@@ -1,4 +1,4 @@
-import { BookOpenText, LogOut, Menu, PanelTop, Settings2, Sparkles, UserRound } from "lucide-react"
+import { LogOut, Menu, Sparkles, UserRound } from "lucide-react"
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 
@@ -6,115 +6,14 @@ import { useLocaleContext } from "../../app/locale-provider"
 import { getShellCopy } from "../../i18n/shell-copy"
 import { Button } from "../ui/button"
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "../ui/drawer"
+import { NavigationLinks, pageFromPath, pagePath } from "./app-navigation"
+
+export type { WorkspaceNavigationItem } from "./app-navigation"
+
+import type { WorkspaceNavigationItem } from "./app-navigation"
 import { type ContextState, ContextStateNotice, ContextSwitcher } from "./context-switcher"
 import { LocaleMenu } from "./locale-menu"
 import "./app-shell.css"
-
-type ShellPage = "welcome" | "knowledge" | "settings" | "chat"
-type ResolvedShellPage = ShellPage | "workspace" | "neutral"
-
-type NavigationItem = {
-  readonly icon: typeof Sparkles
-  readonly key: "nav_welcome" | "nav_knowledge" | "nav_settings" | "nav_chat"
-  readonly page: ShellPage
-}
-
-const homeNavigation = { icon: Sparkles, key: "nav_welcome", page: "welcome" } as const
-const personalNavigationItems = [
-  { icon: BookOpenText, key: "nav_knowledge", page: "knowledge" },
-  { icon: Settings2, key: "nav_settings", page: "settings" },
-  { icon: PanelTop, key: "nav_chat", page: "chat" },
-] as const satisfies readonly NavigationItem[]
-
-function pagePath(page: ShellPage, pathname: string): string {
-  const prefix = pathname === "/app" || pathname.startsWith("/app/") ? "/app" : ""
-  switch (page) {
-    case "welcome":
-      return prefix || "/"
-    case "knowledge":
-      return `${prefix}/knowledge`
-    case "settings":
-      return `${prefix}/settings`
-    case "chat":
-      return `${prefix}/chat`
-  }
-}
-
-export type WorkspaceNavigationItem = {
-  readonly label: string
-  readonly to: string
-}
-
-function NavigationLinks({
-  onNavigate,
-  personalNavigation,
-  workspaceNavigation = [],
-}: {
-  readonly onNavigate?: (() => void) | undefined
-  readonly personalNavigation: boolean
-  readonly workspaceNavigation?: readonly WorkspaceNavigationItem[] | undefined
-}): React.JSX.Element {
-  const { pathname } = useLocation()
-  const { t } = useLocaleContext()
-  const activePage = pageFromPath(pathname)
-  const navigationItems = personalNavigation
-    ? [homeNavigation, ...personalNavigationItems]
-    : [homeNavigation]
-
-  return (
-    <>
-      {navigationItems.map(({ icon: Icon, key, page }) => {
-        const active = page === activePage
-        return (
-          <Link
-            aria-current={active ? "page" : undefined}
-            className={`rs-shell__nav-link${active ? " rs-shell__nav-link--active" : ""}`}
-            key={page}
-            onClick={onNavigate}
-            to={pagePath(page, pathname)}
-          >
-            <Icon aria-hidden="true" size={18} />
-            <span>{t(key)}</span>
-          </Link>
-        )
-      })}
-      {workspaceNavigation.map((item) => (
-        <Link
-          aria-current={pathname === item.to ? "page" : undefined}
-          className={`rs-shell__nav-link${pathname === item.to ? " rs-shell__nav-link--active" : ""}`}
-          key={item.to}
-          onClick={onNavigate}
-          to={item.to}
-        >
-          <PanelTop aria-hidden="true" size={18} />
-          <span>{item.label}</span>
-        </Link>
-      ))}
-    </>
-  )
-}
-
-function pageFromPath(pathname: string): ResolvedShellPage {
-  switch (pathname) {
-    case "/":
-    case "/app":
-      return "welcome"
-    case "/settings":
-    case "/app/settings":
-      return "settings"
-    case "/app/knowledge":
-      return "knowledge"
-    case "/chat":
-    case "/app/chat":
-      return "chat"
-    case "/app/invitations/accept":
-    case "/app/not-found":
-      return "neutral"
-    default:
-      if (pathname.startsWith("/app/workspaces/")) return "workspace"
-      return "neutral"
-  }
-}
 
 function selectedContext(context: ContextState | undefined) {
   if (context?.state !== "ready") return undefined
@@ -140,7 +39,15 @@ export function AppShell({
   const { locale, setLocale, t } = useLocaleContext()
   const shellCopy = getShellCopy(locale)
   const page = pageFromPath(pathname)
-  const shellPageTitle = pageTitle ?? (page === "welcome" ? t("welcome_title") : undefined)
+  const shellPageTitle =
+    pageTitle ??
+    (page === "welcome"
+      ? t("welcome_title")
+      : page === "billing"
+        ? t("billing_title")
+        : page === "widget"
+          ? t("publication_page_title")
+          : undefined)
   const showPageHeader = shellPageTitle !== undefined
   const [menuOpen, setMenuOpen] = useState(false)
   const activeContext = selectedContext(context)
@@ -269,6 +176,9 @@ export function AppShell({
           )}
         </section>
       </main>
+      <nav aria-label={t("aria_mobile_nav")} className="rs-shell__bottom-nav">
+        <NavigationLinks mobileBottom personalNavigation={personalNavigation} />
+      </nav>
     </div>
   )
 }

@@ -16,6 +16,7 @@ security, JavaScript SSE parsing, and the full local RAG pipeline.
 | `retrieve/` | Expansion, budgets, reranking, failure fallback. |
 | `vector_store/` | Contracts, Qdrant translation, replacement, pagination. |
 | `e2e/` | Real temporary Qdrant, embeddings, checkpoints, graph. |
+| `qa/`, `supabase/` | Disposable QA runtime and Postgres/schema contracts. |
 | Root/`js/` | Cross-cutting security/deployment/paths and SSE parser. |
 
 ## Conventions
@@ -31,14 +32,18 @@ security, JavaScript SSE parsing, and the full local RAG pipeline.
 - Root `conftest.py` sets collection-time rate-limit isolation; dedicated
   rate-limit tests must override it deliberately.
 - Registered markers are `unit`, `integration`, and `e2e`; strict markers are on.
+- API route tests live in `tests/api/`; its local guide covers TestClient,
+  dependency overrides, SaaS identity, billing, publication, and SSE contracts.
 
-## Required safety evidence
+## Anti-patterns and required safety evidence
 
 - Assert bounded capacity/load behavior and the exact exhausted-capacity result.
 - Assert cancellation/rollback leaves prior data usable and no partial publish.
 - Assert secrets, user text, paths, and raw provider/SDK errors are redacted.
 - Assert legacy payload/config migration and deterministic metadata/citations.
 - Use disposable data roots for embedded Qdrant and checkpoint tests.
+- Apply Supabase migrations only in disposable Postgres; test ordering, RLS,
+  permissions, rollback, preservation, and quota/concurrency invariants.
 
 ## Commands
 

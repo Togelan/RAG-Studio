@@ -102,6 +102,36 @@ describe("settings API contract", () => {
     )
   })
 
+  it("sends the explicit confirmation through the CSRF-protected credential removal endpoint", async () => {
+    const settings = {
+      provider: "deepseek",
+      model: "deepseek-chat",
+      temperature: 1,
+      max_tokens: 2048,
+      system_prompt: "Answer from context.",
+      top_k: 5,
+      chunk_size: 512,
+      chunk_overlap: 64,
+      chunking,
+      api_key: null,
+    } as const
+    const remove = vi.fn(() => Promise.resolve(jsonResponse(settings)))
+    const http: KyHttpClient = { delete: remove, get: vi.fn(), patch: vi.fn(), post: vi.fn() }
+
+    const cleared = await createSettingsApi(
+      new ApiClient(fetch, http, () => "csrf-proof"),
+    ).clearCredential()
+
+    expect(cleared.api_key).toBeNull()
+    expect(remove).toHaveBeenCalledWith(
+      "/api/personal/settings/credential",
+      expect.objectContaining({
+        json: { confirm: true },
+        retry: 0,
+      }),
+    )
+  })
+
   it("keeps credential validation and model refresh on their exact endpoints", async () => {
     const get = vi.fn(() =>
       Promise.resolve(

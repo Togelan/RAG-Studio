@@ -10,22 +10,22 @@ from fastapi import FastAPI
 from pydantic import SecretStr
 
 from src.api.chat_stream import MAX_CONCURRENT_STREAMS
-from src.api.personal_lab_registry import (
-    PersonalLabRouteDependencies,
-    PersonalLabRouterRegistry,
+from src.api.mvp_public_admission import BurstRateLimiter, PublicAdmissionAuthority
+from src.api.mvp_public_admission_store import PostgresMvpPublicAdmissionStore
+from src.api.mvp_public_execution import (
+    PostgresPublicExecutionScopeSource,
+    PublicExecutionScopeResolver,
 )
-from src.api.personal_lab_scope import (
-    PersonalLabScopeResolver,
-    PostgresPersonalLabScopeRegistry,
-)
+from src.api.mvp_public_proof import PublicProofSigner
+from src.api.personal_lab_composition import mount_personal_lab_routes
+from src.api.public_stream_jobs import PublicStreamJobRegistry
 from src.api.react_ui import (
     UiMode,
     UiServingConfiguration,
     load_ui_serving_configuration,
 )
-from src.api.routes.personal_chat import create_personal_chat_router
-from src.api.routes.personal_lab import create_personal_lab_router
-from src.api.routes.personal_settings import create_personal_settings_router
+from src.api.routes.mvp_public import create_mvp_public_router
+from src.api.routes.mvp_public_stream import create_mvp_public_stream_router
 from src.api.routes.saas_auth import create_saas_auth_router
 from src.api.routes.saas_auth_confirmation import (
     SupabaseConfirmationVerifier,
@@ -56,7 +56,6 @@ from src.api.saas_workspace_context import PostgresMembershipResolver
 from src.api.saas_workspaces import create_postgres_workspace_service
 from src.graph.llm_provider import OpenAIProviderFactory
 from src.ingestion.embedder import get_embedder
-from src.ingestion.personal_router import create_personal_knowledge_router
 from src.paths import data_path
 from src.vector_store.client import get_qdrant_client
 from src.vector_store.tenant_resolver import TrustedTenantRagResolver
@@ -135,27 +134,29 @@ def mount_saas_routes(
     app.state.saas_chatbot_service = authorities.chatbots
     _mount_identity_routes(app, authorities)
     _mount_tenant_routes(app, authorities)
-    _mount_personal_lab_routes(app, authorities)
+    mount_personal_lab_routes(app, authorities.auth_context, authorities.database_url)
+    if runtime.publication_enabled:
+        public_admission = PublicAdmissionAuthority(
+            True,
+            PostgresMvpPublicAdmissionStore(authorities.database_url),
+            PublicProofSigner(
+                authorities.session_signing_key.get_secret_value().encode()
+            ),
+            BurstRateLimiter(limit=20, window_seconds=60, capacity=10_000),
+        )
+        app.include_router(create_mvp_public_router(public_admission))
+        app.include_router(
+            create_mvp_public_stream_router(
+                public_admission,
+                PublicExecutionScopeResolver(
+                    PostgresPublicExecutionScopeSource(authorities.database_url),
+                    data_path("personal-labs"),
+                ),
+                PublicStreamJobRegistry(MAX_CONCURRENT_STREAMS),
+            )
+        )
+        app.state.mvp_public_admission = public_admission
     return authorities.auth_context
-
-
-def _mount_personal_lab_routes(app: FastAPI, authority: _SaasAuthorities) -> None:
-    registry = PersonalLabRouterRegistry()
-    registry.register("context", create_personal_lab_router)
-    registry.register("chat", create_personal_chat_router)
-    registry.register("settings", create_personal_settings_router)
-    registry.register("knowledge", create_personal_knowledge_router)
-    dependencies = PersonalLabRouteDependencies(
-        auth_context=authority.auth_context,
-        scopes=PersonalLabScopeResolver(
-            PostgresPersonalLabScopeRegistry(authority.database_url),
-            data_path("personal-labs"),
-        ),
-    )
-    for router in registry.build(dependencies):
-        app.include_router(router)
-    app.state.personal_lab_router_registry = registry
-    app.state.personal_lab_scope_resolver = dependencies.scopes
 
 
 def _build_authorities(runtime: RuntimeConfiguration) -> _SaasAuthorities:

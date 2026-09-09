@@ -12,6 +12,10 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
 
 from src.vector_store.contracts import VectorStoreError
+from src.vector_store.document_replacement import (
+    ReplacementCommit,
+    replace_personal_document,
+)
 from src.vector_store.models import (
     DenseVector,
     DocumentMetadata,
@@ -120,10 +124,13 @@ class PersonalRagStore:
         doc_id = str(payload.get("doc_id", ""))
         return document_metadata(payload, doc_id=doc_id, filename=filename)
 
-    async def replace_document(self, replacement: DocumentReplacement) -> int:
+    async def replace_document(
+        self,
+        replacement: DocumentReplacement,
+        *,
+        after_publish: ReplacementCommit | None = None,
+    ) -> int:
         """Atomically replace one Personal document and invalidate its cache."""
-        from src.vector_store.document_replacement import replace_personal_document
-
         await _invalidate_cache(self)
 
         async def upsert(records: Sequence[VectorRecord]) -> None:
@@ -134,6 +141,7 @@ class PersonalRagStore:
             self.scope.collection_name,
             upsert,
             replacement,
+            after_publish=after_publish,
         )
 
     async def list_documents(self, cursor: str | None = None) -> ListingPage:

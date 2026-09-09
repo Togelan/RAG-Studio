@@ -16,6 +16,7 @@ from src.api.routes.personal_settings import create_personal_settings_router
 from src.api.saas_security import SaasCsrfMiddleware
 from src.ingestion.embedding import Embedder
 from src.ingestion.personal_router import create_personal_knowledge_router
+from src.ingestion.personal_storage import PersonalKnowledgeStorage
 from src.vector_store.models import DenseVector, SparseVector
 
 
@@ -66,6 +67,7 @@ def _build_app(
     *,
     include_settings: bool = False,
     provider_delay: float = 0.0,
+    storage: PersonalKnowledgeStorage | None = None,
 ) -> tuple[FastAPI, AsyncQdrantClient]:
     dependencies = PersonalLabRouteDependencies(
         _CookieAuth(identities),
@@ -87,7 +89,10 @@ def _build_app(
         app.include_router(create_personal_settings_router(dependencies))
     app.include_router(
         create_personal_knowledge_router(
-            dependencies, client_provider=client_provider, embedder=_Embedder()
+            dependencies,
+            client_provider=client_provider,
+            embedder=_Embedder(),
+            storage=storage,
         )
     )
     return app, qdrant

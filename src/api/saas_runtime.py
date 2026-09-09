@@ -7,7 +7,7 @@ import re
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from pathlib import Path
-from typing import Final, assert_never
+from typing import Final, Literal, assert_never
 
 import anyio
 import asyncpg
@@ -25,6 +25,9 @@ from pydantic import (
 )
 from pydantic_core import PydanticCustomError
 
+from src.api.billing_runtime import BillingConfiguration, load_billing_configuration
+from src.api.mvp_local_demo import LocalDemoConfigurationError, load_local_demo_mode
+from src.api.mvp_publication_runtime import load_publication_enabled
 from src.api.react_ui import UiServingConfiguration, react_document_response
 from src.api.saas_security import load_cookie_transport_policy
 from src.paths import project_root, resolve_project_path
@@ -99,6 +102,9 @@ class RuntimeConfiguration(BaseModel):
     session_signing_key: SecretStr | None = None
     qdrant_url: AnyHttpUrl | None = None
     trusted_origins: tuple[AnyHttpUrl, ...] = ()
+    billing: BillingConfiguration | None = None
+    publication_enabled: bool = False
+    local_demo_mode: bool = False
 
 
 class RuntimeStatus(BaseModel):
@@ -108,6 +114,18 @@ class RuntimeStatus(BaseModel):
 
     mode: RuntimeMode
     status: str
+
+
+class RuntimeCapabilities(BaseModel):
+    """Public non-secret state for independently gated MVP capabilities."""
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["saas"] = "saas"
+    dependencies: Literal["ready", "unavailable"]
+    personal_lab: Literal["configured"] = "configured"
+    billing: Literal["disabled", "local_demo", "stripe_test_mode"]
+    public_widget: Literal["disabled", "protected_preview", "configured"]
 
 
 ReadinessProbe = Callable[[RuntimeConfiguration], Awaitable[bool]]
@@ -153,6 +171,28 @@ def _load_saas_configuration() -> RuntimeConfiguration:
         raise SaasConfigurationError(
             "SaaS runtime configuration is incomplete or invalid."
         ) from None
+    try:
+        billing = load_billing_configuration()
+    except ValidationError:
+        raise SaasConfigurationError(
+            "Billing runtime configuration is incomplete or invalid."
+        ) from None
+    try:
+        publication_enabled = load_publication_enabled()
+    except ValidationError:
+        raise SaasConfigurationError(
+            "Publication runtime configuration is invalid."
+        ) from None
+    try:
+        local_demo_mode = load_local_demo_mode(
+            tuple(str(item) for item in environment.trusted_origins),
+            billing_configured=billing is not None,
+            publication_enabled=publication_enabled,
+        )
+    except ValidationError, LocalDemoConfigurationError:
+        raise SaasConfigurationError(
+            "Local demo runtime configuration is invalid."
+        ) from None
     load_cookie_transport_policy(
         tuple(str(item) for item in environment.trusted_origins)
     )
@@ -166,6 +206,9 @@ def _load_saas_configuration() -> RuntimeConfiguration:
         session_signing_key=environment.session_signing_key,
         qdrant_url=environment.qdrant_url,
         trusted_origins=environment.trusted_origins,
+        billing=billing,
+        publication_enabled=publication_enabled,
+        local_demo_mode=local_demo_mode,
     )
 
 
@@ -294,4 +337,34 @@ def create_saas_runtime_router(
             )
         return RuntimeStatus(mode=RuntimeMode.SAAS, status="ready")
 
+    @router.get("/api/saas/capabilities", response_model=RuntimeCapabilities)
+    async def runtime_capabilities() -> RuntimeCapabilities:
+        if runtime.mode is RuntimeMode.LOCAL:
+            raise HTTPException(status_code=404, detail="Not found")
+        return RuntimeCapabilities(
+            dependencies=("ready" if await readiness_probe(runtime) else "unavailable"),
+            billing=_billing_capability(runtime),
+            public_widget=_public_widget_capability(runtime),
+        )
+
     return router
+
+
+def _billing_capability(
+    runtime: RuntimeConfiguration,
+) -> Literal["disabled", "local_demo", "stripe_test_mode"]:
+    if runtime.local_demo_mode:
+        return "local_demo"
+    if runtime.billing is not None:
+        return "stripe_test_mode"
+    return "disabled"
+
+
+def _public_widget_capability(
+    runtime: RuntimeConfiguration,
+) -> Literal["disabled", "protected_preview", "configured"]:
+    if runtime.local_demo_mode:
+        return "protected_preview"
+    if runtime.publication_enabled:
+        return "configured"
+    return "disabled"

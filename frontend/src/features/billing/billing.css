@@ -1,0 +1,159 @@
+.rs-billing {
+  display: grid;
+  max-width: var(--rs-layout-reading);
+  gap: var(--rs-space-20);
+}
+
+.rs-billing__intro {
+  display: grid;
+  gap: var(--rs-space-8);
+}
+
+.rs-billing__intro p,
+.rs-billing__intro h2,
+.rs-billing__intro span,
+.rs-billing__price,
+.rs-billing__helper,
+.rs-billing__status dd {
+  margin: 0;
+}
+
+.rs-billing__intro p {
+  color: var(--rs-gold);
+  font-size: var(--rs-font-xs);
+  font-weight: var(--rs-font-weight-emphasis);
+  letter-spacing: var(--rs-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.rs-billing__intro h2 {
+  font-size: var(--rs-font-title);
+  line-height: var(--rs-line-height-card);
+}
+
+.rs-billing__intro span,
+.rs-billing__helper,
+.rs-billing__status dt {
+  color: var(--rs-text-muted);
+}
+
+.rs-billing__card {
+  overflow: hidden;
+}
+
+.rs-billing__card-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--rs-space-16);
+  border-bottom: var(--rs-border-width) solid var(--rs-border);
+  padding: var(--rs-space-24);
+}
+
+.rs-billing__plan-mark {
+  display: grid;
+  width: var(--rs-space-44);
+  height: var(--rs-space-44);
+  place-items: center;
+  border: var(--rs-border-width) solid var(--rs-border-strong);
+  border-radius: var(--rs-radius-control);
+  background: var(--rs-surface-raised);
+  color: var(--rs-gold);
+}
+
+.rs-billing__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--rs-space-8);
+  padding-top: var(--rs-space-8);
+}
+
+.rs-billing__price strong {
+  font-size: var(--rs-font-title);
+}
+
+.rs-billing__price span {
+  color: var(--rs-text-muted);
+}
+
+.rs-billing__content {
+  display: grid;
+  gap: var(--rs-space-20);
+  padding: var(--rs-space-24);
+}
+
+.rs-billing__status {
+  display: grid;
+  gap: var(--rs-space-12);
+  margin: 0;
+}
+
+.rs-billing__status > div {
+  display: grid;
+  grid-template-columns: minmax(var(--rs-layout-status-label), 0.4fr) minmax(0, 1fr);
+  gap: var(--rs-space-12);
+  border-bottom: var(--rs-border-width) solid var(--rs-border);
+  padding-bottom: var(--rs-space-12);
+}
+
+.rs-billing__status dd {
+  display: flex;
+  align-items: center;
+  gap: var(--rs-space-8);
+  font-weight: var(--rs-font-weight-emphasis);
+}
+
+.rs-billing__status dd[data-status="active"] {
+  color: var(--rs-success);
+}
+
+.rs-billing__status dd[data-status="past_due"],
+.rs-billing__status dd[data-status="unpaid"] {
+  color: var(--rs-warning);
+}
+
+.rs-billing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rs-space-12);
+}
+
+.rs-billing__actions .rs-button {
+  min-height: var(--rs-space-44);
+}
+
+.rs-billing__skeleton {
+  min-height: var(--rs-layout-loading-block);
+}
+
+.rs-billing__recovery {
+  min-height: var(--rs-layout-loading-block);
+  align-content: center;
+  border: var(--rs-border-width) solid var(--rs-border);
+  border-radius: var(--rs-radius-card);
+  background: var(--rs-surface);
+  padding: var(--rs-space-24);
+}
+
+.rs-billing__recovery h2,
+.rs-billing__recovery p {
+  margin: 0;
+}
+
+@media (max-width: 47.999rem) {
+  .rs-billing__card-header,
+  .rs-billing__content,
+  .rs-billing__recovery {
+    padding: var(--rs-space-20);
+  }
+
+  .rs-billing__status > div {
+    grid-template-columns: 1fr;
+    gap: var(--rs-space-4);
+  }
+
+  .rs-billing__actions {
+    display: grid;
+  }
+}

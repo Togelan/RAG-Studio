@@ -181,7 +181,21 @@ export class ChatController {
         error.status === 404 &&
         this.#current(operation, sessionId)
       ) {
-        this.#set({ ...this.#snapshot, stream: { kind: "idle" } })
+        try {
+          const messages = await this.gateway.listMessages(sessionId)
+          if (!this.#current(operation, sessionId)) return
+          this.#set({
+            ...this.#snapshot,
+            messages,
+            partialResponse: "",
+            sessions: updateMessageCount(this.#snapshot.sessions, sessionId, messages.length),
+            stream: { kind: "idle" },
+          })
+        } catch (reloadError) {
+          if (this.#current(operation, sessionId)) {
+            this.#set({ ...this.#snapshot, stream: errorState(reloadError) })
+          }
+        }
         return
       }
       this.#handleFailure(error, operation, sessionId)

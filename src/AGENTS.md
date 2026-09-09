@@ -33,7 +33,8 @@ retrieval, generation, and vector storage are separate boundaries.
   module rather than duplicating storage or chunking logic.
 - Route persistent path decisions through `src.paths`; pass resolved paths into
   owning modules rather than recomputing them.
-- The running product is one Docker container with embedded persistent Qdrant.
+- The local legacy profile is one container with embedded persistent Qdrant;
+  Stage 3 uses its separately health-gated Qdrant service.
 - Cross-boundary dependencies use protocols/domain records rather than vendor
   SDK types. Inject embedders, vector stores, and providers for tests.
 - Keep bounded concurrency and cancellation behavior explicit at every async

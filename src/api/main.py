@@ -18,10 +18,11 @@ from typing import Any, assert_never, cast
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api.dependencies import log_audit
+from src.api.public_cors import PartitionedCORSMiddleware
 from src.api.rate_limiter import RateLimitMiddleware
 from src.api.routes.chat import router as chat_router
 from src.api.routes.chat import set_graph, shutdown_chat_jobs
@@ -41,11 +42,26 @@ from src.api.saas_security import SaasCsrfMiddleware
 from src.graph import create_graph
 from src.graph.llm_provider import OpenAIProviderFactory
 from src.ingestion.router import router as ingestion_router
-from src.paths import data_path
+from src.paths import data_path, resolve_project_path
 from src.vector_store.client import (
     close_qdrant_client,
     wait_for_qdrant_ready,
 )
+
+_WIDGET_ARTIFACT_NAME = "rag-studio-widget.v1.js"
+
+
+def _widget_artifact_path() -> Path | None:
+    root = resolve_project_path(
+        os.getenv("RAG_STUDIO_WIDGET_DIST", "widget/dist")
+    ).resolve()
+    artifact = (root / _WIDGET_ARTIFACT_NAME).resolve()
+    try:
+        artifact.relative_to(root)
+    except ValueError:
+        return None
+    return artifact if artifact.is_file() else None
+
 
 logger = logging.getLogger(__name__)
 
@@ -255,7 +271,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(
-        CORSMiddleware,
+        PartitionedCORSMiddleware,
         allow_origins=_cors_origins_from_environment(),
         allow_credentials=False,
         allow_methods=_CORS_METHODS,
@@ -279,6 +295,17 @@ def create_app() -> FastAPI:
     app.include_router(
         create_saas_runtime_router(runtime_configuration, ui_configuration)
     )
+
+    widget_artifact = _widget_artifact_path()
+    if widget_artifact is not None:
+
+        @app.get(f"/widget/{_WIDGET_ARTIFACT_NAME}", include_in_schema=False)
+        async def serve_widget_artifact() -> FileResponse:
+            return FileResponse(
+                widget_artifact,
+                media_type="text/javascript",
+                headers={"Cache-Control": "public, max-age=31536000, immutable"},
+            )
 
     # Mount static files (CSS, JS, images)
     static_dir = Path(__file__).resolve().parent / "static"

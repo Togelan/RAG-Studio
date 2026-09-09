@@ -138,3 +138,39 @@ assumed.
 - Group 2 is deliberately a partial FR-023 delivery: AC-023.2 `Create agent
   from Personal Lab` promotion/copy belongs to Group 5. No Group 2 UI or
   completion statement may imply that an Agent or shared data was created.
+
+## MVP v1: Personal Lab billing and widget
+
+- **FR-MVP-001** is the sole owning requirement for this customer-validation
+  slice. It is a bounded amendment to the future SaaS roadmap, not completion
+  or weakening of FR-016, FR-017, FR-023, or FR-029.
+- MVP v1 keeps the approved React Personal Lab as the only knowledge source.
+  A user may explicitly publish that same private scope to one public widget;
+  publication is reversible and never copies, migrates, or exposes Legacy
+  data.
+- Each published widget has exactly one owner-configured origin. Wildcards and
+  automatic trust of `localhost` or `127.0.0.1` are forbidden; development
+  origins are explicit configuration values.
+- Billing is one `$10 USD/month` Stripe test-mode subscription. FastAPI owns
+  all Stripe calls using server-only restricted credentials; hosted Checkout
+  and the Stripe Customer Portal provide payment and self-service management.
+  Verified, idempotent Stripe webhooks are the only source of entitlement
+  state; browser return URLs are non-authoritative.
+- This is an intentionally narrow MVP v1 variation from the later full
+  FR-016/FR-017 catalogue: no three-plan catalog, trial, multi-widget
+  management, usage pricing, or role/workspace expansion is implied. Those
+  remain separately planned SaaS work.
+
+### Future-contract deferment matrix
+
+| Future contract | MVP v1 boundary | Deferred from this slice |
+| --- | --- | --- |
+| FR-016 | One Personal Lab Shadow-DOM widget with one exact origin and server-side admission. | Workspace owner/admin authority, workspace/chatbot resolution, multi-widget lifecycle, and the broader widget contract. |
+| FR-017 | One `$10 USD/month` Stripe test-mode Price with hosted Checkout/Portal and signed webhook entitlement. | Trial, three-plan catalogue, plan changes, usage pricing, tax, production payments, Account Owner authority, and Account-wide limits. |
+| FR-023 | Reuses only AC-023.1's private React Personal Lab scope after server identity resolution. | AC-023.2 Agent promotion, any hidden data movement, Workspace sharing, and Legacy migration. |
+| FR-029 | A Personal Lab entitlement projection gates only the single public widget. | Account billing placeholder, Account Owner authority, and general workspace/agent/member/resource entitlement enforcement. |
+
+The no-Legacy boundary from ADR-0003 remains absolute: no MVP billing,
+publication, or widget request may import, mutate, migrate, expose, or retrieve
+Legacy data. The public widget never receives or chooses a Personal Lab scope,
+collection, provider credential, private session, or billing entitlement.

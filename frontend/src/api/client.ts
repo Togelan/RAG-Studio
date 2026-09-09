@@ -4,6 +4,8 @@ import type { z } from "zod"
 import { browserCsrfToken, csrfHeadersForMutation, requiresCsrfProof } from "./csrf"
 import { ApiContractError, apiErrorFromResponse } from "./errors"
 
+const MULTIPART_REQUEST_TIMEOUT_MS = 300_000
+
 export type JsonRequestOptions = {
   readonly headers?: Readonly<Record<string, string>>
   readonly signal?: AbortSignal
@@ -20,6 +22,7 @@ export type KyRequestOptions = {
   readonly retry?: number
   readonly signal?: AbortSignal
   readonly throwHttpErrors?: boolean
+  readonly timeout?: false | number
 }
 
 export type KyHttpClient = {
@@ -210,9 +213,17 @@ export class ApiClient {
     try {
       validateApiPath(path)
       const requestOptions = await this.#unsafeOptions(path, body, options.headers, options.signal)
-      const response = await this.#http.post(path, { ...requestOptions, throwHttpErrors: false })
+      const response = await this.#http.post(path, {
+        ...requestOptions,
+        throwHttpErrors: false,
+        timeout: MULTIPART_REQUEST_TIMEOUT_MS,
+      })
       return await this.#retryAfterStaleCsrf(response, path, body, options, (retryOptions) =>
-        this.#http.post(path, { ...retryOptions, throwHttpErrors: false }),
+        this.#http.post(path, {
+          ...retryOptions,
+          throwHttpErrors: false,
+          timeout: MULTIPART_REQUEST_TIMEOUT_MS,
+        }),
       )
     } catch (error) {
       if (error instanceof HTTPError) {

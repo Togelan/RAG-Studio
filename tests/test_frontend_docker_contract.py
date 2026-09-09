@@ -4,6 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
+import pytest
+
+from src.api.react_ui import UiMode
+from src.api.saas_composition import load_application_ui_configuration
+from src.api.saas_runtime import RuntimeMode
+
 PROJECT_ROOT: Final = Path(__file__).resolve().parent.parent
 DOCKERFILE_PATH: Final = PROJECT_ROOT / "Dockerfile"
 COMPOSE_PATH: Final = PROJECT_ROOT / "docker-compose.yml"
@@ -84,6 +90,17 @@ def _compose_environment() -> tuple[str, ...]:
     return tuple(values)
 
 
+def _environment_template_value(name: str) -> str:
+    prefix = f"{name}="
+    values = [
+        line.removeprefix(prefix)
+        for line in ENV_EXAMPLE_PATH.read_text(encoding="utf-8").splitlines()
+        if line.startswith(prefix)
+    ]
+    assert len(values) == 1
+    return values[0]
+
+
 def test_node_builder_installs_lockfile_before_building_assets() -> None:
     builder = _stage_named("frontend-builder")
     assert builder.base.startswith("node:24.19.0")
@@ -102,17 +119,33 @@ def test_node_builder_installs_lockfile_before_building_assets() -> None:
     assert instructions.index(locale_copy) < instructions.index("RUN npm run build")
 
 
-def test_python_runtime_copies_only_built_react_assets_from_builder() -> None:
+def test_widget_builder_installs_lockfile_before_building_assets() -> None:
+    builder = _stage_named("widget-builder")
+    assert builder.base == "node:24.19.0-bookworm-slim"
+
+    instructions = list(builder.instructions)
+    lockfile_copy = "COPY widget/package.json widget/package-lock.json ./"
+    source_copy = "COPY widget/ ./"
+    assert lockfile_copy in instructions
+    assert "RUN npm ci" in instructions
+    assert source_copy in instructions
+    assert "RUN npm run build" in instructions
+    assert instructions.index(lockfile_copy) < instructions.index("RUN npm ci")
+    assert instructions.index(source_copy) < instructions.index("RUN npm run build")
+
+
+def test_python_runtime_copies_only_built_asset_artifacts_from_builders() -> None:
     runtime = _docker_stages()[-1]
     assert runtime.base == "python:3.14-slim"
 
     builder_copies = [
         instruction
         for instruction in runtime.instructions
-        if instruction.startswith("COPY --from=frontend-builder ")
+        if instruction.startswith("COPY --from=")
     ]
     assert builder_copies == [
-        "COPY --from=frontend-builder /frontend/dist ./frontend/dist"
+        "COPY --from=frontend-builder /frontend/dist ./frontend/dist",
+        "COPY --from=widget-builder /widget/dist ./widget/dist",
     ]
 
     copied_instructions = [
@@ -123,6 +156,7 @@ def test_python_runtime_copies_only_built_react_assets_from_builder() -> None:
     forbidden_copy_terms = (
         "node_modules",
         "COPY frontend/",
+        "COPY widget/",
         "COPY tests",
         "COPY scripts",
     )
@@ -189,7 +223,9 @@ def test_python_runtime_retains_operational_container_contract() -> None:
     assert "/health" in instructions
 
 
-def test_compose_and_template_default_to_react_with_bundled_distribution() -> None:
+def test_compose_and_template_select_valid_bundled_ui_modes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     assert _compose_service_names() == (
         "rag-studio",
         "rag-studio-saas",
@@ -205,5 +241,14 @@ def test_compose_and_template_default_to_react_with_bundled_distribution() -> No
     assert "RAG_STUDIO_UI_MODE=legacy" in environment
     assert "RAG_STUDIO_REACT_DIST=/app/frontend/dist" in environment
 
-    environment_template = ENV_EXAMPLE_PATH.read_text(encoding="utf-8")
-    assert "RAG_STUDIO_UI_MODE=react" in environment_template
+    template_ui_mode = _environment_template_value("RAG_STUDIO_UI_MODE")
+    template_runtime_mode = _environment_template_value("RAG_STUDIO_RUNTIME_MODE")
+    assert template_ui_mode == "react"
+    assert template_runtime_mode == "saas"
+
+    monkeypatch.setenv("RAG_STUDIO_UI_MODE", template_ui_mode)
+    monkeypatch.delenv("RAG_STUDIO_REACT_DIST", raising=False)
+    configuration = load_application_ui_configuration(
+        RuntimeMode(template_runtime_mode)
+    )
+    assert configuration.mode is UiMode.REACT

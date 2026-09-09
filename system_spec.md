@@ -2,8 +2,15 @@
 
 > **Owner:** @ba (Business Analyst)
 > **Status:** APPROVED
-> **Version:** 3.1.0
-> **Last Updated:** 2026-08-19
+> **Version:** 3.2.0
+> **Last Updated:** 2026-08-25
+>
+> **v3.2.0 Changelog (MVP v1 Personal Lab boundary):**
+> - Added FR-MVP-001 as the owning requirement for the intentionally narrow
+>   Personal Lab billing and single-widget validation slice.
+> - Preserved FR-016, FR-017, FR-023, and FR-029 as future SaaS contracts and
+>   recorded their explicit MVP v1 deferment relationship without weakening
+>   their broader acceptance criteria.
 >
 > **v3.1.0 Changelog (Approved unified RAG-Studio product direction):**
 > - Added FR-021–FR-032 as the future unified-product completion stage, based on the approved end-state brief in `sandbox/end_migration/describe.md`.
@@ -1168,6 +1175,85 @@ data            per-workspace Qdrant collections
 
 ---
 
+## FR-MVP-001: Personal Lab Billing and Single Public Widget
+
+### User Story
+**As a** signed-in Personal Lab user,
+**I want** to validate one Stripe test-mode subscription and publish one
+isolated widget over my existing React Personal Lab,
+**So that** public access can be demonstrated without importing Legacy data or
+claiming the future Workspace, role, Agent, catalogue, or migration product.
+
+### Acceptance Criteria
+
+#### AC-MVP-001.1: Preserve React Personal Lab and forbid Legacy authority
+**Given** a signed-in user has an existing React Personal Lab and a separately
+available `local + legacy` operator mode
+**When** the user configures MVP billing or publishes, disables, or revokes the
+single widget
+**Then** FastAPI continues to derive the opaque Personal Lab scope server-side
+and preserves the user's private settings, documents, re-indexing, sessions,
+streaming, and citations
+**And** Legacy import, mutation, migration, exposure, or retrieval is forbidden
+for every MVP billing, publication, and public-widget request
+**And** the browser, widget key, and public request cannot select a Personal
+Lab scope, collection, provider credential, or private session.
+
+#### AC-MVP-001.2: One Stripe test-mode entitlement is webhook-authoritative
+**Given** server-only Stripe test-mode configuration names one `$10 USD/month`
+recurring Price and an authenticated Personal Lab user requests Checkout or
+Customer Portal
+**When** Checkout returns, the portal returns, or Stripe delivers a signed
+webhook event
+**Then** FastAPI creates only hosted Checkout/Portal sessions and changes the
+last-verified entitlement only after signature verification and idempotent
+event processing
+**And** redirect parameters, client state, custom payment forms, browser-held
+Stripe credentials, live-mode payment data, trials, and a multi-plan catalogue
+do not grant or imply entitlement
+**And** invalid, replayed, or out-of-order events converge safely without
+exposing Stripe secrets, raw payloads, or stack traces.
+
+#### AC-MVP-001.3: One published Personal Lab widget is fail-closed
+**Given** an entitled Personal Lab user explicitly publishes one enabled
+Shadow-DOM widget with one normalized exact origin
+**When** an anonymous host page requests public widget bootstrap, streaming, or
+cancellation
+**Then** FastAPI validates the key, enabled status, exact Origin, entitlement,
+rate limit, 500 successful-message UTC-month quota, and a widget-only signed
+15-minute non-persistent session proof before graph or retrieval execution
+**And** unknown, disabled, origin-mismatched, expired, forged, over-quota, or
+rate-limited requests are sanitized and invoke neither graph nor retrieval
+**And** wildcard origins, implicit `localhost`/`127.0.0.1` trust, multiple
+widgets, copied indexes, durable public history, workspace authority, and
+Agent authority are out of scope.
+
+### Future-contract deferment and relationship matrix
+
+| Future contract | MVP v1 treatment | Explicitly deferred behavior |
+| --- | --- | --- |
+| FR-016 | Adapts only the isolated Shadow-DOM and fail-closed public-request controls to one Personal Lab publication. | Workspace owner/admin authority, workspace/chatbot resolution, multi-widget management, future theming catalogue, and the broader widget lifecycle remain future work. |
+| FR-017 | Narrows local validation to one `$10 USD/month` Stripe test-mode recurring Price, hosted Checkout/Portal, and signed idempotent webhook entitlement. | The 14-day trial, three-plan catalogue, plan changes, usage pricing, tax, production payments, Account Owner role model, and Account-wide limits remain future work. |
+| FR-023 | Extends only the already-approved AC-023.1 React Personal Lab scope as the server-resolved source for this publication. | AC-023.2 Agent promotion, any hidden data movement, Workspace sharing, and Legacy migration remain future work. |
+| FR-029 | Uses a Personal Lab-scoped MVP entitlement projection solely to gate this one public widget. | The Account billing placeholder, Account Owner-only authority, workspace/agent/member/resource quotas, and the general local entitlement foundation remain future work. |
+
+### Test traceability
+
+| MVP AC | Contract proof now | Later implementation proof |
+| --- | --- | --- |
+| AC-MVP-001.1 | `tests/test_mvp_v1_spec_contract.py` | Todos 6, 8, and 14: Personal Lab isolation, no-Legacy, and no-private-state-leak tests. |
+| AC-MVP-001.2 | `tests/test_mvp_v1_spec_contract.py` | Todos 2, 5, 11, 13, and 14: Stripe configuration, signature/replay, entitlement, and hosted-flow tests. |
+| AC-MVP-001.3 | `tests/test_mvp_v1_spec_contract.py` | Todos 6-10, 12-14: publication, public-admission, stream, Shadow-DOM, and host-origin tests. |
+
+### Technical Notes
+- FR-MVP-001 is a bounded customer-validation requirement, not completion of
+  FR-016, FR-017, FR-023, or FR-029. Their existing acceptance criteria remain
+  authoritative for their later planned deliveries.
+- `docs/adr/0005-mvp-v1-personal-lab-billing-widget.md` records the durable
+  one-plan, one-publication, no-Legacy authority decision and rollback limits.
+
+---
+
 ## FR-016: Embeddable Shadow-DOM Chat Widget
 
 ### User Story
@@ -2103,6 +2189,7 @@ Every implementation task must name one primary owning FR, list each existing FR
 | FR-013 | AC-013.1–013.4 | supabase:supabase | `supabase/migrations/`, `src/api/` authentication/workspace modules, `frontend/` auth/workspace surfaces | Authentication, RLS, role-matrix, invitation, and cross-workspace integration tests |
 | FR-014 | AC-014.1–014.5 | qdrant-operations, rag-best-practices, supabase:supabase | `src/api/` tenant dependencies, `src/ingestion/`, `src/retrieve/`, `src/graph/`, `src/vector_store/` | Tenant-isolation, bounded-admission, cancellation, and clean-start integration tests |
 | FR-015 | AC-015.1–015.4 | react-shadcn-ui-contract, langgraph-patterns | `src/api/` chatbot modules, `supabase/migrations/`, `frontend/` chatbot surfaces, `src/graph/` | Chatbot lifecycle, role, tenant-scope, streaming, and Browser journey tests |
+| FR-MVP-001 | AC-MVP-001.1–001.3 | stripe:stripe-best-practices, react-shadcn-ui-contract, omo:visual-qa | Planned Personal Lab billing/public-widget modules only; no Legacy or Workspace authority | `tests/test_mvp_v1_spec_contract.py`, then Todo 2-14 billing, publication, stream, widget, and Browser evidence |
 | FR-016 | AC-016.1–016.5 | react-shadcn-ui-contract, omo:visual-qa | `widget/`, `src/api/` public-widget modules, `supabase/migrations/`, host-page fixtures | Origin/key/rate-limit API tests, Shadow-DOM component tests, and `playwright_qa_2` Playwright MCP host-page evidence |
 | FR-017 | AC-017.1–017.5 | stripe:stripe-best-practices, supabase:supabase | `src/api/` billing modules, `supabase/migrations/`, `frontend/` pricing/billing surfaces | Stripe signature/replay/order fixtures, entitlement tests, role tests, and test-mode Browser journey |
 | FR-018 | AC-018.1–018.4 | design-system-style-intelligence, frontend-design-director, react-shadcn-ui-contract, omo:visual-qa | `frontend/` public routes/components/locales, shared plan-catalog API | Content/link, catalog-consistency, locale, accessibility, responsive, visual-QA, and Browser tests |
